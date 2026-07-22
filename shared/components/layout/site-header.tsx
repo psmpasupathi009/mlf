@@ -13,7 +13,7 @@ export function SiteHeader({ user }: SiteHeaderProps) {
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link href="/" className="flex min-w-0 items-center gap-3">
           <Image
-            src="/images/mlf.jpeg"
+            src="/images/mlf-logo-en.jpeg"
             alt="Manitham Law Foundation"
             width={40}
             height={40}

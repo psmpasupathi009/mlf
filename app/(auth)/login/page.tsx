@@ -13,19 +13,16 @@ export default function LoginPage() {
       <aside className="flex min-h-dvh items-center justify-center bg-navy px-3 py-8 sm:px-6 md:px-8 lg:px-10 xl:px-14">
         <div className="flex w-full flex-col items-center text-center">
           <Image
-            src="/images/mlf.jpeg"
+            src="/images/mlf-logo-en.jpeg"
             alt="Manitham Law Foundation"
             width={240}
             height={240}
             priority
-            className="h-20 w-20 object-contain sm:h-28 sm:w-28 md:h-40 md:w-40 lg:h-48 lg:w-48 xl:h-52 xl:w-52"
+            className="h-24 w-24 object-contain sm:h-32 sm:w-32 md:h-44 md:w-44 lg:h-52 lg:w-52 xl:h-56 xl:w-56"
           />
-          <h1 className="mt-4 w-full text-center text-[0.7rem] leading-snug font-semibold tracking-wide text-white sm:mt-6 sm:text-sm md:mt-7 md:text-xl lg:mt-8 lg:whitespace-nowrap lg:text-[clamp(1.1rem,2vw,1.75rem)] xl:text-[1.85rem]">
-            Manitham Law Foundation
-          </h1>
           <span
             aria-hidden
-            className="mt-3 block h-px w-6 bg-gold sm:mt-4 sm:w-8 md:mt-5 md:w-10"
+            className="mt-5 block h-px w-6 bg-gold sm:mt-6 sm:w-8 md:w-10"
           />
         </div>
       </aside>
