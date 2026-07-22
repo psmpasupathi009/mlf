@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  sub_admin
+  staff
+  advocate
+  client
+}
+
+enum OtpPurpose {
+  setup
+  forgot_pin
+}
+
+model User {
+  id                String         @id @default(auto()) @map("_id") @db.ObjectId
+  /// Globally unique login identity for every role (admin, staff, advocate, client).
+  mobile            String         @unique
+  role              UserRole
+  pinHash           String?
+  isActive          Boolean        @default(true)
+  name              String?
+  createdById       String?        @db.ObjectId
+  failedPinAttempts Int            @default(0)
+  pinLockedUntil    DateTime?
+  lastLoginAt       DateTime?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  refreshTokens     RefreshToken[]
+}
+
+model OtpSession {
+  id        String     @id @default(auto()) @map("_id") @db.ObjectId
+  mobile    String
+  /// 2factor SMS OTP session id from AUTOGEN3 response Details.
+  sessionId String
+  purpose   OtpPurpose
+  expiresAt DateTime
+  verified  Boolean    @default(false)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([mobile, purpose])
+  @@index([expiresAt])
+}
+
+model RefreshToken {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  userId    String   @db.ObjectId
+  user      User     @relation(fields: [userId], references: [id])
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}

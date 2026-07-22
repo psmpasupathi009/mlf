@@ -1,0 +1,69 @@
+@import "tailwindcss";
+
+:root {
+  /* Brand — restrained, professional */
+  --background: #ffffff;
+  --foreground: #3a3a3a; /* dark grey text */
+  --navy: #1b2a4a;
+  --navy-foreground: #ffffff;
+  --gold: #b8953f; /* muted gold accent — not flashy */
+  --gold-foreground: #1b2a4a;
+  --muted: #f3f4f6;
+  --muted-foreground: #5c5c5c;
+  --border: #e2e4e8;
+  --input: #d8dbe0;
+  --ring: #1b2a4a;
+  --card: #ffffff;
+  --card-foreground: #3a3a3a;
+  --primary: #1b2a4a;
+  --primary-foreground: #ffffff;
+  --secondary: #f3f4f6;
+  --secondary-foreground: #1b2a4a;
+  --accent: #b8953f;
+  --accent-foreground: #1b2a4a;
+  --destructive: #8f2f2f; /* muted red, not bright */
+  --destructive-foreground: #ffffff;
+  --radius: 0.5rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-navy: var(--navy);
+  --color-navy-foreground: var(--navy-foreground);
+  --color-gold: var(--gold);
+  --color-gold-foreground: var(--gold-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+* {
+  border-color: var(--border);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
