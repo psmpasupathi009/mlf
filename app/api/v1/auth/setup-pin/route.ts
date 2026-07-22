@@ -1,14 +1,14 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
-import { verifyOtpProofToken } from "@/lib/auth/jwt";
+import { consumeOtpProof } from "@/lib/auth/otp-proof";
 import { hashPin, isWeakPin } from "@/lib/auth/pin";
 import {
   applyCorsHeaders,
   attachAuthCookies,
   corsPreflight,
   issueAuthTokens,
-  jsonError,
 } from "@/lib/auth/session";
+import { jsonFail, jsonOk } from "@/lib/api/response";
 import { setupPinSchema } from "@/lib/validations/auth.schema";
 
 export async function OPTIONS(request: Request) {
@@ -22,21 +22,21 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return applyCorsHeaders(
         request,
-        jsonError(
+        jsonFail(
+          "VALIDATION",
           parsed.error.issues[0]?.message ?? "Invalid request",
-          "INVALID_INPUT",
           400
         )
       );
     }
 
-    const proof = await verifyOtpProofToken(parsed.data.otpProofToken);
-    if (!proof || proof.purpose !== "setup") {
+    const proof = await consumeOtpProof(parsed.data.otpProofToken, "setup");
+    if (!proof) {
       return applyCorsHeaders(
         request,
-        jsonError(
-          "OTP verification expired. Please verify again.",
-          "PROOF_EXPIRED",
+        jsonFail(
+          "UNAUTHORIZED",
+          "OTP verification expired or already used. Please verify again.",
           401
         )
       );
@@ -45,9 +45,9 @@ export async function POST(request: Request) {
     if (isWeakPin(parsed.data.pin)) {
       return applyCorsHeaders(
         request,
-        jsonError(
+        jsonFail(
+          "VALIDATION",
           "Choose a stronger 6-digit PIN. Avoid sequences like 123456 or repeated digits.",
-          "WEAK_PIN",
           400
         )
       );
@@ -59,14 +59,18 @@ export async function POST(request: Request) {
     if (!user || !user.isActive) {
       return applyCorsHeaders(
         request,
-        jsonError("Number not registered. Contact admin.", "NOT_FOUND", 404)
+        jsonFail("NOT_FOUND", "Number not registered. Contact admin.", 404)
       );
     }
 
     if (user.pinHash) {
       return applyCorsHeaders(
         request,
-        jsonError("PIN already set. Use login or forgot PIN.", "PIN_EXISTS", 400)
+        jsonFail(
+          "CONFLICT",
+          "PIN already set. Use login or forgot PIN.",
+          400
+        )
       );
     }
 
@@ -76,10 +80,8 @@ export async function POST(request: Request) {
     });
 
     const tokens = await issueAuthTokens(updated);
-    const response = NextResponse.json({
+    const response = jsonOk({
       message: "PIN set successfully",
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
       user: tokens.user,
     });
 
@@ -88,7 +90,7 @@ export async function POST(request: Request) {
     console.error("setup-pin error", error);
     return applyCorsHeaders(
       request,
-      jsonError("Failed to set PIN", "SERVER_ERROR", 500)
+      jsonFail("SERVER_ERROR", "Failed to set PIN", 500)
     );
   }
 }

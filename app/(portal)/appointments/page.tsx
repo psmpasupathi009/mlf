@@ -1,0 +1,16 @@
+import { getSessionUser } from "@/lib/auth/session-user";
+import { ForbiddenState } from "@/shared/components/feedback/forbidden-state";
+import { AppointmentsPage } from "@/features/appointments/components/appointments-page";
+import { isModuleEnabled } from "@/config/company/modules";
+
+export default async function Page() {
+  const user = await getSessionUser();
+  if (
+    !user ||
+    !isModuleEnabled("appointments") ||
+    !user.permissions.includes("appointments.view")
+  ) {
+    return <ForbiddenState />;
+  }
+  return <AppointmentsPage user={user} />;
+}

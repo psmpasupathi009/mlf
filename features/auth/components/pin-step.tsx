@@ -16,6 +16,8 @@ type PinStepProps = {
   loading: boolean;
   error?: string;
   showForgot?: boolean;
+  /** PIN lockout — disable sign-in and push Forgot PIN */
+  locked?: boolean;
   submitLabel?: string;
   onPinChange: (value: string) => void;
   onConfirmChange?: (value: string) => void;
@@ -25,7 +27,7 @@ type PinStepProps = {
 };
 
 const slotClass =
-  "h-11 w-9 rounded-md border border-input bg-white text-base text-foreground shadow-none first:rounded-md first:border-l last:rounded-md data-[active=true]:border-navy data-[active=true]:ring-1 data-[active=true]:ring-navy/25 sm:h-12 sm:w-10";
+  "h-12 w-10 rounded-md border border-input bg-white text-base text-foreground shadow-none first:rounded-md first:border-l last:rounded-md data-[active=true]:border-navy data-[active=true]:ring-1 data-[active=true]:ring-navy/25 sm:h-12 sm:w-11";
 
 export function PinStep({
   pin,
@@ -34,6 +36,7 @@ export function PinStep({
   loading,
   error,
   showForgot = false,
+  locked = false,
   submitLabel,
   onPinChange,
   onConfirmChange,
@@ -50,9 +53,33 @@ export function PinStep({
       className="space-y-6"
       onSubmit={(event) => {
         event.preventDefault();
+        if (locked) return;
         onSubmit();
       }}
     >
+      {locked ? (
+        <div
+          className="border-l-2 border-gold bg-muted/40 px-3 py-3 text-sm leading-relaxed text-foreground"
+          role="status"
+        >
+          <p className="font-medium text-navy">PIN temporarily locked</p>
+          <p className="mt-1 text-muted-foreground">
+            Use <span className="font-medium text-foreground">Forgot PIN</span>{" "}
+            to verify OTP and set a new PIN, or wait and try again later.
+          </p>
+          {showForgot && onForgot ? (
+            <Button
+              type="button"
+              className="mt-3 h-11 w-full text-[0.9375rem] font-medium tracking-wide"
+              onClick={onForgot}
+              disabled={loading}
+            >
+              {loading ? "Sending OTP…" : "Forgot PIN — verify OTP"}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="space-y-2.5">
         <Label className="text-[0.8125rem] font-medium tracking-wide text-foreground">
           {showConfirm
@@ -63,7 +90,8 @@ export function PinStep({
           maxLength={PIN_LENGTH}
           value={pin}
           onChange={onPinChange}
-          autoFocus
+          autoFocus={!locked}
+          disabled={locked || loading}
           containerClassName="justify-between sm:justify-start sm:gap-2"
         >
           <InputOTPGroup className="gap-1.5 sm:gap-2">
@@ -110,16 +138,18 @@ export function PinStep({
         </p>
       ) : null}
 
-      <Button
-        type="submit"
-        className="h-12 w-full text-[0.9375rem] font-medium tracking-wide"
-        disabled={loading || !ready}
-      >
-        {loading
-          ? "Please wait…"
-          : (submitLabel ??
-            (showConfirm ? "Save PIN & continue" : "Sign in"))}
-      </Button>
+      {!locked ? (
+        <Button
+          type="submit"
+          className="h-12 w-full text-[0.9375rem] font-medium tracking-wide"
+          disabled={loading || !ready}
+        >
+          {loading
+            ? "Please wait…"
+            : (submitLabel ??
+              (showConfirm ? "Save PIN & continue" : "Sign in"))}
+        </Button>
+      ) : null}
 
       <div className="flex items-center justify-between gap-3 text-sm">
         {onBack ? (
@@ -134,7 +164,7 @@ export function PinStep({
         ) : (
           <span />
         )}
-        {showForgot && onForgot ? (
+        {showForgot && onForgot && !locked ? (
           <button
             type="button"
             className="font-medium text-navy underline-offset-4 transition-colors hover:underline disabled:opacity-50"

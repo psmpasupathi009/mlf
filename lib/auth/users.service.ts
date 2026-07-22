@@ -1,6 +1,7 @@
 import { Prisma, type User, type UserRole } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { normalizeMobile } from "@/lib/auth/mobile";
+import { nextUnitId } from "@/lib/ids";
 
 export class MobileConflictError extends Error {
   constructor(message = "This mobile number is already registered") {
@@ -23,19 +24,23 @@ export async function findUserByMobile(mobile91: string): Promise<User | null> {
 
 export async function createUserWithUniqueMobile(input: {
   mobile: string;
-  role: UserRole;
+  roles: UserRole[];
   name?: string;
+  designation?: string;
   createdById?: string;
   isActive?: boolean;
 }): Promise<User> {
   const mobile = requireNormalizedMobile(input.mobile);
+  const unitId = await nextUnitId("employee");
 
   try {
     return await prisma.user.create({
       data: {
+        unitId,
         mobile,
-        role: input.role,
+        roles: input.roles,
         name: input.name,
+        designation: input.designation,
         createdById: input.createdById,
         isActive: input.isActive ?? true,
         failedPinAttempts: 0,

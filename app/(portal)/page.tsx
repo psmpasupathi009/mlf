@@ -1,4 +1,4 @@
-import { WelcomeOverview } from "@/features/home/components";
+import { WelcomeOverview } from "@/features/home/components/welcome-overview";
 import { getSessionUser } from "@/lib/auth/session-user";
 
 /** Session is request-cached with layout — one DB read per navigation. */

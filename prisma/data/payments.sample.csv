@@ -1,0 +1,3 @@
+unitId,clientMobile,clientUnitId,caseUnitId,caseNumber,type,amount,status,paidOn,notes
+,9123456780,,CSE-00001,,advance,10000,paid,2024-06-16,Initial advance
+,,CLI-00002,,,partial,5000,pending,,Partial toward fee

@@ -8,8 +8,10 @@ import {
 import {
   applyCorsHeaders,
   corsPreflight,
-  jsonError,
 } from "@/lib/auth/session";
+import { jsonFail, jsonOk } from "@/lib/api/response";
+import { rateLimit } from "@/lib/rate-limit";
+import { clientRateKey } from "@/lib/rate-limit/client-key";
 import { checkMobileSchema } from "@/lib/validations/auth.schema";
 
 export async function OPTIONS(request: Request) {
@@ -23,7 +25,7 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return applyCorsHeaders(
         request,
-        jsonError("Invalid mobile number", "INVALID_MOBILE", 400)
+        jsonFail("VALIDATION", "Invalid mobile number", 400)
       );
     }
 
@@ -31,10 +33,23 @@ export async function POST(request: Request) {
     if (!mobile) {
       return applyCorsHeaders(
         request,
-        jsonError(
+        jsonFail(
+          "VALIDATION",
           "Enter a valid 10-digit Indian mobile number",
-          "INVALID_MOBILE",
           400
+        )
+      );
+    }
+
+    const limited = await rateLimit(clientRateKey(request, "check-mobile", mobile), 20, 15 * 60 * 1000);
+    if (!limited.allowed) {
+      return applyCorsHeaders(
+        request,
+        jsonFail(
+          "RATE_LIMITED",
+          `Too many attempts. Try again in ${limited.retryAfterSec}s`,
+          429,
+          { retryAfterSec: limited.retryAfterSec }
         )
       );
     }
@@ -48,8 +63,8 @@ export async function POST(request: Request) {
       if (!user.isActive) {
         return applyCorsHeaders(
           request,
-          NextResponse.json({
-            status: "not_found",
+          jsonOk({
+            status: "not_found" as const,
             message: "Number not registered. Contact admin.",
           })
         );
@@ -57,8 +72,10 @@ export async function POST(request: Request) {
 
       return applyCorsHeaders(
         request,
-        NextResponse.json({
-          status: user.pinHash ? "pin" : "otp_required",
+        jsonOk({
+          status: (user.pinHash ? "pin" : "otp_required") as
+            | "pin"
+            | "otp_required",
         })
       );
     }
@@ -66,14 +83,14 @@ export async function POST(request: Request) {
     if (isEnvAdminMobile(mobile) && getAdminRoleForMobile(mobile)) {
       return applyCorsHeaders(
         request,
-        NextResponse.json({ status: "otp_required" })
+        jsonOk({ status: "otp_required" as const })
       );
     }
 
     return applyCorsHeaders(
       request,
-      NextResponse.json({
-        status: "not_found",
+      jsonOk({
+        status: "not_found" as const,
         message: "Number not registered. Contact admin.",
       })
     );
@@ -81,7 +98,7 @@ export async function POST(request: Request) {
     console.error("check-mobile error", error);
     return applyCorsHeaders(
       request,
-      jsonError("Something went wrong", "SERVER_ERROR", 500)
+      jsonFail("SERVER_ERROR", "Something went wrong", 500)
     );
   }
 }

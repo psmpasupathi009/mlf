@@ -7,7 +7,11 @@ import { OtpStep } from "@/features/auth/components/otp-step";
 import { PhoneStep } from "@/features/auth/components/phone-step";
 import { PinStep } from "@/features/auth/components/pin-step";
 import { useResendCountdown } from "@/features/auth/hooks/use-resend-countdown";
-import { authFetch, getErrorMessage } from "@/features/auth/lib/auth-client";
+import {
+  authFetch,
+  getErrorCode,
+  getErrorMessage,
+} from "@/lib/api/client";
 
 type Step =
   | "phone"
@@ -30,6 +34,7 @@ export function LoginForm() {
   const [otpProofToken, setOtpProofToken] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [pinLocked, setPinLocked] = useState(false);
 
   const busy = loading || pending;
 
@@ -38,6 +43,7 @@ export function LoginForm() {
     setPin("");
     setConfirmPin("");
     setError("");
+    setPinLocked(false);
   }
 
   function goHome() {
@@ -128,20 +134,36 @@ export function LoginForm() {
   }
 
   async function handleLogin() {
-    if (busy) return;
+    if (busy || pinLocked) return;
     setLoading(true);
     setError("");
-    const { ok, data } = await authFetch<{ error?: string }>(
-      "/api/v1/auth/login",
-      { mobile, pin }
-    );
+    const { ok, status, data } = await authFetch<{
+      error?: string;
+      code?: string;
+    }>("/api/v1/auth/login", { mobile, pin });
     setLoading(false);
 
     if (!ok) {
+      const locked =
+        status === 423 || getErrorCode(data) === "PIN_LOCKED";
+      if (locked) {
+        setPinLocked(true);
+        setPin("");
+        setError(
+          getErrorMessage(
+            data,
+            "PIN locked. Use Forgot PIN to reset via OTP."
+          )
+        );
+        return;
+      }
+
       setError(getErrorMessage(data, "Invalid mobile or PIN"));
+      setPin("");
       return;
     }
 
+    setPinLocked(false);
     toast.success("Welcome back");
     goHome();
   }
@@ -205,7 +227,10 @@ export function LoginForm() {
     step === "phone"
       ? { title: "Sign in", subtitle: null as string | null }
       : step === "pin"
-        ? { title: "Enter PIN", subtitle: `+91 ${mobile}` }
+        ? {
+            title: pinLocked ? "PIN locked" : "Enter PIN",
+            subtitle: `+91 ${mobile}`,
+          }
         : step === "otp_setup"
           ? { title: "Verify OTP", subtitle: `Sent to +91 ${mobile}` }
           : step === "otp_forgot"
@@ -242,9 +267,13 @@ export function LoginForm() {
         <PinStep
           pin={pin}
           loading={busy}
-          error={error}
+          error={pinLocked ? undefined : error}
           showForgot
-          onPinChange={setPin}
+          locked={pinLocked}
+          onPinChange={(value) => {
+            setPin(value);
+            if (error && !pinLocked) setError("");
+          }}
           onSubmit={handleLogin}
           onForgot={handleForgotPin}
           onBack={() => {

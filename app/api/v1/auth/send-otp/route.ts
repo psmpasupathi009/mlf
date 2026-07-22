@@ -1,12 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { isEnvAdminMobile, normalizeMobile } from "@/lib/auth/mobile";
-import { rateLimit } from "@/lib/auth/rate-limit";
+import { rateLimit } from "@/lib/rate-limit";
 import {
   applyCorsHeaders,
   corsPreflight,
-  jsonError,
 } from "@/lib/auth/session";
+import { jsonFail, jsonOk } from "@/lib/api/response";
 import { sendOtpSms } from "@/lib/services/two-factor.service";
 import { sendOtpSchema } from "@/lib/validations/auth.schema";
 
@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return applyCorsHeaders(
         request,
-        jsonError("Invalid request", "INVALID_INPUT", 400)
+        jsonFail("VALIDATION", "Invalid request", 400)
       );
     }
 
@@ -31,22 +31,22 @@ export async function POST(request: Request) {
     if (!mobile) {
       return applyCorsHeaders(
         request,
-        jsonError(
+        jsonFail(
+          "VALIDATION",
           "Enter a valid 10-digit Indian mobile number",
-          "INVALID_MOBILE",
           400
         )
       );
     }
 
     const { purpose } = parsed.data;
-    const limited = rateLimit(`otp:${mobile}`, 3, 15 * 60 * 1000);
+    const limited = await rateLimit(`otp:${mobile}`, 3, 15 * 60 * 1000);
     if (!limited.allowed) {
       return applyCorsHeaders(
         request,
-        jsonError(
-          `Too many OTP requests. Try again in ${limited.retryAfterSec}s`,
+        jsonFail(
           "RATE_LIMITED",
+          `Too many OTP requests. Try again in ${limited.retryAfterSec}s`,
           429,
           { retryAfterSec: limited.retryAfterSec }
         )
@@ -62,9 +62,9 @@ export async function POST(request: Request) {
       if (!allowed) {
         return applyCorsHeaders(
           request,
-          jsonError(
+          jsonFail(
+            "FORBIDDEN",
             "OTP setup is not available for this number",
-            "OTP_NOT_ALLOWED",
             400
           )
         );
@@ -73,9 +73,9 @@ export async function POST(request: Request) {
       if (!user || !user.isActive || !user.pinHash) {
         return applyCorsHeaders(
           request,
-          jsonError(
+          jsonFail(
+            "FORBIDDEN",
             "Unable to reset PIN for this number",
-            "RESET_NOT_ALLOWED",
             400
           )
         );
@@ -97,7 +97,7 @@ export async function POST(request: Request) {
 
     return applyCorsHeaders(
       request,
-      NextResponse.json({
+      jsonOk({
         message: "OTP sent successfully",
         expiresIn: 600,
       })
@@ -107,11 +107,11 @@ export async function POST(request: Request) {
     console.error("send-otp error", message);
     return applyCorsHeaders(
       request,
-      jsonError(
+      jsonFail(
+        "SERVER_ERROR",
         process.env.NODE_ENV === "development"
           ? `Failed to send OTP: ${message}`
           : "Failed to send OTP. Please try again.",
-        "OTP_SEND_FAILED",
         502
       )
     );

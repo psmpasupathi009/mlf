@@ -60,10 +60,29 @@
   border-color: var(--border);
 }
 
+html {
+  overflow-x: clip;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: clip;
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  /* Prefer readable text on phones without accidental zoom from tiny inputs */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Comfortable tap feedback without flashy outlines on every element */
+@media (pointer: coarse) {
+  button,
+  a,
+  [role="button"] {
+    -webkit-tap-highlight-color: rgb(27 42 74 / 0.08);
+  }
 }

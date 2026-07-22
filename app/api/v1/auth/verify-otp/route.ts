@@ -2,15 +2,17 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { signOtpProofToken } from "@/lib/auth/jwt";
 import {
-  getAdminRoleForMobile,
+  getAdminRolesForMobile,
   isEnvAdminMobile,
   normalizeMobile,
 } from "@/lib/auth/mobile";
 import {
   applyCorsHeaders,
   corsPreflight,
-  jsonError,
 } from "@/lib/auth/session";
+import { jsonFail, jsonOk } from "@/lib/api/response";
+import { rateLimit } from "@/lib/rate-limit";
+import { clientRateKey } from "@/lib/rate-limit/client-key";
 import {
   createUserWithUniqueMobile,
   findUserByMobile,
@@ -30,7 +32,7 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return applyCorsHeaders(
         request,
-        jsonError("Invalid OTP request", "INVALID_INPUT", 400)
+        jsonFail("VALIDATION", "Invalid OTP request", 400)
       );
     }
 
@@ -38,10 +40,23 @@ export async function POST(request: Request) {
     if (!mobile) {
       return applyCorsHeaders(
         request,
-        jsonError(
+        jsonFail(
+          "VALIDATION",
           "Enter a valid 10-digit Indian mobile number",
-          "INVALID_MOBILE",
           400
+        )
+      );
+    }
+
+    const limited = await rateLimit(clientRateKey(request, "verify-otp", mobile), 10, 15 * 60 * 1000);
+    if (!limited.allowed) {
+      return applyCorsHeaders(
+        request,
+        jsonFail(
+          "RATE_LIMITED",
+          `Too many OTP checks. Try again in ${limited.retryAfterSec}s`,
+          429,
+          { retryAfterSec: limited.retryAfterSec }
         )
       );
     }
@@ -61,9 +76,9 @@ export async function POST(request: Request) {
     if (!session) {
       return applyCorsHeaders(
         request,
-        jsonError(
+        jsonFail(
+          "VALIDATION",
           "OTP expired or not found. Request a new one.",
-          "OTP_EXPIRED",
           400
         )
       );
@@ -73,7 +88,7 @@ export async function POST(request: Request) {
     if (!ok) {
       return applyCorsHeaders(
         request,
-        jsonError("Incorrect OTP", "OTP_INVALID", 400)
+        jsonFail("VALIDATION", "Incorrect OTP", 400)
       );
     }
 
@@ -85,22 +100,22 @@ export async function POST(request: Request) {
     if (purpose === "setup") {
       let user = await findUserByMobile(mobile);
       if (!user && isEnvAdminMobile(mobile)) {
-        const role = getAdminRoleForMobile(mobile);
-        if (!role) {
+        const roles = getAdminRolesForMobile(mobile);
+        if (roles.length === 0) {
           return applyCorsHeaders(
             request,
-            jsonError("Unauthorized mobile", "UNAUTHORIZED", 403)
+            jsonFail("UNAUTHORIZED", "Unauthorized mobile", 403)
           );
         }
         try {
-          user = await createUserWithUniqueMobile({ mobile, role });
+          user = await createUserWithUniqueMobile({ mobile, roles });
         } catch (error) {
           if (error instanceof MobileConflictError) {
             return applyCorsHeaders(
               request,
-              jsonError(
+              jsonFail(
+                "CONFLICT",
                 "This mobile number is already registered",
-                "MOBILE_EXISTS",
                 409
               )
             );
@@ -112,7 +127,11 @@ export async function POST(request: Request) {
       if (!user || !user.isActive) {
         return applyCorsHeaders(
           request,
-          jsonError("Number not registered. Contact admin.", "NOT_FOUND", 404)
+          jsonFail(
+            "NOT_FOUND",
+            "Number not registered. Contact admin.",
+            404
+          )
         );
       }
     } else {
@@ -120,9 +139,9 @@ export async function POST(request: Request) {
       if (!user || !user.isActive || !user.pinHash) {
         return applyCorsHeaders(
           request,
-          jsonError(
+          jsonFail(
+            "FORBIDDEN",
             "Unable to reset PIN for this number",
-            "RESET_NOT_ALLOWED",
             400
           )
         );
@@ -133,7 +152,7 @@ export async function POST(request: Request) {
 
     return applyCorsHeaders(
       request,
-      NextResponse.json({
+      jsonOk({
         verified: true,
         otpProofToken,
         requiresPinSetup: purpose === "setup",
@@ -144,11 +163,11 @@ export async function POST(request: Request) {
     console.error("verify-otp error", message);
     return applyCorsHeaders(
       request,
-      jsonError(
+      jsonFail(
+        "SERVER_ERROR",
         process.env.NODE_ENV === "development"
           ? `Failed to verify OTP: ${message}`
           : "Failed to verify OTP",
-        "OTP_VERIFY_FAILED",
         502
       )
     );

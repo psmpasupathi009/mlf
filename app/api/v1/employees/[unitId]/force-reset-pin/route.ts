@@ -1,0 +1,36 @@
+import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
+import { requirePerm } from "@/lib/api/guard";
+import { prisma } from "@/lib/db/prisma";
+import { writeAudit } from "@/lib/audit";
+import { revokeAllRefreshTokens } from "@/lib/auth/session";
+import { toEmployeeSummary } from "@/features/employees/server/serialize";
+
+/** Clears the PIN + revokes sessions — employee must set up a new PIN via OTP. */
+export const POST = apiHandler(async (request, context) => {
+  const { user, response } = await requirePerm(request, "employees", "edit");
+  if (!user) return response;
+
+  const { unitId } = (await context.params) ?? {};
+  const target = unitId ? await prisma.user.findUnique({ where: { unitId } }) : null;
+  if (!target) return jsonFail("NOT_FOUND", "Employee not found", 404);
+
+  const updated = await prisma.user.update({
+    where: { id: target.id },
+    data: {
+      pinHash: null,
+      failedPinAttempts: 0,
+      pinLockedUntil: null,
+    },
+  });
+
+  await revokeAllRefreshTokens(target.id);
+
+  await writeAudit({
+    actorUnitId: user.unitId,
+    action: "employee.force_reset_pin",
+    entity: "User",
+    entityUnitId: updated.unitId,
+  });
+
+  return jsonOk({ employee: toEmployeeSummary(updated) });
+});

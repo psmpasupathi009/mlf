@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import "./globals.css";
@@ -19,6 +19,13 @@ export const metadata: Metadata = {
     template: "%s | Manitham Law Foundation",
   },
   description: "Secure portal for Manitham Law Foundation",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#1b2a4a",
 };
 
 export default function RootLayout({

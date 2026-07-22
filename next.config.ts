@@ -11,7 +11,7 @@ const nextConfig: NextConfig = {
     minimumCacheTTL: 60 * 60 * 24 * 30,
   },
   experimental: {
-    optimizePackageImports: ["sonner", "radix-ui"],
+    optimizePackageImports: ["sonner", "radix-ui", "lucide-react", "date-fns"],
   },
   async headers() {
     return [

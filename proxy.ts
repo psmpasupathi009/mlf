@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { jwtVerify } from "jose";
 
 const ACCESS_COOKIE = "mlf_access";
+const REFRESH_COOKIE = "mlf_refresh";
 
 async function hasValidAccess(request: NextRequest): Promise<boolean> {
   const token = request.cookies.get(ACCESS_COOKIE)?.value;
@@ -18,18 +19,24 @@ async function hasValidAccess(request: NextRequest): Promise<boolean> {
   }
 }
 
+function isPublicPath(pathname: string): boolean {
+  return pathname === "/login" || pathname.startsWith("/legal");
+}
+
 /**
  * Login-first gate:
- * - Guests → /login
+ * - Guests → /login (except public routes)
+ * - Expired access + refresh cookie → allow into portal (SessionRefreshGate)
  * - Signed-in users on /login → /
- * Portal home (/) requires a valid session cookie.
  */
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isLogin = pathname === "/login";
   const authenticated = await hasValidAccess(request);
+  const hasRefresh = Boolean(request.cookies.get(REFRESH_COOKIE)?.value);
+  const maybeAuthed = authenticated || hasRefresh;
 
-  if (!authenticated && !isLogin) {
+  if (!maybeAuthed && !isPublicPath(pathname)) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 

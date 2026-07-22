@@ -10,23 +10,64 @@ import {
   verifyAccessToken,
   type AccessTokenPayload,
 } from "@/lib/auth/jwt";
+import { getEffectivePermissionsForUser } from "@/lib/rbac";
 
 export const ACCESS_COOKIE = "mlf_access";
 export const REFRESH_COOKIE = "mlf_refresh";
 
-export type PublicUser = {
+/**
+ * Fields needed for auth/session + public profile.
+ * Declared explicitly so the app doesn’t break if the IDE’s Prisma
+ * client cache is stale (schema uses `roles[]`, not singular `role`).
+ */
+export type AuthUser = {
   id: string;
+  unitId: string;
   mobile: string;
-  role: UserRole;
-  name?: string;
+  roles: UserRole[];
+  name: string | null;
+  designation?: string | null;
+  email?: string | null;
+  address?: string | null;
+  photoKey?: string | null;
+  isActive: boolean;
 };
 
-export function toPublicUser(user: User): PublicUser {
-  return {
+/** Public contract — never expose Mongo ObjectId. */
+export type PublicUser = {
+  unitId: string;
+  mobile: string;
+  roles: UserRole[];
+  name?: string;
+  designation?: string;
+  email?: string;
+  address?: string;
+  /** Authenticated photo URL when user has uploaded a profile pic */
+  photoUrl?: string;
+  permissions: string[];
+};
+
+export function userPhotoUrl(unitId: string, hasPhoto: boolean): string | undefined {
+  if (!hasPhoto) return undefined;
+  return `/api/v1/users/${unitId}/photo`;
+}
+
+export async function toPublicUser(user: AuthUser): Promise<PublicUser> {
+  const permissions = await getEffectivePermissionsForUser({
     id: user.id,
+    roles: user.roles,
+    isActive: user.isActive,
+  });
+  return {
+    unitId: user.unitId,
     mobile: user.mobile,
-    role: user.role,
+    roles: user.roles,
     name: user.name ?? undefined,
+    designation: user.designation ?? undefined,
+    email: user.email ?? undefined,
+    address: user.address ?? undefined,
+    photoUrl: userPhotoUrl(user.unitId, Boolean(user.photoKey)),
+    permissions,
   };
 }
 
@@ -40,7 +81,7 @@ function cookieOptions(maxAge: number) {
   };
 }
 
-export async function issueAuthTokens(user: User): Promise<{
+export async function issueAuthTokens(user: AuthUser): Promise<{
   accessToken: string;
   refreshToken: string;
   user: PublicUser;
@@ -48,10 +89,14 @@ export async function issueAuthTokens(user: User): Promise<{
   const accessToken = await signAccessToken({
     userId: user.id,
     mobile: user.mobile,
-    role: user.role,
+    roles: user.roles,
   });
 
   const refreshToken = createRefreshTokenValue();
+  // Drop expired rows so login/refresh doesn't accumulate dead tokens.
+  await prisma.refreshToken.deleteMany({
+    where: { userId: user.id, expiresAt: { lte: new Date() } },
+  });
   await prisma.refreshToken.create({
     data: {
       userId: user.id,
@@ -72,7 +117,7 @@ export async function issueAuthTokens(user: User): Promise<{
   return {
     accessToken,
     refreshToken,
-    user: toPublicUser(updated),
+    user: await toPublicUser(updated as unknown as AuthUser),
   };
 }
 
@@ -101,6 +146,10 @@ export async function revokeRefreshToken(refreshToken: string): Promise<void> {
   });
 }
 
+export async function revokeAllRefreshTokens(userId: string): Promise<void> {
+  await prisma.refreshToken.deleteMany({ where: { userId } });
+}
+
 export async function rotateRefreshToken(refreshToken: string): Promise<{
   accessToken: string;
   refreshToken: string;
@@ -121,7 +170,7 @@ export async function rotateRefreshToken(refreshToken: string): Promise<{
   await prisma.refreshToken.delete({ where: { id: existing.id } });
 
   if (!user || !user.isActive) return null;
-  return issueAuthTokens(user);
+  return issueAuthTokens(user as unknown as AuthUser);
 }
 
 export function getBearerToken(request: Request): string | null {
@@ -149,15 +198,6 @@ export async function getCurrentUser(request: Request): Promise<User | null> {
   const user = await prisma.user.findUnique({ where: { id: payload.sub } });
   if (!user || !user.isActive) return null;
   return user;
-}
-
-export function jsonError(
-  error: string,
-  code: string,
-  status: number,
-  extra?: Record<string, unknown>
-): NextResponse {
-  return NextResponse.json({ error, code, ...extra }, { status });
 }
 
 export function applyCorsHeaders(

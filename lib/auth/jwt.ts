@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "crypto";
+import { createHash, randomBytes, randomUUID } from "crypto";
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import type { UserRole } from "@prisma/client";
 
@@ -9,11 +9,12 @@ const OTP_PROOF_TTL = "10m";
 export type AccessTokenPayload = JWTPayload & {
   sub: string;
   mobile: string;
-  role: UserRole;
+  roles: UserRole[];
   typ: "access";
 };
 
 export type OtpProofPayload = JWTPayload & {
+  jti: string;
   mobile: string;
   purpose: "setup" | "forgot_pin";
   typ: "otp_proof";
@@ -30,11 +31,11 @@ function getSecret(name: "JWT_SECRET" | "JWT_REFRESH_SECRET"): Uint8Array {
 export async function signAccessToken(input: {
   userId: string;
   mobile: string;
-  role: UserRole;
+  roles: UserRole[];
 }): Promise<string> {
   return new SignJWT({
     mobile: input.mobile,
-    role: input.role,
+    roles: input.roles,
     typ: "access",
   })
     .setProtectedHeader({ alg: "HS256" })
@@ -60,12 +61,14 @@ export async function signOtpProofToken(input: {
   mobile: string;
   purpose: "setup" | "forgot_pin";
 }): Promise<string> {
+  const jti = randomUUID();
   return new SignJWT({
     mobile: input.mobile,
     purpose: input.purpose,
     typ: "otp_proof",
   })
     .setProtectedHeader({ alg: "HS256" })
+    .setJti(jti)
     .setIssuedAt()
     .setExpirationTime(OTP_PROOF_TTL)
     .sign(getSecret("JWT_SECRET"));
@@ -76,7 +79,11 @@ export async function verifyOtpProofToken(
 ): Promise<OtpProofPayload | null> {
   try {
     const { payload } = await jwtVerify(token, getSecret("JWT_SECRET"));
-    if (payload.typ !== "otp_proof" || typeof payload.mobile !== "string") {
+    if (
+      payload.typ !== "otp_proof" ||
+      typeof payload.mobile !== "string" ||
+      typeof payload.jti !== "string"
+    ) {
       return null;
     }
     return payload as OtpProofPayload;

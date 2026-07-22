@@ -12,7 +12,7 @@ enum UserRole {
   sub_admin
   staff
   advocate
-  client
+  accountant
 }
 
 enum OtpPurpose {
@@ -20,14 +20,64 @@ enum OtpPurpose {
   forgot_pin
 }
 
+enum CaseStatus {
+  pending
+  listed
+  disposed
+  withdrawn
+  transferred
+}
+
+enum PaymentType {
+  advance
+  partial
+  full
+}
+
+enum PaymentStatus {
+  pending
+  paid
+  void
+}
+
+enum AppointmentStatus {
+  scheduled
+  completed
+  cancelled
+}
+
+enum LeaveStatus {
+  pending
+  approved
+  rejected
+}
+
+enum DocumentType {
+  judgment
+  order
+  pleading
+  vakalatnama
+  petition
+  affidavit
+  evidence
+  id_proof
+  receipt
+  other
+}
+
 model User {
   id                String         @id @default(auto()) @map("_id") @db.ObjectId
-  /// Globally unique login identity for every role (admin, staff, advocate, client).
+  unitId            String         @unique
+  /// Globally unique login identity (10-digit Indian → stored as 91…).
   mobile            String         @unique
-  role              UserRole
+  roles             UserRole[]
+  designation       String?
   pinHash           String?
   isActive          Boolean        @default(true)
   name              String?
+  email             String?
+  address           String?
+  photoKey          String?
   createdById       String?        @db.ObjectId
   failedPinAttempts Int            @default(0)
   pinLockedUntil    DateTime?
@@ -35,6 +85,8 @@ model User {
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
   refreshTokens     RefreshToken[]
+
+  @@index([name])
 }
 
 model OtpSession {
@@ -52,6 +104,18 @@ model OtpSession {
   @@index([expiresAt])
 }
 
+/// One-time OTP proof JWTs (jti) — prevents replay of setup/forgot PIN.
+model ConsumedOtpProof {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  jti       String   @unique
+  mobile    String
+  purpose   String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([expiresAt])
+}
+
 model RefreshToken {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   userId    String   @db.ObjectId
@@ -62,4 +126,295 @@ model RefreshToken {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+model RolePermission {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  role      UserRole
+  module    String
+  action    String
+  allowed   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([role, module, action])
+  @@index([role])
+}
+
+model AuditLog {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  actorUnitId  String?
+  action       String
+  entity       String
+  entityUnitId String?
+  meta         Json?
+  createdAt    DateTime @default(now())
+
+  @@index([entity, entityUnitId])
+  @@index([actorUnitId])
+  @@index([createdAt])
+}
+
+model IdCounter {
+  id     String @id @default(auto()) @map("_id") @db.ObjectId
+  entity String @unique
+  seq    Int    @default(0)
+}
+
+model RateLimit {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  key       String   @unique
+  count     Int      @default(0)
+  resetAt   DateTime
+  updatedAt DateTime @updatedAt
+
+  @@index([resetAt])
+}
+
+model Client {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  unitId           String   @unique
+  name             String
+  /// Father / husband / guardian — common on vakalat / petitions
+  fatherOrSpouse   String?
+  occupation       String?
+  gender           String?
+  mobile           String
+  altMobile        String?
+  email            String?
+  address          String?
+  city             String?
+  district         String?
+  state            String?
+  aadhaarLast4     String?
+  /// How the client found the office
+  referredBy       String?
+  /// Short facts at intake (before case register)
+  matterBrief      String?
+  notes            String?
+  /// Consent to hearing SMS on primary mobile
+  smsConsent       Boolean  @default(true)
+  createdById      String?  @db.ObjectId
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([name])
+  @@index([mobile])
+}
+
+model Case {
+  id                    String     @id @default(auto()) @map("_id") @db.ObjectId
+  unitId                String     @unique
+  clientId              String     @db.ObjectId
+  clientUnitId          String
+  /// Optional; sparse uniqueness checked in app (Mongo unique index would reject
+  /// multiple nulls under some drivers, so we validate manually on write).
+  caseNumber            String?
+  /// Filing number (before registration number is allotted)
+  filingNumber          String?
+  /// Registration / filing year (e.g. 2024)
+  caseYear              Int?
+  cnr                   String?
+  state                 String?
+  district              String?
+  /// Town / city of the court complex (within district)
+  city                  String?
+  courtName             String?
+  advocateMobiles       String[]   @default([])
+  primaryAdvocateMobile String?
+  opposingParty         String?
+  /// petitioner | respondent | complainant | accused | appellant | other
+  ourSide               String?
+  /// Acts / sections (e.g. Sec 138 NI Act)
+  underActs             String?
+  policeStation         String?
+  firNumber             String?
+  /// Current stage note (e.g. Evidence, Arguments)
+  stage                 String?
+  caseType              String?
+  status                CaseStatus @default(pending)
+  filingDate            DateTime?
+  nextHearingAt         DateTime?
+  agreedFee             Float?
+  notes                 String?
+  createdById           String?    @db.ObjectId
+  createdAt             DateTime   @default(now())
+  updatedAt             DateTime   @updatedAt
+
+  @@index([clientId])
+  @@index([clientUnitId])
+  @@index([status])
+  @@index([caseNumber])
+  @@index([nextHearingAt])
+  @@index([primaryAdvocateMobile])
+}
+
+model Hearing {
+  id          String    @id @default(auto()) @map("_id") @db.ObjectId
+  unitId      String    @unique
+  caseId      String    @db.ObjectId
+  caseUnitId  String
+  hearingDate DateTime
+  purpose     String?
+  notes       String?
+  outcome     String?
+  isAdjourned Boolean   @default(false)
+  smsSentAt   DateTime?
+  createdById String?   @db.ObjectId
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([caseId])
+  @@index([caseUnitId])
+  @@index([hearingDate])
+  @@index([smsSentAt, hearingDate])
+}
+
+model CashPayment {
+  id           String        @id @default(auto()) @map("_id") @db.ObjectId
+  unitId       String        @unique
+  clientId     String        @db.ObjectId
+  clientUnitId String
+  caseId       String?       @db.ObjectId
+  caseUnitId   String?
+  type         PaymentType
+  amount       Float
+  status       PaymentStatus @default(pending)
+  paidOn       DateTime?
+  notes        String?
+  voidedAt     DateTime?
+  voidedById   String?       @db.ObjectId
+  voidReason   String?
+  createdById  String?       @db.ObjectId
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([clientId])
+  @@index([clientUnitId])
+  @@index([caseId])
+  @@index([caseUnitId])
+  @@index([status])
+}
+
+model Document {
+  id           String       @id @default(auto()) @map("_id") @db.ObjectId
+  unitId       String       @unique
+  caseId       String?      @db.ObjectId
+  caseUnitId   String?
+  clientId     String?      @db.ObjectId
+  clientUnitId String?
+  /// judgment | order | pleading | vakalatnama | petition | affidavit | evidence | id_proof | receipt | other
+  docType      DocumentType @default(other)
+  title        String
+  notes        String?
+  fileKey      String
+  mimeType     String
+  size         Int
+  originalName String
+  uploadedById String?      @db.ObjectId
+  createdAt    DateTime     @default(now())
+
+  @@index([caseId])
+  @@index([caseUnitId])
+  @@index([clientId])
+  @@index([clientUnitId])
+  @@index([docType])
+}
+
+model Appointment {
+  id             String            @id @default(auto()) @map("_id") @db.ObjectId
+  unitId         String            @unique
+  clientId       String?           @db.ObjectId
+  clientUnitId   String?
+  /// Advocate on this slot (10-digit or 91… mobile)
+  advocateMobile String?
+  title          String
+  scheduledAt    DateTime
+  durationMin    Int               @default(30)
+  /// office | call | video
+  mode           String            @default("office")
+  location       String?
+  notes          String?
+  status         AppointmentStatus @default(scheduled)
+  createdById    String?           @db.ObjectId
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([scheduledAt])
+  @@index([status])
+  @@index([advocateMobile])
+}
+
+model Attendance {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  unitId     String    @unique
+  userId     String    @db.ObjectId
+  userUnitId String
+  /// IST calendar day, YYYY-MM-DD.
+  date       String
+  checkInAt  DateTime?
+  checkOutAt DateTime?
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  @@unique([userId, date])
+  @@index([userUnitId])
+  @@index([date])
+}
+
+model LeaveRequest {
+  id           String      @id @default(auto()) @map("_id") @db.ObjectId
+  unitId       String      @unique
+  userId       String      @db.ObjectId
+  userUnitId   String
+  fromDate     String
+  toDate       String
+  reason       String?
+  status       LeaveStatus @default(pending)
+  approvedById String?     @db.ObjectId
+  approvedAt   DateTime?
+  rejectReason String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  @@index([userId])
+  @@index([status])
+}
+
+/// Recurring weekly open windows (IST). Multiple ranges per weekday allowed.
+model AdvocateWeeklyHours {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  unitId     String   @unique
+  userId     String   @db.ObjectId
+  userUnitId String
+  /// 0=Sunday … 6=Saturday (IST calendar)
+  weekday    Int
+  /// HH:mm IST
+  startTime  String
+  endTime    String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId, weekday])
+  @@index([userUnitId])
+}
+
+/// One-off unavailability: lunch, court, personal, etc.
+model AdvocateTimeBlock {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  unitId     String   @unique
+  userId     String   @db.ObjectId
+  userUnitId String
+  startsAt   DateTime
+  endsAt     DateTime
+  /// break | court | personal | other
+  kind       String   @default("break")
+  reason     String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([userId, startsAt])
+  @@index([userId, endsAt])
+  @@index([userUnitId])
 }

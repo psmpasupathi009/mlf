@@ -1,0 +1,6 @@
+unitId,clientMobile,scheduledAt,durationMin,mode,title,location,notes,advocateMobile,status
+,9123456780,TODAY_10:30,30,office,Initial consultation — land dispute,Chamber 1,Bring survey documents,9841578862,scheduled
+,9123456782,TODAY_14:00,30,call,Maintenance follow-up call,,Confirm next hearing,8760228622,scheduled
+,9123456783,TOMORROW_11:00,45,office,Cheque bounce briefing,Chamber 2,,9786570408,scheduled
+,9123456785,TOMORROW_16:30,30,video,MACT docs review,,Google Meet,9003485618,scheduled
+,9123456787,DAY_AFTER_09:30,30,office,Bail papers check,Front desk,,9578042348,scheduled

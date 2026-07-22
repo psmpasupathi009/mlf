@@ -1,28 +1,29 @@
 import Link from "next/link";
+import { brand } from "@/config/company/brand";
 
-type SiteFooterProps = {
-  compact?: boolean;
-};
-
-export function SiteFooter({ compact = false }: SiteFooterProps) {
+export function SiteFooter() {
   const year = new Date().getFullYear();
 
   return (
-    <footer className="mt-auto border-t border-border bg-white">
-      <div
-        className={`mx-auto flex w-full max-w-6xl flex-col gap-2 px-4 text-sm text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6 ${
-          compact ? "py-4" : "py-5"
-        }`}
-      >
-        <p>© {year} Manitham Law Foundation. All rights reserved.</p>
-        <div className="flex gap-4">
-          <Link href="#" className="hover:text-navy">
-            Privacy
-          </Link>
-          <Link href="#" className="hover:text-navy">
+    <footer className="border-t border-border/80 bg-white pb-[env(safe-area-inset-bottom)]">
+      <div className="flex min-h-11 w-full flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:px-4 lg:px-6">
+        <p className="text-xs text-muted-foreground">
+          © {year} {brand.name}
+        </p>
+        <nav className="flex flex-wrap gap-1 text-xs text-muted-foreground">
+          <Link href="/legal/terms" className="rounded-md px-2 py-2 hover:bg-muted hover:text-navy">
             Terms
           </Link>
-        </div>
+          <Link
+            href="/legal/consultation-policy"
+            className="rounded-md px-2 py-2 hover:bg-muted hover:text-navy"
+          >
+            Consultation
+          </Link>
+          <Link href="/legal/privacy" className="rounded-md px-2 py-2 hover:bg-muted hover:text-navy">
+            Privacy
+          </Link>
+        </nav>
       </div>
     </footer>
   );

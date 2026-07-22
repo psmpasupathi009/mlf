@@ -2,7 +2,12 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { prisma } from "@/lib/db/prisma";
 import { verifyAccessToken } from "@/lib/auth/jwt";
-import { ACCESS_COOKIE, type PublicUser } from "@/lib/auth/session";
+import {
+  ACCESS_COOKIE,
+  REFRESH_COOKIE,
+  toPublicUser,
+  type PublicUser,
+} from "@/lib/auth/session";
 
 export const getSessionUser = cache(async (): Promise<PublicUser | null> => {
   const cookieStore = await cookies();
@@ -16,19 +21,25 @@ export const getSessionUser = cache(async (): Promise<PublicUser | null> => {
     where: { id: payload.sub },
     select: {
       id: true,
+      unitId: true,
       mobile: true,
-      role: true,
+      roles: true,
       name: true,
+      designation: true,
+      email: true,
+      address: true,
+      photoKey: true,
       isActive: true,
     },
   });
 
   if (!user || !user.isActive) return null;
 
-  return {
-    id: user.id,
-    mobile: user.mobile,
-    role: user.role,
-    name: user.name ?? undefined,
-  };
+  return toPublicUser(user);
 });
+
+/** True when refresh cookie exists (access may be expired). */
+export async function hasRefreshCookie(): Promise<boolean> {
+  const cookieStore = await cookies();
+  return Boolean(cookieStore.get(REFRESH_COOKIE)?.value);
+}

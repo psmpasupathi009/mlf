@@ -12,8 +12,10 @@ import {
   attachAuthCookies,
   corsPreflight,
   issueAuthTokens,
-  jsonError,
 } from "@/lib/auth/session";
+import { jsonFail, jsonOk } from "@/lib/api/response";
+import { rateLimit } from "@/lib/rate-limit";
+import { clientRateKey } from "@/lib/rate-limit/client-key";
 import { loginSchema } from "@/lib/validations/auth.schema";
 
 export async function OPTIONS(request: Request) {
@@ -27,7 +29,7 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return applyCorsHeaders(
         request,
-        jsonError("Invalid login details", "INVALID_INPUT", 400)
+        jsonFail("VALIDATION", "Invalid login details", 400)
       );
     }
 
@@ -35,10 +37,23 @@ export async function POST(request: Request) {
     if (!mobile) {
       return applyCorsHeaders(
         request,
-        jsonError(
+        jsonFail(
+          "VALIDATION",
           "Enter a valid 10-digit Indian mobile number",
-          "INVALID_MOBILE",
           400
+        )
+      );
+    }
+
+    const limited = await rateLimit(clientRateKey(request, "login", mobile), 10, 15 * 60 * 1000);
+    if (!limited.allowed) {
+      return applyCorsHeaders(
+        request,
+        jsonFail(
+          "RATE_LIMITED",
+          `Too many login attempts. Try again in ${limited.retryAfterSec}s`,
+          429,
+          { retryAfterSec: limited.retryAfterSec }
         )
       );
     }
@@ -48,16 +63,16 @@ export async function POST(request: Request) {
     if (!user || !user.isActive || !user.pinHash) {
       return applyCorsHeaders(
         request,
-        jsonError("Invalid mobile or PIN", "INVALID_CREDENTIALS", 401)
+        jsonFail("INVALID_CREDENTIALS", "Invalid mobile or PIN", 401)
       );
     }
 
     if (isPinLocked(user.pinLockedUntil)) {
       return applyCorsHeaders(
         request,
-        jsonError(
-          "Too many incorrect PIN attempts. Please try again later.",
+        jsonFail(
           "PIN_LOCKED",
+          "PIN locked after too many attempts. Use Forgot PIN to reset via OTP, or try again later.",
           423
         )
       );
@@ -76,24 +91,31 @@ export async function POST(request: Request) {
             ),
           },
         });
-      } else {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: { failedPinAttempts: attempts },
-        });
+
+        return applyCorsHeaders(
+          request,
+          jsonFail(
+            "PIN_LOCKED",
+            "Too many incorrect PIN attempts. Use Forgot PIN to reset via OTP, or try again later.",
+            423
+          )
+        );
       }
+
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { failedPinAttempts: attempts },
+      });
 
       return applyCorsHeaders(
         request,
-        jsonError("Invalid mobile or PIN", "INVALID_CREDENTIALS", 401)
+        jsonFail("INVALID_CREDENTIALS", "Invalid mobile or PIN", 401)
       );
     }
 
     const tokens = await issueAuthTokens(user);
-    const response = NextResponse.json({
+    const response = jsonOk({
       message: "Login successful",
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
       user: tokens.user,
     });
 
@@ -102,7 +124,7 @@ export async function POST(request: Request) {
     console.error("login error", error);
     return applyCorsHeaders(
       request,
-      jsonError("Login failed", "SERVER_ERROR", 500)
+      jsonFail("SERVER_ERROR", "Login failed", 500)
     );
   }
 }

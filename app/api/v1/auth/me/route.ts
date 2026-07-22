@@ -3,9 +3,9 @@ import {
   applyCorsHeaders,
   corsPreflight,
   getCurrentUser,
-  jsonError,
   toPublicUser,
 } from "@/lib/auth/session";
+import { jsonFail, jsonOk } from "@/lib/api/response";
 
 export async function OPTIONS(request: Request) {
   return corsPreflight(request) ?? new NextResponse(null, { status: 204 });
@@ -17,19 +17,19 @@ export async function GET(request: Request) {
     if (!user) {
       return applyCorsHeaders(
         request,
-        jsonError("Unauthorized", "UNAUTHORIZED", 401)
+        jsonFail("UNAUTHORIZED", "Unauthorized", 401)
       );
     }
 
     return applyCorsHeaders(
       request,
-      NextResponse.json({ user: toPublicUser(user) })
+      jsonOk({ user: await toPublicUser(user) })
     );
   } catch (error) {
     console.error("me error", error);
     return applyCorsHeaders(
       request,
-      jsonError("Something went wrong", "SERVER_ERROR", 500)
+      jsonFail("SERVER_ERROR", "Something went wrong", 500)
     );
   }
 }

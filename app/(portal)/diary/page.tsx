@@ -1,0 +1,14 @@
+import { getSessionUser } from "@/lib/auth/session-user";
+import { ForbiddenState } from "@/shared/components/feedback/forbidden-state";
+import { DiaryPage } from "@/features/diary/components/diary-page";
+import { isModuleEnabled } from "@/config/company/modules";
+
+export default async function DiaryRoutePage() {
+  const user = await getSessionUser();
+  if (!user) return null;
+  const can =
+    isModuleEnabled("cases") &&
+    (user.permissions ?? []).includes("cases.view");
+  if (!can) return <ForbiddenState />;
+  return <DiaryPage />;
+}

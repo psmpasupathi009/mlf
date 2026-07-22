@@ -6,10 +6,10 @@ import {
   clearAuthCookies,
   corsPreflight,
   getCurrentUser,
-  jsonError,
   REFRESH_COOKIE,
   revokeRefreshToken,
 } from "@/lib/auth/session";
+import { jsonFail, jsonOk } from "@/lib/api/response";
 
 export async function OPTIONS(request: Request) {
   return corsPreflight(request) ?? new NextResponse(null, { status: 204 });
@@ -40,13 +40,13 @@ export async function POST(request: Request) {
       }
     }
 
-    const response = NextResponse.json({ message: "Logged out" });
+    const response = jsonOk({ message: "Logged out" });
     return applyCorsHeaders(request, clearAuthCookies(response));
   } catch (error) {
     console.error("logout error", error);
     return applyCorsHeaders(
       request,
-      jsonError("Logout failed", "SERVER_ERROR", 500)
+      jsonFail("SERVER_ERROR", "Logout failed", 500)
     );
   }
 }

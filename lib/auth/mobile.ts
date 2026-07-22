@@ -42,6 +42,13 @@ export function getAdminRoleForMobile(
   return null;
 }
 
+export function getAdminRolesForMobile(
+  mobile91: string
+): ("admin" | "sub_admin")[] {
+  const role = getAdminRoleForMobile(mobile91);
+  return role ? [role] : [];
+}
+
 export function isEnvAdminMobile(mobile91: string): boolean {
   return getAdminRoleForMobile(mobile91) !== null;
 }

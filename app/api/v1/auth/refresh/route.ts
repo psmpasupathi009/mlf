@@ -5,10 +5,10 @@ import {
   attachAuthCookies,
   clearAuthCookies,
   corsPreflight,
-  jsonError,
   REFRESH_COOKIE,
   rotateRefreshToken,
 } from "@/lib/auth/session";
+import { jsonFail, jsonOk } from "@/lib/api/response";
 import { refreshSchema } from "@/lib/validations/auth.schema";
 
 export async function OPTIONS(request: Request) {
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return applyCorsHeaders(
         request,
-        jsonError("Invalid request", "INVALID_INPUT", 400)
+        jsonFail("VALIDATION", "Invalid request", 400)
       );
     }
 
@@ -42,23 +42,21 @@ export async function POST(request: Request) {
     if (!refreshToken) {
       return applyCorsHeaders(
         request,
-        jsonError("Refresh token required", "REFRESH_REQUIRED", 401)
+        jsonFail("UNAUTHORIZED", "Refresh token required", 401)
       );
     }
 
     const tokens = await rotateRefreshToken(refreshToken);
     if (!tokens) {
-      const response = jsonError(
+      const response = jsonFail(
+        "UNAUTHORIZED",
         "Session expired. Please sign in again.",
-        "REFRESH_INVALID",
         401
       );
       return applyCorsHeaders(request, clearAuthCookies(response));
     }
 
-    const response = NextResponse.json({
-      accessToken: tokens.accessToken,
-      refreshToken: tokens.refreshToken,
+    const response = jsonOk({
       user: tokens.user,
     });
 
@@ -67,7 +65,7 @@ export async function POST(request: Request) {
     console.error("refresh error", error);
     return applyCorsHeaders(
       request,
-      jsonError("Failed to refresh session", "SERVER_ERROR", 500)
+      jsonFail("SERVER_ERROR", "Failed to refresh session", 500)
     );
   }
 }
