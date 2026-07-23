@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { PageHeader } from "@/shared/components/data/page-header";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
@@ -34,6 +34,14 @@ import { istDateKey } from "@/lib/utils/ist";
 
 type AttendanceList = { data: AttendanceSummary[]; meta: { total: number } };
 type LeaveList = { data: LeaveSummary[]; meta: { total: number } };
+type EmployeeRow = {
+  unitId: string;
+  name: string | null;
+  mobile: string;
+  roles: string[];
+  isActive: boolean;
+};
+type EmployeeList = { data: EmployeeRow[]; meta: { total: number } };
 
 const LEAVE_VARIANT: Record<string, "warning" | "success" | "destructive"> = {
   pending: "warning",
@@ -45,13 +53,17 @@ function personLabel(unitId: string, name: string | null | undefined) {
   return name?.trim() || unitId;
 }
 
+type PresenceStatus = "absent" | "in" | "out";
+
 export function HrmsPage({ user }: { user: PublicUser }) {
   const canManageAttendance = user.permissions.includes("hrms.manage_attendance");
   const canApproveLeave = user.permissions.includes("hrms.approve_leave");
+  const canViewEmployees = user.permissions.includes("employees.view");
 
   const [myAttendance, setMyAttendance] = useState<AttendanceSummary[]>([]);
   const [myLeave, setMyLeave] = useState<LeaveSummary[]>([]);
   const [teamAttendance, setTeamAttendance] = useState<AttendanceSummary[]>([]);
+  const [advocates, setAdvocates] = useState<EmployeeRow[]>([]);
   const [pendingLeave, setPendingLeave] = useState<LeaveSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [applyOpen, setApplyOpen] = useState(false);
@@ -82,12 +94,20 @@ export function HrmsPage({ user }: { user: PublicUser }) {
 
       if (canManageAttendance) {
         const teamRes = await apiFetch<AttendanceList>(
-          `/api/v1/hrms/attendance?from=${today}&to=${today}&pageSize=50`
+          `/api/v1/hrms/attendance?from=${today}&to=${today}&pageSize=100`
         );
         if (!teamRes.ok) {
           toast.error(getErrorMessage(teamRes.data as Record<string, unknown>, "Failed to load team attendance"));
         } else {
           setTeamAttendance((teamRes.data as unknown as AttendanceList).data ?? []);
+        }
+      }
+      if (canManageAttendance && canViewEmployees) {
+        const empRes = await apiFetch<EmployeeList>(
+          "/api/v1/employees?role=advocate&status=active&pageSize=100"
+        );
+        if (empRes.ok) {
+          setAdvocates((empRes.data as unknown as EmployeeList).data ?? []);
         }
       }
       if (canApproveLeave) {
@@ -101,7 +121,7 @@ export function HrmsPage({ user }: { user: PublicUser }) {
     } finally {
       setLoading(false);
     }
-  }, [canManageAttendance, canApproveLeave, today]);
+  }, [canManageAttendance, canApproveLeave, canViewEmployees, today]);
 
   useEffect(() => {
     void (async () => {
@@ -109,6 +129,70 @@ export function HrmsPage({ user }: { user: PublicUser }) {
       await load();
     })();
   }, [load]);
+
+  const presenceRows = useMemo(() => {
+    const attByUnit = new Map(
+      teamAttendance.map((a) => [a.userUnitId, a] as const)
+    );
+    const rank = { absent: 0, out: 1, in: 2 } as const;
+
+    if (advocates.length > 0) {
+      return advocates
+        .map((adv) => {
+          const att = attByUnit.get(adv.unitId);
+          const status: PresenceStatus = att?.checkOutAt
+            ? "out"
+            : att?.checkInAt
+              ? "in"
+              : "absent";
+          return {
+            key: adv.unitId,
+            name: personLabel(adv.unitId, adv.name),
+            unitId: adv.unitId,
+            mobile: adv.mobile || "—",
+            status,
+            checkInAt: att?.checkInAt ?? null,
+            checkOutAt: att?.checkOutAt ?? null,
+          };
+        })
+        .sort((a, b) => {
+          const r = rank[a.status] - rank[b.status];
+          if (r !== 0) return r;
+          return a.name.localeCompare(b.name);
+        });
+    }
+
+    return teamAttendance
+      .map((att) => {
+        const status: PresenceStatus = att.checkOutAt
+          ? "out"
+          : att.checkInAt
+            ? "in"
+            : "absent";
+        return {
+          key: att.unitId,
+          name: personLabel(att.userUnitId, att.userName),
+          unitId: att.userUnitId,
+          mobile: "—",
+          status,
+          checkInAt: att.checkInAt,
+          checkOutAt: att.checkOutAt,
+        };
+      })
+      .sort((a, b) => {
+        const r = rank[a.status] - rank[b.status];
+        if (r !== 0) return r;
+        return a.name.localeCompare(b.name);
+      });
+  }, [advocates, teamAttendance]);
+
+  const presenceStats = useMemo(() => {
+    return {
+      absent: presenceRows.filter((r) => r.status === "absent").length,
+      present: presenceRows.filter((r) => r.status === "in").length,
+      out: presenceRows.filter((r) => r.status === "out").length,
+    };
+  }, [presenceRows]);
 
   async function handleCheckIn() {
     const { ok, data } = await apiFetch("/api/v1/hrms/attendance/check-in", { method: "POST", json: {} });
@@ -306,35 +390,88 @@ export function HrmsPage({ user }: { user: PublicUser }) {
 
       {canManageAttendance ? (
         <Card>
-          <CardHeader>
-            <CardTitle>Team attendance — today</CardTitle>
+          <CardHeader className="flex flex-col gap-3 space-y-0 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <CardTitle>Advocate presence — today</CardTitle>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Full roster · absent listed first
+              </p>
+            </div>
+            {!loading && presenceRows.length > 0 ? (
+              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                <span className="rounded-md bg-amber-50 px-2 py-0.5 font-semibold text-amber-900">
+                  {presenceStats.absent} absent
+                </span>
+                <span className="rounded-md bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-800">
+                  {presenceStats.present} present
+                </span>
+                <span className="rounded-md bg-muted px-2 py-0.5 font-medium text-muted-foreground">
+                  {presenceStats.out} out
+                </span>
+              </div>
+            ) : null}
           </CardHeader>
           <CardContent className="p-0">
-            {teamAttendance.length === 0 ? (
-              <p className="px-5 pb-5 text-sm text-muted-foreground">No one has checked in yet today.</p>
+            {loading ? (
+              <p className="px-5 pb-5 text-sm text-muted-foreground">Loading…</p>
+            ) : presenceRows.length === 0 ? (
+              <p className="px-5 pb-5 text-sm text-muted-foreground">
+                No active advocates found.
+              </p>
             ) : (
               <Table containerClassName="rounded-none border-0 border-t shadow-none">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Employee</TableHead>
+                    <TableHead>Advocate</TableHead>
+                    <TableHead>Mobile</TableHead>
+                    <TableHead>Status</TableHead>
                     <TableHead>Check in</TableHead>
                     <TableHead>Check out</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {teamAttendance.map((a) => (
-                    <TableRow key={a.unitId}>
+                  {presenceRows.map((row) => (
+                    <TableRow
+                      key={row.key}
+                      className={
+                        row.status === "absent" ? "bg-amber-50/40" : undefined
+                      }
+                    >
                       <TableCell>
-                        <div className="font-medium text-navy">{personLabel(a.userUnitId, a.userName)}</div>
-                        {a.userName ? (
-                          <div className="text-xs text-muted-foreground">{a.userUnitId}</div>
-                        ) : null}
+                        <div className="font-medium text-navy">{row.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {row.unitId}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">
+                        {row.mobile}
                       </TableCell>
                       <TableCell>
-                        {a.checkInAt ? new Date(a.checkInAt).toLocaleTimeString("en-IN") : "—"}
+                        <Badge
+                          variant={
+                            row.status === "absent"
+                              ? "warning"
+                              : row.status === "in"
+                                ? "muted"
+                                : "outline"
+                          }
+                        >
+                          {row.status === "absent"
+                            ? "Absent"
+                            : row.status === "in"
+                              ? "Present"
+                              : "Out"}
+                        </Badge>
                       </TableCell>
                       <TableCell>
-                        {a.checkOutAt ? new Date(a.checkOutAt).toLocaleTimeString("en-IN") : "—"}
+                        {row.checkInAt
+                          ? new Date(row.checkInAt).toLocaleTimeString("en-IN")
+                          : "—"}
+                      </TableCell>
+                      <TableCell>
+                        {row.checkOutAt
+                          ? new Date(row.checkOutAt).toLocaleTimeString("en-IN")
+                          : "—"}
                       </TableCell>
                     </TableRow>
                   ))}

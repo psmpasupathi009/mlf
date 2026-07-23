@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ComponentType, type ReactNode } from "react";
 import {
   AlertTriangle,
   Briefcase,
@@ -13,16 +13,23 @@ import {
   Users,
   ClipboardCheck,
   ArrowRight,
-  Phone,
-  Video,
-  Building2,
   UserCheck,
+  UserX,
+  CheckCircle2,
 } from "lucide-react";
 import type { PublicUser } from "@/lib/auth/session";
 import { isModuleEnabled } from "@/config/company/modules";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { apiFetch } from "@/lib/api/client";
 import { UnitIdBadge } from "@/shared/components/data/unit-id-badge";
 import { cn } from "@/lib/utils/cn";
@@ -115,8 +122,32 @@ type DashboardSummary = {
   };
 };
 
+type DayKindFilter = "all" | "appointments" | "hearings";
+
+type TimelineRow = {
+  key: string;
+  kind: "appointment" | "hearing";
+  sortAt: number;
+  timeLabel: string;
+  title: string;
+  href: string;
+  client: string;
+  advocate: ReactNode;
+  detail: string;
+  refId: string;
+  advocateMobile: string | null;
+};
+
 function rupee(n: number) {
   return `₹${n.toLocaleString("en-IN")}`;
+}
+
+function tenDigits(mobile: string | null | undefined): string | null {
+  if (!mobile) return null;
+  const d = mobile.replace(/\D/g, "");
+  if (d.length >= 12 && d.startsWith("91")) return d.slice(-10);
+  if (d.length === 10) return d;
+  return d.slice(-10) || null;
 }
 
 function greetingLabel(date = new Date()) {
@@ -141,16 +172,21 @@ function formatTodayLabel(date = new Date()) {
   }).format(date);
 }
 
-function ModeIcon({ mode }: { mode: string }) {
-  if (mode === "call") return <Phone className="size-3.5" />;
-  if (mode === "video") return <Video className="size-3.5" />;
-  return <Building2 className="size-3.5" />;
+function formatHearingTime(iso: string | null): string {
+  if (!iso) return "—";
+  return new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }).format(new Date(iso));
 }
 
 export function WelcomeOverview({ user }: WelcomeOverviewProps) {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [advocateFilter, setAdvocateFilter] = useState<string>("all");
+  const [dayFilter, setDayFilter] = useState<DayKindFilter>("all");
   const perms = useMemo(
     () => new Set(user?.permissions ?? []),
     [user?.permissions]
@@ -163,6 +199,8 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
     summary?.isOfficeAdmin ||
     user?.roles.includes("admin") ||
     user?.roles.includes("sub_admin");
+
+  const myMobile = tenDigits(user?.mobile);
 
   useEffect(() => {
     if (!user) return;
@@ -186,19 +224,170 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
 
   const firstName = user?.name?.trim().split(/\s+/)[0];
   const todayHearings = summary?.cases?.todayHearings ?? [];
-  const todayAppts = useMemo(() => {
-    const list = summary?.appointments?.todayList ?? [];
-    if (advocateFilter === "all") return list;
-    if (advocateFilter === "unassigned") {
-      return list.filter((a) => !a.advocateMobile);
+
+  const advocateBoard = useMemo(() => {
+    const loadMap = new Map(
+      (summary?.appointments?.byAdvocate ?? []).map((a) => [
+        a.mobile || a.name,
+        a,
+      ])
+    );
+    const attendance = summary?.adminBoard?.advocates ?? [];
+
+    type BoardRow = {
+      key: string;
+      name: string;
+      mobile: string | null;
+      today: number;
+      week: number;
+      checkedIn: boolean;
+      checkedOut: boolean;
+      filterKey: string;
+      showAttendance: boolean;
+      status: "absent" | "in" | "out" | "unknown";
+    };
+
+    const statusRank = { absent: 0, out: 1, in: 2, unknown: 3 } as const;
+
+    let rows: BoardRow[];
+
+    if (attendance.length > 0) {
+      rows = attendance.map((a) => {
+        const load =
+          (a.mobile ? loadMap.get(a.mobile) : undefined) ?? loadMap.get(a.name);
+        const status: BoardRow["status"] = a.checkedOut
+          ? "out"
+          : a.checkedIn
+            ? "in"
+            : "absent";
+        return {
+          key: a.unitId,
+          name: a.name,
+          mobile: a.mobile,
+          today: load?.today ?? 0,
+          week: load?.week ?? 0,
+          checkedIn: a.checkedIn,
+          checkedOut: a.checkedOut,
+          filterKey: a.mobile || "unassigned",
+          showAttendance: true,
+          status,
+        };
+      });
+    } else {
+      rows = (summary?.appointments?.byAdvocate ?? []).map((a) => ({
+        key: a.mobile || a.name,
+        name: a.name,
+        mobile: a.mobile || null,
+        today: a.today,
+        week: a.week,
+        checkedIn: false,
+        checkedOut: false,
+        filterKey: a.mobile || "unassigned",
+        showAttendance: false,
+        status: "unknown" as const,
+      }));
     }
-    return list.filter((a) => a.advocateMobile === advocateFilter);
-  }, [summary?.appointments?.todayList, advocateFilter]);
+
+    return rows.sort((a, b) => {
+      const rank = statusRank[a.status] - statusRank[b.status];
+      if (rank !== 0) return rank;
+      return a.name.localeCompare(b.name);
+    });
+  }, [summary?.appointments?.byAdvocate, summary?.adminBoard?.advocates]);
+
+  const presenceStats = useMemo(() => {
+    const absent = advocateBoard.filter((a) => a.status === "absent").length;
+    const present = advocateBoard.filter((a) => a.status === "in").length;
+    const out = advocateBoard.filter((a) => a.status === "out").length;
+    return { absent, present, out };
+  }, [advocateBoard]);
+
+  const timelineRows = useMemo(() => {
+    const rows: TimelineRow[] = [];
+
+    if (moduleOn("appointments") && can("appointments.view")) {
+      for (const a of summary?.appointments?.todayList ?? []) {
+        rows.push({
+          key: `appt-${a.unitId}`,
+          kind: "appointment",
+          sortAt: new Date(a.scheduledAt).getTime(),
+          timeLabel: a.timeLabel,
+          title: a.title,
+          href: "/appointments",
+          client: a.clientName ?? "No client",
+          advocate: a.advocateName ?? a.advocateMobile ?? (
+            <span className="text-amber-700">Unassigned</span>
+          ),
+          detail: [
+            a.mode,
+            `${a.durationMin} min`,
+            a.location,
+          ]
+            .filter(Boolean)
+            .join(" · "),
+          refId: a.unitId,
+          advocateMobile: a.advocateMobile,
+        });
+      }
+    }
+
+    if (moduleOn("cases") && can("cases.view")) {
+      for (const h of todayHearings) {
+        rows.push({
+          key: `hearing-${h.caseUnitId}`,
+          kind: "hearing",
+          sortAt: h.nextHearingAt
+            ? new Date(h.nextHearingAt).getTime()
+            : Number.MAX_SAFE_INTEGER,
+          timeLabel: formatHearingTime(h.nextHearingAt),
+          title: h.clientName,
+          href: `/cases/${h.caseUnitId}`,
+          client: h.clientName,
+          advocate: h.advocateName ?? h.advocateMobile ?? "—",
+          detail:
+            [h.courtName, h.district, h.caseType].filter(Boolean).join(" · ") ||
+            "Court not set",
+          refId: h.caseUnitId,
+          advocateMobile: h.advocateMobile ?? null,
+        });
+      }
+    }
+
+    rows.sort((a, b) => a.sortAt - b.sortAt);
+
+    return rows.filter((row) => {
+      if (dayFilter === "appointments" && row.kind !== "appointment") {
+        return false;
+      }
+      if (dayFilter === "hearings" && row.kind !== "hearing") return false;
+
+      if (!isAdmin && myMobile) {
+        const adv = tenDigits(row.advocateMobile);
+        if (adv && adv !== myMobile) return false;
+        if (!adv && row.kind === "appointment") return false;
+      }
+
+      if (advocateFilter === "all") return true;
+      if (advocateFilter === "unassigned") return !row.advocateMobile;
+      return tenDigits(row.advocateMobile) === tenDigits(advocateFilter);
+    });
+    // can/moduleOn are stable enough for this render; summary drives data
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    summary?.appointments?.todayList,
+    todayHearings,
+    dayFilter,
+    advocateFilter,
+    isAdmin,
+    myMobile,
+    user?.permissions,
+  ]);
 
   const attention: {
     label: string;
     value: string;
     href: string;
+    cta: string;
     tone: "warning" | "danger" | "info";
   }[] = [];
 
@@ -211,6 +400,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
       label: "Cases missing court number",
       value: String(summary!.cases!.missingCourtNumber),
       href: "/cases?missingCourtNumber=1",
+      cta: "Open",
       tone: "warning",
     });
   }
@@ -223,6 +413,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
       label: "Pending payments",
       value: `${summary!.accounts!.pendingCount} · ${rupee(summary!.accounts!.pendingAmount)}`,
       href: "/accounts",
+      cta: "Review",
       tone: "danger",
     });
   }
@@ -235,6 +426,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
       label: "Leave approvals waiting",
       value: String(summary!.hrms!.pendingLeaveApprovals),
       href: "/hrms",
+      cta: "Approve",
       tone: "info",
     });
   }
@@ -250,6 +442,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
         summary!.appointments!.todayList.filter((a) => !a.advocateMobile).length
       ),
       href: "/appointments?hearing=today",
+      cta: "Assign",
       tone: "warning",
     });
   }
@@ -259,7 +452,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
     value: string;
     hint?: string;
     href: string;
-    icon: React.ComponentType<{ className?: string }>;
+    icon: ComponentType<{ className?: string }>;
   }[] = [];
 
   if (moduleOn("cases") && can("cases.view") && summary?.cases) {
@@ -327,6 +520,16 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
     });
   }
 
+  const canSeeTimeline =
+    (moduleOn("appointments") && can("appointments.view")) ||
+    (moduleOn("cases") && can("cases.view"));
+
+  const dayFilters: { id: DayKindFilter; label: string }[] = [
+    { id: "all", label: "All" },
+    { id: "appointments", label: "Appointments" },
+    { id: "hearings", label: "Hearings" },
+  ];
+
   return (
     <section className="space-y-6">
       <div className="overflow-hidden rounded-2xl border border-border/80 bg-navy text-white shadow-sm">
@@ -343,11 +546,9 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
             <div>
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-sm text-white/65">{formatTodayLabel()}</p>
-                {isAdmin ? (
-                  <span className="rounded-full bg-gold/20 px-2.5 py-0.5 text-[11px] font-medium text-gold">
-                    Admin office board
-                  </span>
-                ) : null}
+                <span className="rounded-full bg-gold/20 px-2.5 py-0.5 text-[11px] font-medium text-gold">
+                  {isAdmin ? "Admin office board" : "My day"}
+                </span>
               </div>
               <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
                 {greetingLabel()}
@@ -355,8 +556,8 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
               </h1>
               <p className="mt-2 max-w-xl text-sm leading-relaxed text-white/70">
                 {isAdmin
-                  ? "All advocate appointments, today’s hearings, cash, and staff — one board."
-                  : "Office overview for today — hearings, appointments, and what needs attention."}
+                  ? "Act on blockers, then scan today’s schedule and who’s in."
+                  : "Your schedule for today — appointments, hearings, and attendance."}
               </p>
             </div>
 
@@ -453,412 +654,276 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
         </div>
       ) : null}
 
-      {/* Admin: advocate load + attendance */}
-      {isAdmin &&
-      !loading &&
-      ((summary?.appointments?.byAdvocate.length ?? 0) > 0 ||
-        summary?.adminBoard) ? (
-        <div className="grid gap-4 md:grid-cols-2">
-          {moduleOn("appointments") &&
-          can("appointments.view") &&
-          summary?.appointments ? (
-            <Card>
-              <div className="flex flex-wrap items-start justify-between gap-2 border-b border-border/80 px-4 py-3 sm:px-5 sm:py-4">
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-base font-semibold text-navy">
-                    Advocate appointment load
-                  </h2>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Today / this week (IST)
-                  </p>
-                </div>
-                <Button asChild variant="ghost" size="sm" className="shrink-0">
-                  <Link href="/appointments">
-                    All
-                    <ArrowRight className="size-4" />
-                  </Link>
-                </Button>
-              </div>
-              <CardContent className="p-0">
-                {(summary.appointments.byAdvocate.length ?? 0) === 0 ? (
-                  <p className="px-5 py-8 text-sm text-muted-foreground">
-                    No scheduled appointments yet.
-                  </p>
-                ) : (
-                  <ul className="divide-y divide-border/80">
-                    {summary.appointments.byAdvocate.map((a) => (
-                      <li key={a.mobile || a.name}>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setAdvocateFilter(
-                              a.mobile
-                                ? advocateFilter === a.mobile
-                                  ? "all"
-                                  : a.mobile
-                                : advocateFilter === "unassigned"
-                                  ? "all"
-                                  : "unassigned"
-                            )
-                          }
-                          className={cn(
-                            "flex w-full items-center justify-between gap-3 px-5 py-3 text-left transition-colors hover:bg-muted/50",
-                            (a.mobile && advocateFilter === a.mobile) ||
-                              (!a.mobile && advocateFilter === "unassigned")
-                              ? "bg-muted/40"
-                              : null
-                          )}
-                        >
-                          <div className="min-w-0">
-                            <p className="truncate text-sm font-medium text-navy">
-                              {a.name}
-                            </p>
-                            {a.mobile ? (
-                              <p className="text-xs text-muted-foreground">
-                                {a.mobile}
-                              </p>
-                            ) : null}
-                          </div>
-                          <div className="flex shrink-0 gap-2">
-                            <Badge variant="muted">{a.today} today</Badge>
-                            <Badge variant="outline">{a.week} week</Badge>
-                          </div>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
-          ) : null}
-
-          {summary?.adminBoard ? (
-            <Card>
-              <div className="flex flex-wrap items-start justify-between gap-2 border-b border-border/80 px-4 py-3 sm:px-5 sm:py-4">
-                <div className="min-w-0 flex-1">
-                  <h2 className="text-base font-semibold text-navy">
-                    Advocate attendance today
-                  </h2>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {summary.adminBoard.checkedInCount} /{" "}
-                    {summary.adminBoard.advocateCount} checked in
-                  </p>
-                </div>
-                <Button asChild variant="ghost" size="sm" className="shrink-0">
-                  <Link href="/hrms">
-                    HRMS
-                    <ArrowRight className="size-4" />
-                  </Link>
-                </Button>
-              </div>
-              <CardContent className="max-h-72 overflow-y-auto p-0">
-                {summary.adminBoard.advocates.length === 0 ? (
-                  <p className="px-5 py-8 text-sm text-muted-foreground">
-                    No active advocates in staff list.
-                  </p>
-                ) : (
-                  <ul className="divide-y divide-border/80">
-                    {summary.adminBoard.advocates.map((a) => (
-                      <li
-                        key={a.unitId}
-                        className="flex items-center justify-between gap-3 px-5 py-3"
-                      >
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium text-navy">
-                            {a.name}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {a.mobile ?? a.unitId}
-                          </p>
-                        </div>
-                        <Badge
-                          variant={a.checkedIn ? "muted" : "warning"}
-                          className="shrink-0"
-                        >
-                          <UserCheck className="mr-1 size-3" />
-                          {a.checkedOut
-                            ? "Out"
-                            : a.checkedIn
-                              ? "In"
-                              : "Absent"}
-                        </Badge>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </CardContent>
-            </Card>
-          ) : null}
-        </div>
-      ) : null}
-
-      <div className="grid gap-4 xl:grid-cols-[1.35fr_1fr]">
-        {/* Today's appointments — full details */}
-        {moduleOn("appointments") && can("appointments.view") ? (
-          <Card className="overflow-hidden xl:row-span-2">
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/80 px-5 py-4">
+      {/* 1. Action queue */}
+      {!loading ? (
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-base font-semibold text-navy">Action queue</h2>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Items that need a decision before the day runs
+            </p>
+          </div>
+          {attention.length === 0 ? (
+            <div className="flex items-center gap-3 rounded-xl border border-emerald-200/80 bg-emerald-50/50 px-4 py-3.5 sm:px-5">
+              <CheckCircle2 className="size-5 shrink-0 text-emerald-700" />
               <div>
-                <h2 className="text-base font-semibold text-navy">
-                  Today’s appointments
-                  {isAdmin ? " — all advocates" : ""}
-                </h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {advocateFilter === "all"
-                    ? "Full diary with client, advocate, mode"
-                    : `Filtered · tap advocate load to clear`}
+                <p className="text-sm font-medium text-navy">All clear</p>
+                <p className="text-xs text-muted-foreground">
+                  No blockers on the board right now.
                 </p>
               </div>
-              <div className="flex gap-2">
-                {advocateFilter !== "all" ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setAdvocateFilter("all")}
-                  >
-                    Clear filter
-                  </Button>
-                ) : null}
-                <Button asChild variant="ghost" size="sm">
-                  <Link href="/appointments?hearing=today">
-                    Open list
-                    <ArrowRight className="size-4" />
-                  </Link>
-                </Button>
-              </div>
             </div>
-            <CardContent className="p-0">
-              {loading ? (
-                <div className="space-y-3 p-5">
-                  {Array.from({ length: 3 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-16 animate-pulse rounded-lg bg-muted"
-                    />
-                  ))}
-                </div>
-              ) : todayAppts.length === 0 ? (
-                <div className="px-5 py-12 text-center">
-                  <CalendarClock className="mx-auto size-8 text-muted-foreground/50" />
-                  <p className="mt-3 text-sm font-medium text-navy">
-                    No appointments today
-                  </p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Book a consultation and assign an advocate.
-                  </p>
-                  {can("appointments.create") ? (
-                    <Button asChild size="sm" className="mt-4">
-                      <Link href="/appointments?new=1">Book appointment</Link>
-                    </Button>
-                  ) : null}
-                </div>
-              ) : (
-                <ul className="divide-y divide-border/80">
-                  {todayAppts.map((a) => (
-                    <li key={a.unitId}>
-                      <Link
-                        href="/appointments"
-                        className="flex flex-col gap-2 px-5 py-4 transition-colors hover:bg-muted/50 sm:flex-row sm:items-start sm:justify-between"
-                      >
-                        <div className="min-w-0 space-y-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="rounded-md bg-navy/5 px-2 py-0.5 text-xs font-semibold text-navy">
-                              {a.timeLabel}
-                            </span>
-                            <p className="font-medium text-navy">{a.title}</p>
-                            <UnitIdBadge value={a.unitId} />
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            {a.clientName
-                              ? `Client: ${a.clientName}`
-                              : "No client linked"}
-                            {a.clientMobile ? ` · ${a.clientMobile}` : ""}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            Advocate:{" "}
-                            {a.advocateName ?? a.advocateMobile ?? (
-                              <span className="text-amber-700">Unassigned</span>
-                            )}
-                            {a.location ? ` · ${a.location}` : ""}
-                          </p>
-                          {a.notes ? (
-                            <p className="line-clamp-1 text-xs text-muted-foreground">
-                              {a.notes}
-                            </p>
-                          ) : null}
-                        </div>
-                        <div className="flex shrink-0 flex-wrap gap-1.5">
-                          <Badge variant="outline" className="capitalize">
-                            <ModeIcon mode={a.mode} />
-                            <span className="ml-1">{a.mode}</span>
-                          </Badge>
-                          <Badge variant="muted">{a.durationMin} min</Badge>
-                        </div>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-        ) : null}
-
-        <div className="space-y-4">
-          <Card className="overflow-hidden">
-            <div className="flex flex-wrap items-start justify-between gap-2 border-b border-border/80 px-4 py-3 sm:px-5 sm:py-4">
-              <div className="min-w-0 flex-1">
-                <h2 className="text-base font-semibold text-navy">
-                  Today’s hearings
-                </h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Cause list with advocate on record
-                </p>
-              </div>
-              {moduleOn("cases") && can("cases.view") ? (
-                <Button asChild variant="ghost" size="sm" className="shrink-0">
-                  <Link href="/cases?hearing=today">
-                    Today’s list
-                    <ArrowRight className="size-4" />
-                  </Link>
-                </Button>
-              ) : null}
-            </div>
-            <CardContent className="p-0">
-              {!moduleOn("cases") || !can("cases.view") ? (
-                <p className="px-5 py-10 text-sm text-muted-foreground">
-                  You don’t have access to cases.
-                </p>
-              ) : loading ? (
-                <div className="space-y-3 p-5">
-                  {Array.from({ length: 2 }).map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-14 animate-pulse rounded-lg bg-muted"
-                    />
-                  ))}
-                </div>
-              ) : todayHearings.length === 0 ? (
-                <div className="px-5 py-10 text-center">
-                  <CalendarDays className="mx-auto size-7 text-muted-foreground/50" />
-                  <p className="mt-2 text-sm font-medium text-navy">
-                    No hearings today
-                  </p>
-                </div>
-              ) : (
-                <ul className="max-h-80 divide-y divide-border/80 overflow-y-auto">
-                  {todayHearings.map((h) => (
-                    <li key={h.caseUnitId}>
-                      <Link
-                        href={`/cases/${h.caseUnitId}`}
-                        className="block px-5 py-3.5 transition-colors hover:bg-muted/50"
-                      >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-medium text-navy">{h.clientName}</p>
-                          <UnitIdBadge value={h.caseUnitId} />
-                          {h.caseNumber ? (
-                            <Badge variant="outline">{h.caseNumber}</Badge>
-                          ) : (
-                            <Badge variant="warning">No court no.</Badge>
-                          )}
-                        </div>
-                        <p className="mt-1 truncate text-sm text-muted-foreground">
-                          {[h.courtName, h.district, h.caseType]
-                            .filter(Boolean)
-                            .join(" · ") || "Court not set"}
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          Adv:{" "}
-                          {h.advocateName ?? h.advocateMobile ?? "—"}
-                        </p>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <div className="border-b border-border/80 px-5 py-4">
-              <h2 className="text-base font-semibold text-navy">
-                Needs attention
-              </h2>
-            </div>
-            <CardContent className="p-0">
-              {loading ? (
-                <div className="space-y-2 p-4">
-                  <div className="h-12 animate-pulse rounded-lg bg-muted" />
-                </div>
-              ) : attention.length === 0 ? (
-                <div className="flex items-start gap-3 px-5 py-8">
-                  <ClipboardCheck className="mt-0.5 size-5 text-emerald-600" />
-                  <div>
-                    <p className="text-sm font-medium text-navy">All clear</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      No blockers on the office board right now.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <ul className="divide-y divide-border/80">
-                  {attention.map((item) => (
-                    <li key={item.label}>
-                      <Link
-                        href={item.href}
-                        className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-muted/50"
-                      >
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Issue</TableHead>
+                  <TableHead>Detail</TableHead>
+                  <TableHead className="text-right">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {attention.map((item) => (
+                  <TableRow key={item.label}>
+                    <TableCell>
+                      <div className="flex items-center gap-2.5">
                         <span
                           className={cn(
-                            "flex size-9 shrink-0 items-center justify-center rounded-lg",
+                            "flex size-8 shrink-0 items-center justify-center rounded-lg",
                             item.tone === "danger" && "bg-red-50 text-red-700",
                             item.tone === "warning" &&
                               "bg-amber-50 text-amber-800",
                             item.tone === "info" && "bg-[#eef1f6] text-navy"
                           )}
                         >
-                          <AlertTriangle className="size-4" />
+                          <AlertTriangle className="size-3.5" />
                         </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-navy">
-                            {item.label}
-                          </p>
-                          <p className="truncate text-xs text-muted-foreground">
-                            {item.value}
-                          </p>
-                        </div>
-                        <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
+                        <span className="font-medium text-navy">
+                          {item.label}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {item.value}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={item.href}>
+                          {item.cta}
+                          <ArrowRight className="size-3.5" />
+                        </Link>
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </section>
+      ) : null}
 
-          {moduleOn("hrms") && can("hrms.own_attendance") && summary?.hrms ? (
-            <Card>
-              <CardContent className="p-5">
-                <h2 className="text-base font-semibold text-navy">
-                  Your attendance
-                </h2>
-                <div className="mt-3 flex items-center justify-between rounded-lg bg-muted/60 px-3 py-2.5 text-sm">
-                  <span className="text-muted-foreground">Today</span>
-                  <span className="font-medium text-navy">
-                    {summary.hrms.checkedOutToday
-                      ? "Checked out"
-                      : summary.hrms.checkedInToday
-                        ? "Checked in"
-                        : "Not checked in"}
-                  </span>
-                </div>
-                <Button asChild variant="outline" size="sm" className="mt-3">
-                  <Link href="/hrms">Open HRMS</Link>
+      {/* 2. Today timeline */}
+      {canSeeTimeline ? (
+        <section className="space-y-3">
+          <div className="flex flex-wrap items-end justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-navy">
+                {isAdmin ? "Today’s schedule" : "My day"}
+              </h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Appointments and hearings in one timeline
+                {advocateFilter !== "all" ? " · filtered by advocate" : ""}
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {advocateFilter !== "all" ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setAdvocateFilter("all")}
+                >
+                  Clear advocate
                 </Button>
-              </CardContent>
-            </Card>
-          ) : null}
+              ) : null}
+              {moduleOn("appointments") && can("appointments.view") ? (
+                <Button asChild variant="ghost" size="sm">
+                  <Link href="/appointments?hearing=today">
+                    Appointments
+                    <ArrowRight className="size-4" />
+                  </Link>
+                </Button>
+              ) : null}
+              {moduleOn("cases") && can("cases.view") ? (
+                <Button asChild variant="ghost" size="sm">
+                  <Link href="/cases?hearing=today">
+                    Hearings
+                    <ArrowRight className="size-4" />
+                  </Link>
+                </Button>
+              ) : null}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            {dayFilters.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setDayFilter(f.id)}
+                className={cn(
+                  "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                  dayFilter === f.id
+                    ? "bg-navy text-white"
+                    : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-navy"
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {loading ? (
+            <div className="h-44 animate-pulse rounded-xl border border-border/80 bg-white" />
+          ) : timelineRows.length === 0 ? (
+            <div className="rounded-xl border border-border/80 bg-white px-5 py-12 text-center shadow-sm shadow-black/2">
+              <CalendarClock className="mx-auto size-8 text-muted-foreground/50" />
+              <p className="mt-3 text-sm font-medium text-navy">
+                Nothing scheduled today
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {isAdmin
+                  ? "Book an appointment or check tomorrow’s cause list."
+                  : "No appointments or hearings assigned to you today."}
+              </p>
+              {can("appointments.create") ? (
+                <Button asChild size="sm" className="mt-4">
+                  <Link href="/appointments?new=1">Book appointment</Link>
+                </Button>
+              ) : null}
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-24">Time</TableHead>
+                  <TableHead className="w-28">Type</TableHead>
+                  <TableHead>Title / client</TableHead>
+                  <TableHead>Advocate</TableHead>
+                  <TableHead>Detail</TableHead>
+                  <TableHead>Ref</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {timelineRows.map((row) => (
+                  <TableRow key={row.key}>
+                    <TableCell className="whitespace-nowrap font-semibold text-navy">
+                      {row.timeLabel}
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        variant={
+                          row.kind === "hearing" ? "warning" : "muted"
+                        }
+                        className="capitalize"
+                      >
+                        {row.kind === "hearing" ? (
+                          <CalendarDays className="mr-1 size-3" />
+                        ) : (
+                          <CalendarClock className="mr-1 size-3" />
+                        )}
+                        {row.kind === "hearing" ? "Hearing" : "Appt"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Link
+                        href={row.href}
+                        className="font-medium text-navy hover:underline"
+                      >
+                        {row.title}
+                      </Link>
+                      {row.kind === "appointment" &&
+                      row.client !== row.title ? (
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {row.client}
+                        </p>
+                      ) : null}
+                    </TableCell>
+                    <TableCell>{row.advocate}</TableCell>
+                    <TableCell className="max-w-52 truncate text-muted-foreground">
+                      {row.detail}
+                    </TableCell>
+                    <TableCell>
+                      <UnitIdBadge value={row.refId} />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </section>
+      ) : null}
+
+      {/* 3. Advocate presence — compact counts only; details in HRMS */}
+      {isAdmin && !loading && advocateBoard.some((a) => a.showAttendance) ? (
+        <Link
+          href="/hrms"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/80 bg-white px-4 py-3 shadow-sm shadow-black/2 transition-colors hover:border-navy/30 sm:px-5"
+        >
+          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-navy">
+                Advocate presence
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Today · open HRMS for full list
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900">
+                <UserX className="size-3.5" />
+                {presenceStats.absent} absent
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+                <UserCheck className="size-3.5" />
+                {presenceStats.present} present
+              </span>
+              <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                {presenceStats.out} out
+              </span>
+            </div>
+          </div>
+          <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-navy">
+            HRMS
+            <ArrowRight className="size-3.5" />
+          </span>
+        </Link>
+      ) : null}
+
+      {/* Personal attendance (non-admin) */}
+      {!isAdmin &&
+      moduleOn("hrms") &&
+      can("hrms.own_attendance") &&
+      summary?.hrms ? (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/80 bg-white px-4 py-3.5 shadow-sm shadow-black/2 sm:px-5">
+          <div className="flex items-center gap-3">
+            <ClipboardCheck className="size-5 text-navy" />
+            <div>
+              <p className="text-sm font-semibold text-navy">Your attendance</p>
+              <p className="text-xs text-muted-foreground">
+                {summary.hrms.checkedOutToday
+                  ? "Checked out"
+                  : summary.hrms.checkedInToday
+                    ? "Checked in"
+                    : "Not checked in"}
+              </p>
+            </div>
+          </div>
+          <Button asChild variant="outline" size="sm">
+            <Link href="/hrms">Open HRMS</Link>
+          </Button>
         </div>
-      </div>
+      ) : null}
     </section>
   );
 }
