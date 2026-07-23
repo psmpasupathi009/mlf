@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import {
-  getAdminRoleForMobile,
   isEnvAdminMobile,
   normalizeMobile,
 } from "@/lib/auth/mobile";
@@ -25,7 +24,11 @@ export async function POST(request: Request) {
     if (!parsed.success) {
       return applyCorsHeaders(
         request,
-        jsonFail("VALIDATION", "Invalid mobile number", 400)
+        jsonFail(
+          "VALIDATION",
+          "Enter a valid 10-digit Indian mobile number",
+          400
+        )
       );
     }
 
@@ -35,7 +38,7 @@ export async function POST(request: Request) {
         request,
         jsonFail(
           "VALIDATION",
-          "Enter a valid 10-digit Indian mobile number",
+          "Enter a valid 10-digit Indian mobile number (starts with 6–9)",
           400
         )
       );
@@ -65,7 +68,8 @@ export async function POST(request: Request) {
           request,
           jsonOk({
             status: "not_found" as const,
-            message: "Number not registered. Contact admin.",
+            message:
+              "This number is not registered. Contact your admin for access.",
           })
         );
       }
@@ -80,7 +84,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (isEnvAdminMobile(mobile) && getAdminRoleForMobile(mobile)) {
+    if (isEnvAdminMobile(mobile)) {
       return applyCorsHeaders(
         request,
         jsonOk({ status: "otp_required" as const })
@@ -91,14 +95,29 @@ export async function POST(request: Request) {
       request,
       jsonOk({
         status: "not_found" as const,
-        message: "Number not registered. Contact admin.",
+        message:
+          "This number is not registered. Contact your admin for access.",
       })
     );
   } catch (error) {
     console.error("check-mobile error", error);
+    const message = String(
+      error instanceof Error ? error.message : error
+    ).toLowerCase();
+    const dbDown =
+      message.includes("server selection") ||
+      message.includes("connect") ||
+      message.includes("timed out") ||
+      message.includes("replica");
     return applyCorsHeaders(
       request,
-      jsonFail("SERVER_ERROR", "Something went wrong", 500)
+      jsonFail(
+        "SERVER_ERROR",
+        dbDown
+          ? "Database unreachable. Check MongoDB Atlas Network Access (IP allowlist)."
+          : "Could not verify this number. Please try again.",
+        500
+      )
     );
   }
 }

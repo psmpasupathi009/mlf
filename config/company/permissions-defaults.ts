@@ -125,9 +125,12 @@ function buildMatrix(): Matrix {
     grant("admin", module, action);
   }
 
-  // sub_admin
+  // sub_admin — can manage employees (not assign admin; API guard enforces that)
   all("sub_admin", [
     ["employees", "view"],
+    ["employees", "create"],
+    ["employees", "edit"],
+    ["employees", "deactivate"],
     ["clients", "view"],
     ["clients", "create"],
     ["clients", "edit"],

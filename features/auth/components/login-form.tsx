@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { Lock } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { OtpStep } from "@/features/auth/components/otp-step";
@@ -90,7 +91,7 @@ export function LoginForm() {
     if (busy) return;
     setError("");
     if (mobile.length !== 10 || !/^[6-9]/.test(mobile)) {
-      setError("Enter a valid 10-digit Indian mobile (starts with 6–9)");
+      setError("Enter a valid 10-digit Indian mobile number (starts with 6–9)");
       return;
     }
 
@@ -103,7 +104,25 @@ export function LoginForm() {
     setLoading(false);
 
     if (!ok) {
-      setError(getErrorMessage(data, "Unable to check mobile"));
+      const code = getErrorCode(data);
+      if (code === "VALIDATION") {
+        setError(
+          getErrorMessage(
+            data,
+            "Enter a valid 10-digit Indian mobile number"
+          )
+        );
+        return;
+      }
+      if (code === "RATE_LIMITED") {
+        setError(
+          getErrorMessage(data, "Too many attempts. Please try again later.")
+        );
+        return;
+      }
+      setError(
+        getErrorMessage(data, "Could not verify this number. Please try again.")
+      );
       return;
     }
 
@@ -118,7 +137,15 @@ export function LoginForm() {
       return;
     }
 
-    setError(data.message || "Number not registered. Contact admin.");
+    if (data.status === "not_found") {
+      setError(
+        data.message ||
+          "This number is not registered. Contact your admin for access."
+      );
+      return;
+    }
+
+    setError("Could not verify this number. Please try again.");
   }
 
   async function sendOtp(purpose: "setup" | "forgot_pin") {
@@ -282,7 +309,11 @@ export function LoginForm() {
   return (
     <div className="w-full text-foreground">
       <header className="mb-9">
-        <div className="mb-3 h-px w-8 bg-gold" aria-hidden />
+        <Lock
+          aria-hidden
+          className="mb-3 size-5 text-navy sm:size-6"
+          strokeWidth={1.75}
+        />
         <h2 className="text-xl font-semibold tracking-tight text-navy sm:text-[1.5rem]">
           {heading.title}
         </h2>

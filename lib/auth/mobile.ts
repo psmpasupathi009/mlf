@@ -16,39 +16,15 @@ export function displayMobile(mobile91: string): string {
   return mobile91.startsWith("91") ? mobile91.slice(2) : mobile91;
 }
 
-function envAdminMobiles(): {
-  admin: string | null;
-  subAdmin: string | null;
-} {
-  const admin = normalizeMobile(process.env.ADMIN_MOBILE_1 ?? "");
-  const subAdmin = normalizeMobile(process.env.ADMIN_MOBILE_2 ?? "");
-
-  if (admin && subAdmin && admin === subAdmin) {
-    console.error(
-      "[auth] ADMIN_MOBILE_1 and ADMIN_MOBILE_2 must be unique different numbers"
-    );
-    return { admin, subAdmin: null };
-  }
-
-  return { admin, subAdmin };
+/** Bootstrap admin mobile from `ADMIN_MOBILE` (legacy: `ADMIN_MOBILE_1`). */
+export function getEnvAdminMobile(): string | null {
+  return normalizeMobile(
+    process.env.ADMIN_MOBILE ?? process.env.ADMIN_MOBILE_1 ?? ""
+  );
 }
 
-export function getAdminRoleForMobile(
-  mobile91: string
-): "admin" | "sub_admin" | null {
-  const { admin, subAdmin } = envAdminMobiles();
-  if (admin && mobile91 === admin) return "admin";
-  if (subAdmin && mobile91 === subAdmin) return "sub_admin";
-  return null;
-}
-
-export function getAdminRolesForMobile(
-  mobile91: string
-): ("admin" | "sub_admin")[] {
-  const role = getAdminRoleForMobile(mobile91);
-  return role ? [role] : [];
-}
-
+/** True when this mobile is the env bootstrap admin (first-time setup only). */
 export function isEnvAdminMobile(mobile91: string): boolean {
-  return getAdminRoleForMobile(mobile91) !== null;
+  const admin = getEnvAdminMobile();
+  return Boolean(admin && mobile91 === admin);
 }

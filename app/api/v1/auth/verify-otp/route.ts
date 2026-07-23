@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { signOtpProofToken } from "@/lib/auth/jwt";
 import {
-  getAdminRolesForMobile,
   isEnvAdminMobile,
   normalizeMobile,
 } from "@/lib/auth/mobile";
@@ -100,15 +99,11 @@ export async function POST(request: Request) {
     if (purpose === "setup") {
       let user = await findUserByMobile(mobile);
       if (!user && isEnvAdminMobile(mobile)) {
-        const roles = getAdminRolesForMobile(mobile);
-        if (roles.length === 0) {
-          return applyCorsHeaders(
-            request,
-            jsonFail("UNAUTHORIZED", "Unauthorized mobile", 403)
-          );
-        }
         try {
-          user = await createUserWithUniqueMobile({ mobile, roles });
+          user = await createUserWithUniqueMobile({
+            mobile,
+            roles: ["admin"],
+          });
         } catch (error) {
           if (error instanceof MobileConflictError) {
             return applyCorsHeaders(
