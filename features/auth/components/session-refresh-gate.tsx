@@ -1,39 +1,42 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { apiFetch } from "@/lib/api/client";
+import { ensureSessionRefresh } from "@/lib/api/client";
 
 /**
- * When access JWT expired but refresh cookie exists, refresh once then reload RSC.
+ * When access JWT expired but refresh cookie exists, refresh once then
+ * hard-navigate so RSC picks up new cookies reliably.
  */
-export function SessionRefreshGate({ children }: { children: React.ReactNode }) {
-  const router = useRouter();
-  const [ready, setReady] = useState(false);
+export function SessionRefreshGate() {
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    const timeout = window.setTimeout(() => {
+      if (!cancelled) {
+        setFailed(true);
+        window.location.assign("/login");
+      }
+    }, 15000);
 
     (async () => {
-      const { ok } = await apiFetch("/api/v1/auth/refresh", {
-        method: "POST",
-        json: {},
-      });
+      const ok = await ensureSessionRefresh();
       if (cancelled) return;
+      window.clearTimeout(timeout);
       if (!ok) {
         setFailed(true);
-        router.replace("/login");
+        // Clear leftovers then login
+        window.location.assign("/api/v1/auth/session-expired");
         return;
       }
-      setReady(true);
-      router.refresh();
+      window.location.assign("/");
     })();
 
     return () => {
       cancelled = true;
+      window.clearTimeout(timeout);
     };
-  }, [router]);
+  }, []);
 
   if (failed) {
     return (
@@ -43,13 +46,9 @@ export function SessionRefreshGate({ children }: { children: React.ReactNode }) 
     );
   }
 
-  if (!ready) {
-    return (
-      <div className="flex flex-1 items-center justify-center p-8 text-sm text-muted-foreground">
-        Restoring session…
-      </div>
-    );
-  }
-
-  return <>{children}</>;
+  return (
+    <div className="flex flex-1 items-center justify-center p-8 text-sm text-muted-foreground">
+      Restoring session…
+    </div>
+  );
 }

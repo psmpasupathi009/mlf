@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { OtpStep } from "@/features/auth/components/otp-step";
@@ -11,7 +11,9 @@ import {
   authFetch,
   getErrorCode,
   getErrorMessage,
+  getRetryAfterSec,
 } from "@/lib/api/client";
+import { isWeakPin } from "@/lib/auth/pin-rules";
 
 type Step =
   | "phone"
@@ -35,15 +37,33 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [pinLocked, setPinLocked] = useState(false);
+  const [lockRemainingSec, setLockRemainingSec] = useState(0);
 
   const busy = loading || pending;
+
+  useEffect(() => {
+    if (!pinLocked) return;
+    const id = window.setInterval(() => {
+      setLockRemainingSec((s) => {
+        if (s <= 1) {
+          setPinLocked(false);
+          setError("");
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => window.clearInterval(id);
+  }, [pinLocked]);
 
   function resetCodes() {
     setOtp("");
     setPin("");
     setConfirmPin("");
+    setOtpProofToken("");
     setError("");
     setPinLocked(false);
+    setLockRemainingSec(0);
   }
 
   function goHome() {
@@ -53,11 +73,24 @@ export function LoginForm() {
     });
   }
 
+  function applyPinLock(data: unknown, fallbackSec = 15 * 60) {
+    const sec = getRetryAfterSec(data) ?? fallbackSec;
+    setPinLocked(true);
+    setLockRemainingSec(sec);
+    setPin("");
+    setError(
+      getErrorMessage(
+        data,
+        `PIN locked. Use Forgot PIN, or try again in ${sec}s.`
+      )
+    );
+  }
+
   async function handleCheckMobile() {
     if (busy) return;
     setError("");
-    if (mobile.length !== 10) {
-      setError("Enter a valid 10-digit mobile number");
+    if (mobile.length !== 10 || !/^[6-9]/.test(mobile)) {
+      setError("Enter a valid 10-digit Indian mobile (starts with 6–9)");
       return;
     }
 
@@ -100,9 +133,6 @@ export function LoginForm() {
 
     if (!ok) {
       setError(getErrorMessage(data, "Failed to send OTP"));
-      if (purpose === "forgot_pin") {
-        setStep("otp_forgot");
-      }
       return;
     }
 
@@ -147,14 +177,7 @@ export function LoginForm() {
       const locked =
         status === 423 || getErrorCode(data) === "PIN_LOCKED";
       if (locked) {
-        setPinLocked(true);
-        setPin("");
-        setError(
-          getErrorMessage(
-            data,
-            "PIN locked. Use Forgot PIN to reset via OTP."
-          )
-        );
+        applyPinLock(data);
         return;
       }
 
@@ -164,6 +187,7 @@ export function LoginForm() {
     }
 
     setPinLocked(false);
+    setLockRemainingSec(0);
     toast.success("Welcome back");
     goHome();
   }
@@ -172,6 +196,12 @@ export function LoginForm() {
     if (busy) return;
     if (pin !== confirmPin) {
       setError("PINs do not match");
+      return;
+    }
+    if (isWeakPin(pin)) {
+      setError(
+        "Choose a stronger 6-digit PIN. Avoid sequences like 123456 or repeated digits."
+      );
       return;
     }
 
@@ -198,6 +228,12 @@ export function LoginForm() {
       setError("PINs do not match");
       return;
     }
+    if (isWeakPin(pin)) {
+      setError(
+        "Choose a stronger 6-digit PIN. Avoid sequences like 123456 or repeated digits."
+      );
+      return;
+    }
 
     setLoading(true);
     setError("");
@@ -219,9 +255,13 @@ export function LoginForm() {
   async function handleForgotPin() {
     if (busy) return;
     resetCodes();
-    setStep("otp_forgot");
     await sendOtp("forgot_pin");
   }
+
+  const lockHint =
+    pinLocked && lockRemainingSec > 0
+      ? `Try again in ${lockRemainingSec}s, or use Forgot PIN.`
+      : undefined;
 
   const heading =
     step === "phone"
@@ -267,7 +307,7 @@ export function LoginForm() {
         <PinStep
           pin={pin}
           loading={busy}
-          error={pinLocked ? undefined : error}
+          error={pinLocked ? lockHint : error}
           showForgot
           locked={pinLocked}
           onPinChange={(value) => {
@@ -315,6 +355,10 @@ export function LoginForm() {
           onPinChange={setPin}
           onConfirmChange={setConfirmPin}
           onSubmit={handleSetupPin}
+          onBack={() => {
+            resetCodes();
+            setStep("otp_setup");
+          }}
         />
       ) : null}
 
@@ -329,6 +373,10 @@ export function LoginForm() {
           onPinChange={setPin}
           onConfirmChange={setConfirmPin}
           onSubmit={handleResetPin}
+          onBack={() => {
+            resetCodes();
+            setStep("otp_forgot");
+          }}
         />
       ) : null}
     </div>

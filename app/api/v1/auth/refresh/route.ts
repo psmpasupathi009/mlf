@@ -10,6 +10,8 @@ import {
 } from "@/lib/auth/session";
 import { jsonFail, jsonOk } from "@/lib/api/response";
 import { refreshSchema } from "@/lib/validations/auth.schema";
+import { rateLimit } from "@/lib/rate-limit";
+import { clientRateKey } from "@/lib/rate-limit/client-key";
 
 export async function OPTIONS(request: Request) {
   return corsPreflight(request) ?? new NextResponse(null, { status: 204 });
@@ -17,6 +19,23 @@ export async function OPTIONS(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const limited = await rateLimit(
+      clientRateKey(request, "refresh"),
+      60,
+      15 * 60 * 1000
+    );
+    if (!limited.allowed) {
+      return applyCorsHeaders(
+        request,
+        jsonFail(
+          "RATE_LIMITED",
+          `Too many refresh attempts. Try again in ${limited.retryAfterSec}s`,
+          429,
+          { retryAfterSec: limited.retryAfterSec }
+        )
+      );
+    }
+
     const cookieStore = await cookies();
     const cookieRefresh = cookieStore.get(REFRESH_COOKIE)?.value;
 
@@ -46,8 +65,22 @@ export async function POST(request: Request) {
       );
     }
 
-    const tokens = await rotateRefreshToken(refreshToken);
-    if (!tokens) {
+    const result = await rotateRefreshToken(refreshToken);
+
+    if (!result.ok) {
+      if (result.reason === "raced") {
+        // Another tab already rotated — browser likely has the new cookies.
+        // Do NOT clear; client should hard-reload.
+        return applyCorsHeaders(
+          request,
+          jsonFail(
+            "STALE_REFRESH",
+            "Session was renewed elsewhere. Reloading…",
+            409
+          )
+        );
+      }
+
       const response = jsonFail(
         "UNAUTHORIZED",
         "Session expired. Please sign in again.",
@@ -57,10 +90,16 @@ export async function POST(request: Request) {
     }
 
     const response = jsonOk({
-      user: tokens.user,
+      user: result.user,
     });
 
-    return applyCorsHeaders(request, attachAuthCookies(response, tokens));
+    return applyCorsHeaders(
+      request,
+      attachAuthCookies(response, {
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+      })
+    );
   } catch (error) {
     console.error("refresh error", error);
     return applyCorsHeaders(

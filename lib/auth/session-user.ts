@@ -8,6 +8,7 @@ import {
   toPublicUser,
   type PublicUser,
 } from "@/lib/auth/session";
+import { REFRESH_COOKIE_MIN_LENGTH } from "@/lib/auth/cookie-names";
 
 export const getSessionUser = cache(async (): Promise<PublicUser | null> => {
   const cookieStore = await cookies();
@@ -38,8 +39,9 @@ export const getSessionUser = cache(async (): Promise<PublicUser | null> => {
   return toPublicUser(user);
 });
 
-/** True when refresh cookie exists (access may be expired). */
+/** True when a plausible refresh cookie exists (access may be expired). */
 export async function hasRefreshCookie(): Promise<boolean> {
   const cookieStore = await cookies();
-  return Boolean(cookieStore.get(REFRESH_COOKIE)?.value);
+  const value = cookieStore.get(REFRESH_COOKIE)?.value;
+  return Boolean(value && value.length >= REFRESH_COOKIE_MIN_LENGTH);
 }

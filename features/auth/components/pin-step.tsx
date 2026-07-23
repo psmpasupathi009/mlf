@@ -65,7 +65,8 @@ export function PinStep({
           <p className="font-medium text-navy">PIN temporarily locked</p>
           <p className="mt-1 text-muted-foreground">
             Use <span className="font-medium text-foreground">Forgot PIN</span>{" "}
-            to verify OTP and set a new PIN, or wait and try again later.
+            to verify OTP and set a new PIN
+            {error ? `, or ${error.replace(/^Try again/, "try again")}` : ", or wait and try again later"}.
           </p>
           {showForgot && onForgot ? (
             <Button
@@ -112,10 +113,11 @@ export function PinStep({
           <Label className="text-[0.8125rem] font-medium tracking-wide text-foreground">
             Confirm PIN
           </Label>
-          <InputOTP
+        <InputOTP
             maxLength={PIN_LENGTH}
             value={confirmPin}
             onChange={onConfirmChange}
+            disabled={loading}
             containerClassName="justify-between sm:justify-start sm:gap-2"
           >
             <InputOTPGroup className="gap-1.5 sm:gap-2">
@@ -132,7 +134,7 @@ export function PinStep({
         </div>
       ) : null}
 
-      {error ? (
+      {error && !locked ? (
         <p className="text-sm text-destructive" role="alert">
           {error}
         </p>

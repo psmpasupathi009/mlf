@@ -17,15 +17,12 @@ export default async function PortalLayout({
     if (await hasRefreshCookie()) {
       return (
         <div className="flex min-h-full flex-1 flex-col bg-muted/30">
-          <SessionRefreshGate>
-            <div className="flex flex-1 items-center justify-center p-8 text-sm text-muted-foreground">
-              Loading portal…
-            </div>
-          </SessionRefreshGate>
+          <SessionRefreshGate />
         </div>
       );
     }
-    redirect("/login");
+    // Clears leftover access JWT (e.g. deactivated user) then → /login
+    redirect("/api/v1/auth/session-expired");
   }
 
   return <AppShell user={user}>{children}</AppShell>;

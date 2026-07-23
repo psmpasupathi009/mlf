@@ -10,6 +10,8 @@ import {
 } from "@/lib/auth/session";
 import { jsonFail, jsonOk } from "@/lib/api/response";
 import { setupPinSchema } from "@/lib/validations/auth.schema";
+import { rateLimit } from "@/lib/rate-limit";
+import { clientRateKey } from "@/lib/rate-limit/client-key";
 
 export async function OPTIONS(request: Request) {
   return corsPreflight(request) ?? new NextResponse(null, { status: 204 });
@@ -17,6 +19,23 @@ export async function OPTIONS(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    const limited = await rateLimit(
+      clientRateKey(request, "setup-pin"),
+      10,
+      15 * 60 * 1000
+    );
+    if (!limited.allowed) {
+      return applyCorsHeaders(
+        request,
+        jsonFail(
+          "RATE_LIMITED",
+          `Too many attempts. Try again in ${limited.retryAfterSec}s`,
+          429,
+          { retryAfterSec: limited.retryAfterSec }
+        )
+      );
+    }
+
     const body = await request.json();
     const parsed = setupPinSchema.safeParse(body);
     if (!parsed.success) {

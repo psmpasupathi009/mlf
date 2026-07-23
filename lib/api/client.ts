@@ -60,6 +60,17 @@ export function getErrorCode(data: unknown): string | undefined {
   return undefined;
 }
 
+/** Pull `retryAfterSec` from `{ error: { details } }` envelopes. */
+export function getRetryAfterSec(data: unknown): number | undefined {
+  const body = data as ApiEnvelope;
+  const details =
+    body?.error && typeof body.error === "object"
+      ? (body.error as { details?: { retryAfterSec?: unknown } }).details
+      : undefined;
+  const n = details?.retryAfterSec;
+  return typeof n === "number" && n > 0 ? Math.ceil(n) : undefined;
+}
+
 /** Lightweight JSON POST with credentials (web cookies) + timeout. */
 export async function authFetch<T = Record<string, unknown>>(
   path: string,
@@ -104,7 +115,11 @@ export async function authFetch<T = Record<string, unknown>>(
 
 let refreshInFlight: Promise<boolean> | null = null;
 
-async function silentRefresh(): Promise<boolean> {
+/**
+ * Shared refresh mutex — SessionRefreshGate and apiFetch must share this
+ * so concurrent tabs / Strict Mode don't race-rotate and clear cookies.
+ */
+export async function ensureSessionRefresh(): Promise<boolean> {
   if (!refreshInFlight) {
     refreshInFlight = (async () => {
       try {
@@ -115,7 +130,8 @@ async function silentRefresh(): Promise<boolean> {
           body: "{}",
           cache: "no-store",
         });
-        return res.ok;
+        // 409 = another tab already rotated; cookies should be the new ones.
+        return res.ok || res.status === 409;
       } catch {
         return false;
       } finally {
@@ -124,6 +140,11 @@ async function silentRefresh(): Promise<boolean> {
     })();
   }
   return refreshInFlight;
+}
+
+/** @deprecated Use ensureSessionRefresh */
+async function silentRefresh(): Promise<boolean> {
+  return ensureSessionRefresh();
 }
 
 /**

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { isEnvAdminMobile, normalizeMobile } from "@/lib/auth/mobile";
 import { rateLimit } from "@/lib/rate-limit";
+import { clientRateKey } from "@/lib/rate-limit/client-key";
 import {
   applyCorsHeaders,
   corsPreflight,
@@ -35,6 +36,24 @@ export async function POST(request: Request) {
           "VALIDATION",
           "Enter a valid 10-digit Indian mobile number",
           400
+        )
+      );
+    }
+
+    // Per-IP first so one attacker cannot burn many numbers' quotas.
+    const ipLimited = await rateLimit(
+      clientRateKey(request, "otp-ip"),
+      10,
+      15 * 60 * 1000
+    );
+    if (!ipLimited.allowed) {
+      return applyCorsHeaders(
+        request,
+        jsonFail(
+          "RATE_LIMITED",
+          `Too many OTP requests. Try again in ${ipLimited.retryAfterSec}s`,
+          429,
+          { retryAfterSec: ipLimited.retryAfterSec }
         )
       );
     }

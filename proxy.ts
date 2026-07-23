@@ -1,8 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { jwtVerify } from "jose";
-
-const ACCESS_COOKIE = "mlf_access";
-const REFRESH_COOKIE = "mlf_refresh";
+import {
+  ACCESS_COOKIE,
+  REFRESH_COOKIE,
+  REFRESH_COOKIE_MIN_LENGTH,
+} from "@/lib/auth/cookie-names";
 
 async function hasValidAccess(request: NextRequest): Promise<boolean> {
   const token = request.cookies.get(ACCESS_COOKIE)?.value;
@@ -19,6 +21,11 @@ async function hasValidAccess(request: NextRequest): Promise<boolean> {
   }
 }
 
+function hasRefreshCookie(request: NextRequest): boolean {
+  const value = request.cookies.get(REFRESH_COOKIE)?.value;
+  return Boolean(value && value.length >= REFRESH_COOKIE_MIN_LENGTH);
+}
+
 function isPublicPath(pathname: string): boolean {
   return pathname === "/login" || pathname.startsWith("/legal");
 }
@@ -33,7 +40,7 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isLogin = pathname === "/login";
   const authenticated = await hasValidAccess(request);
-  const hasRefresh = Boolean(request.cookies.get(REFRESH_COOKIE)?.value);
+  const hasRefresh = hasRefreshCookie(request);
   const maybeAuthed = authenticated || hasRefresh;
 
   if (!maybeAuthed && !isPublicPath(pathname)) {
@@ -48,5 +55,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|images|api).*)"],
+  matcher: ["/((?!_next|favicon.ico|images|api).*)"],
 };

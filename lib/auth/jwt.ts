@@ -20,10 +20,10 @@ export type OtpProofPayload = JWTPayload & {
   typ: "otp_proof";
 };
 
-function getSecret(name: "JWT_SECRET" | "JWT_REFRESH_SECRET"): Uint8Array {
-  const value = process.env[name];
+function getSecret(): Uint8Array {
+  const value = process.env.JWT_SECRET;
   if (!value) {
-    throw new Error(`Missing ${name} environment variable`);
+    throw new Error("Missing JWT_SECRET environment variable");
   }
   return new TextEncoder().encode(value);
 }
@@ -42,14 +42,14 @@ export async function signAccessToken(input: {
     .setSubject(input.userId)
     .setIssuedAt()
     .setExpirationTime(ACCESS_TTL)
-    .sign(getSecret("JWT_SECRET"));
+    .sign(getSecret());
 }
 
 export async function verifyAccessToken(
   token: string
 ): Promise<AccessTokenPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, getSecret("JWT_SECRET"));
+    const { payload } = await jwtVerify(token, getSecret());
     if (payload.typ !== "access" || !payload.sub) return null;
     return payload as AccessTokenPayload;
   } catch {
@@ -71,14 +71,14 @@ export async function signOtpProofToken(input: {
     .setJti(jti)
     .setIssuedAt()
     .setExpirationTime(OTP_PROOF_TTL)
-    .sign(getSecret("JWT_SECRET"));
+    .sign(getSecret());
 }
 
 export async function verifyOtpProofToken(
   token: string
 ): Promise<OtpProofPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, getSecret("JWT_SECRET"));
+    const { payload } = await jwtVerify(token, getSecret());
     if (
       payload.typ !== "otp_proof" ||
       typeof payload.mobile !== "string" ||

@@ -7,7 +7,7 @@ export type RateLimitResult = {
 
 /**
  * Mongo-backed rate limit (works across instances).
- * Swap to Redis later behind this same interface.
+ * Uses conditional increment to reduce check-then-update races.
  */
 export async function rateLimit(
   key: string,
@@ -15,6 +15,7 @@ export async function rateLimit(
   windowMs: number
 ): Promise<RateLimitResult> {
   const now = new Date();
+
   const existing = await prisma.rateLimit.findUnique({ where: { key } });
 
   if (!existing || existing.resetAt.getTime() <= now.getTime()) {
@@ -37,10 +38,26 @@ export async function rateLimit(
     };
   }
 
-  await prisma.rateLimit.update({
-    where: { key },
+  // Conditional increment — only succeeds while still under the limit.
+  const bumped = await prisma.rateLimit.updateMany({
+    where: {
+      key,
+      count: { lt: limit },
+      resetAt: { gt: now },
+    },
     data: { count: { increment: 1 } },
   });
+
+  if (bumped.count === 0) {
+    const latest = await prisma.rateLimit.findUnique({ where: { key } });
+    return {
+      allowed: false,
+      retryAfterSec: Math.max(
+        1,
+        Math.ceil(((latest?.resetAt.getTime() ?? now.getTime()) - now.getTime()) / 1000)
+      ),
+    };
+  }
 
   return { allowed: true, retryAfterSec: 0 };
 }

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { normalizeMobile } from "@/lib/auth/mobile";
 import {
   isPinLocked,
+  pinLockRetryAfterSec,
   PIN_LOCK_MINUTES,
   PIN_MAX_ATTEMPTS,
   verifyPin,
@@ -12,6 +13,7 @@ import {
   attachAuthCookies,
   corsPreflight,
   issueAuthTokens,
+  revokeAllRefreshTokens,
 } from "@/lib/auth/session";
 import { jsonFail, jsonOk } from "@/lib/api/response";
 import { rateLimit } from "@/lib/rate-limit";
@@ -68,12 +70,14 @@ export async function POST(request: Request) {
     }
 
     if (isPinLocked(user.pinLockedUntil)) {
+      const retryAfterSec = pinLockRetryAfterSec(user.pinLockedUntil);
       return applyCorsHeaders(
         request,
         jsonFail(
           "PIN_LOCKED",
-          "PIN locked after too many attempts. Use Forgot PIN to reset via OTP, or try again later.",
-          423
+          `PIN locked after too many attempts. Use Forgot PIN, or try again in ${retryAfterSec}s.`,
+          423,
+          { retryAfterSec }
         )
       );
     }
@@ -96,8 +100,9 @@ export async function POST(request: Request) {
           request,
           jsonFail(
             "PIN_LOCKED",
-            "Too many incorrect PIN attempts. Use Forgot PIN to reset via OTP, or try again later.",
-            423
+            `Too many incorrect PIN attempts. Use Forgot PIN, or try again in ${PIN_LOCK_MINUTES * 60}s.`,
+            423,
+            { retryAfterSec: PIN_LOCK_MINUTES * 60 }
           )
         );
       }
@@ -107,12 +112,22 @@ export async function POST(request: Request) {
         data: { failedPinAttempts: attempts },
       });
 
+      const remaining = PIN_MAX_ATTEMPTS - attempts;
       return applyCorsHeaders(
         request,
-        jsonFail("INVALID_CREDENTIALS", "Invalid mobile or PIN", 401)
+        jsonFail(
+          "INVALID_CREDENTIALS",
+          remaining > 0
+            ? `Invalid mobile or PIN. ${remaining} attempt${remaining === 1 ? "" : "s"} left.`
+            : "Invalid mobile or PIN",
+          401,
+          { attemptsRemaining: remaining }
+        )
       );
     }
 
+    // New login invalidates other device sessions.
+    await revokeAllRefreshTokens(user.id);
     const tokens = await issueAuthTokens(user);
     const response = jsonOk({
       message: "Login successful",

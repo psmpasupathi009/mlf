@@ -62,7 +62,7 @@ export function PhoneStep({
       <Button
         type="submit"
         className="h-12 w-full text-[0.9375rem] font-medium tracking-wide"
-        disabled={loading || mobile.length !== 10}
+        disabled={loading || mobile.length !== 10 || !/^[6-9]/.test(mobile)}
       >
         {loading ? "Please wait…" : "Continue"}
       </Button>

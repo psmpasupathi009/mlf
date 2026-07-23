@@ -11,9 +11,9 @@ import {
   type AccessTokenPayload,
 } from "@/lib/auth/jwt";
 import { getEffectivePermissionsForUser } from "@/lib/rbac";
+import { ACCESS_COOKIE, REFRESH_COOKIE } from "@/lib/auth/cookie-names";
 
-export const ACCESS_COOKIE = "mlf_access";
-export const REFRESH_COOKIE = "mlf_refresh";
+export { ACCESS_COOKIE, REFRESH_COOKIE } from "@/lib/auth/cookie-names";
 
 /**
  * Fields needed for auth/session + public profile.
@@ -150,27 +150,54 @@ export async function revokeAllRefreshTokens(userId: string): Promise<void> {
   await prisma.refreshToken.deleteMany({ where: { userId } });
 }
 
-export async function rotateRefreshToken(refreshToken: string): Promise<{
-  accessToken: string;
-  refreshToken: string;
-  user: PublicUser;
-} | null> {
+export type RotateRefreshResult =
+  | {
+      ok: true;
+      accessToken: string;
+      refreshToken: string;
+      user: PublicUser;
+    }
+  | {
+      ok: false;
+      /** `raced` = another request already rotated this token — do not clear cookies. */
+      reason: "invalid" | "raced" | "inactive";
+    };
+
+export async function rotateRefreshToken(
+  refreshToken: string
+): Promise<RotateRefreshResult> {
+  const tokenHash = hashToken(refreshToken);
+  const now = new Date();
+
   const existing = await prisma.refreshToken.findUnique({
-    where: { tokenHash: hashToken(refreshToken) },
+    where: { tokenHash },
   });
 
-  if (!existing || existing.expiresAt.getTime() <= Date.now()) {
-    if (existing) {
-      await prisma.refreshToken.delete({ where: { id: existing.id } });
-    }
-    return null;
+  if (!existing) {
+    // Already consumed by a concurrent refresh, or never existed.
+    return { ok: false, reason: "raced" };
+  }
+
+  if (existing.expiresAt.getTime() <= now.getTime()) {
+    await prisma.refreshToken.deleteMany({ where: { id: existing.id } });
+    return { ok: false, reason: "invalid" };
+  }
+
+  // Atomic consume — only one concurrent rotate wins.
+  const consumed = await prisma.refreshToken.deleteMany({
+    where: { id: existing.id, tokenHash },
+  });
+  if (consumed.count === 0) {
+    return { ok: false, reason: "raced" };
   }
 
   const user = await prisma.user.findUnique({ where: { id: existing.userId } });
-  await prisma.refreshToken.delete({ where: { id: existing.id } });
+  if (!user || !user.isActive) {
+    return { ok: false, reason: "inactive" };
+  }
 
-  if (!user || !user.isActive) return null;
-  return issueAuthTokens(user as unknown as AuthUser);
+  const tokens = await issueAuthTokens(user as unknown as AuthUser);
+  return { ok: true, ...tokens };
 }
 
 export function getBearerToken(request: Request): string | null {

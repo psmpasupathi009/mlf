@@ -57,6 +57,7 @@ export function OtpStep({
           value={otp}
           onChange={onChange}
           autoFocus
+          disabled={loading}
           containerClassName="justify-start gap-2.5"
         >
           <InputOTPGroup className="gap-2.5">
