@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
 import { writeAudit } from "@/lib/audit";
 import { normalizeMobile } from "@/lib/auth/mobile";
-import { isDesignation, designationDefaultRoles } from "@/config/company/designations";
+import { designationDefaultRoles, normalizeDesignation } from "@/config/company/designations";
 import { importEmployeesSchema } from "@/lib/validations/employees.schema";
 import { compliance } from "@/config/company/compliance";
 
@@ -49,8 +49,17 @@ export const POST = apiHandler(async (request) => {
     }
     seenMobiles.add(mobile);
 
-    const designation = row.designation && isDesignation(row.designation) ? row.designation : undefined;
-    const roles = designation ? designationDefaultRoles[designation] : ["staff" as const];
+    const designation = normalizeDesignation(row.designation);
+    if (!designation) {
+      results.push({
+        row: rowNum,
+        unitId: row.unitId || null,
+        status: "error",
+        message: "Select a designation",
+      });
+      continue;
+    }
+    const roles = designationDefaultRoles[designation];
 
     try {
       const existingByMobile = await prisma.user.findUnique({ where: { mobile } });

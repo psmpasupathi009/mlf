@@ -33,6 +33,8 @@ import {
 import { apiFetch } from "@/lib/api/client";
 import { UnitIdBadge } from "@/shared/components/data/unit-id-badge";
 import { cn } from "@/lib/utils/cn";
+import { PersonChip } from "@/shared/components/user/person-chip";
+import { personDisplayName, personFirstName } from "@/shared/lib/person";
 
 type WelcomeOverviewProps = {
   user: PublicUser | null;
@@ -67,6 +69,8 @@ type TodayAppointment = {
   clientMobile: string | null;
   advocateName: string | null;
   advocateMobile: string | null;
+  advocateUnitId?: string | null;
+  advocatePhotoUrl?: string | null;
 };
 
 type AdvocateLoad = {
@@ -80,6 +84,7 @@ type AdminAdvocate = {
   unitId: string;
   name: string;
   mobile: string | null;
+  photoUrl?: string | null;
   checkedIn: boolean;
   checkedOut: boolean;
 };
@@ -222,7 +227,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
     };
   }, [user]);
 
-  const firstName = user?.name?.trim().split(/\s+/)[0];
+  const firstName = personFirstName({ name: user?.name, fallback: "" });
   const todayHearings = summary?.cases?.todayHearings ?? [];
 
   const advocateBoard = useMemo(() => {
@@ -238,6 +243,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
       key: string;
       name: string;
       mobile: string | null;
+      photoUrl?: string | null;
       today: number;
       week: number;
       checkedIn: boolean;
@@ -262,8 +268,13 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
             : "absent";
         return {
           key: a.unitId,
-          name: a.name,
+          name: personDisplayName({
+            name: a.name,
+            mobile: a.mobile,
+            unitId: a.unitId,
+          }),
           mobile: a.mobile,
+          photoUrl: a.photoUrl,
           today: load?.today ?? 0,
           week: load?.week ?? 0,
           checkedIn: a.checkedIn,
@@ -276,7 +287,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
     } else {
       rows = (summary?.appointments?.byAdvocate ?? []).map((a) => ({
         key: a.mobile || a.name,
-        name: a.name,
+        name: personDisplayName({ name: a.name, mobile: a.mobile }),
         mobile: a.mobile || null,
         today: a.today,
         week: a.week,
@@ -315,9 +326,17 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
           title: a.title,
           href: "/appointments",
           client: a.clientName ?? "No client",
-          advocate: a.advocateName ?? a.advocateMobile ?? (
-            <span className="text-amber-700">Unassigned</span>
-          ),
+          advocate:
+            a.advocateName || a.advocateMobile ? (
+              <PersonChip
+                name={a.advocateName}
+                photoUrl={a.advocatePhotoUrl}
+                mobile={a.advocateMobile}
+                unitId={a.advocateUnitId}
+              />
+            ) : (
+              <span className="text-amber-700">Unassigned</span>
+            ),
           detail: [
             a.mode,
             `${a.durationMin} min`,

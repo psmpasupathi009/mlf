@@ -83,6 +83,13 @@ async function migrateLegacyUsers() {
       updates.roles = roles;
     }
 
+    if (doc.designation === "Administration") {
+      updates.designation = "Office Manager";
+    }
+    if (doc.designation === "Principal") {
+      updates.designation = "Managing Partner";
+    }
+
     if (Object.keys(updates).length === 0) continue;
 
     await prisma.$runCommandRaw({

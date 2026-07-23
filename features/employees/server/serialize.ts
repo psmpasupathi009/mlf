@@ -1,14 +1,20 @@
 import type { User } from "@prisma/client";
 import { displayMobile } from "@/lib/auth/mobile";
+import { normalizeDesignation } from "@/config/company/designations";
+import { personDisplayName } from "@/shared/lib/person";
+import { userPhotoUrl } from "@/lib/auth/user-photo";
 
 export type EmployeeSummary = {
   unitId: string;
   name: string | null;
+  /** Always a resolved display label (never empty when mobile/unitId exist). */
+  displayName: string;
   mobile: string;
   roles: string[];
   designation: string | null;
   email: string | null;
   address: string | null;
+  photoUrl?: string;
   isActive: boolean;
   hasPin: boolean;
   lastLoginAt: string | null;
@@ -17,14 +23,21 @@ export type EmployeeSummary = {
 
 /** Never leak Mongo _id or pinHash — public shape only. */
 export function toEmployeeSummary(user: User): EmployeeSummary {
+  const mobile = displayMobile(user.mobile);
   return {
     unitId: user.unitId,
     name: user.name,
-    mobile: displayMobile(user.mobile),
+    displayName: personDisplayName({
+      name: user.name,
+      mobile,
+      unitId: user.unitId,
+    }),
+    mobile,
     roles: user.roles,
-    designation: user.designation,
+    designation: normalizeDesignation(user.designation) ?? user.designation,
     email: user.email,
     address: user.address,
+    photoUrl: userPhotoUrl(user.unitId, Boolean(user.photoKey)),
     isActive: user.isActive,
     hasPin: Boolean(user.pinHash),
     lastLoginAt: user.lastLoginAt ? user.lastLoginAt.toISOString() : null,

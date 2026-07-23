@@ -195,7 +195,7 @@ export function PermissionsMatrixPage({ user }: { user: PublicUser }) {
     <section>
       <PageHeader
         title="Permissions"
-        description="Decide what each role can do. Admin always has full access."
+        description="Roles control what people can do in the app. Job titles are set on each employee as Designation. Admin always has full access."
         actions={
           canEdit ? (
             <div className="flex flex-wrap gap-2">

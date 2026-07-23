@@ -2,6 +2,9 @@ import { apiHandler, jsonFail, jsonOkList, parsePagination } from "@/lib/api/res
 import { requireUser } from "@/lib/api/guard";
 import { hasPermission } from "@/lib/rbac";
 import { prisma } from "@/lib/db/prisma";
+import { displayMobile } from "@/lib/auth/mobile";
+import { userPhotoUrl } from "@/lib/auth/user-photo";
+import { personDisplayName } from "@/shared/lib/person";
 
 /**
  * Advocates list for case assignment and appointment booking.
@@ -48,18 +51,28 @@ export const GET = apiHandler(async (request) => {
         name: true,
         mobile: true,
         designation: true,
+        photoKey: true,
       },
     }),
     prisma.user.count({ where }),
   ]);
 
   return jsonOkList(
-    rows.map((r) => ({
-      unitId: r.unitId,
-      name: r.name ?? "Advocate",
-      mobile: r.mobile,
-      designation: r.designation,
-    })),
+    rows.map((r) => {
+      const mobile = displayMobile(r.mobile);
+      return {
+        unitId: r.unitId,
+        name: r.name,
+        displayName: personDisplayName({
+          name: r.name,
+          mobile,
+          unitId: r.unitId,
+        }),
+        mobile,
+        designation: r.designation,
+        photoUrl: userPhotoUrl(r.unitId, Boolean(r.photoKey)),
+      };
+    }),
     { page, pageSize, total }
   );
 });

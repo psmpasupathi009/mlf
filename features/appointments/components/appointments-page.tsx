@@ -34,6 +34,7 @@ import { istDateKey, istDayBounds } from "@/lib/utils/ist";
 import { cn } from "@/lib/utils/cn";
 import { canBookForAnyAdvocate } from "@/lib/appointments/booking-rules";
 import { displayMobile } from "@/lib/auth/mobile";
+import { PersonChip } from "@/shared/components/user/person-chip";
 
 type ListResponse = {
   data: AppointmentSummary[];
@@ -326,11 +327,17 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                   </TableCell>
                   <TableCell className="font-medium text-navy">{a.title}</TableCell>
                   <TableCell>
-                    <div className="text-sm">
-                      {a.advocateName ?? a.advocateMobile ?? (
-                        <span className="text-amber-700">Unassigned</span>
-                      )}
-                    </div>
+                    {a.advocateName || a.advocateMobile ? (
+                      <PersonChip
+                        name={a.advocateName}
+                        photoUrl={a.advocatePhotoUrl}
+                        mobile={a.advocateMobile}
+                        unitId={a.advocateUnitId}
+                        subtitle={a.advocateMobile ? `+91 ${a.advocateMobile}` : undefined}
+                      />
+                    ) : (
+                      <span className="text-amber-700">Unassigned</span>
+                    )}
                   </TableCell>
                   <TableCell>{a.clientName ?? a.clientUnitId ?? "—"}</TableCell>
                   <TableCell>

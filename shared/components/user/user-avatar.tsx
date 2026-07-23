@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useState } from "react";
 import { cn } from "@/lib/utils/cn";
+import { personInitials } from "@/shared/lib/person";
 
 type UserAvatarProps = {
   name?: string | null;
@@ -16,20 +17,15 @@ const SIZES = {
   lg: "size-24 text-2xl",
 } as const;
 
-function initials(name?: string | null): string {
-  if (!name?.trim()) return "?";
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 1) return parts[0]!.slice(0, 2).toUpperCase();
-  return `${parts[0]![0] ?? ""}${parts[parts.length - 1]![0] ?? ""}`.toUpperCase();
-}
-
 export function UserAvatar({
   name,
   photoUrl,
   size = "md",
   className,
 }: UserAvatarProps) {
-  const label = useMemo(() => initials(name), [name]);
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  const label = personInitials(name);
+  const showPhoto = Boolean(photoUrl) && photoUrl !== failedUrl;
 
   return (
     <div
@@ -38,14 +34,15 @@ export function UserAvatar({
         SIZES[size],
         className
       )}
-      aria-hidden={!name}
+      aria-hidden
     >
-      {photoUrl ? (
+      {showPhoto ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={photoUrl}
+          src={photoUrl!}
           alt=""
           className="size-full object-cover"
+          onError={() => setFailedUrl(photoUrl ?? null)}
         />
       ) : (
         <span>{label}</span>

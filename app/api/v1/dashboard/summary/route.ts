@@ -4,6 +4,8 @@ import { hasPermission } from "@/lib/rbac";
 import { prisma } from "@/lib/db/prisma";
 import { istDateKey, istDayBounds, formatIstTime } from "@/lib/utils/ist";
 import { displayMobile } from "@/lib/auth/mobile";
+import { personDisplayName } from "@/shared/lib/person";
+import { userPhotoUrl } from "@/lib/auth/user-photo";
 
 function toTen(mobile: string): string {
   const d = mobile.replace(/\D/g, "");
@@ -239,16 +241,27 @@ export const GET = apiHandler(async (request) => {
                 return [{ mobile: m }, { mobile: ten }, { mobile: `91${ten}` }];
               }),
             },
-            select: { mobile: true, name: true, unitId: true },
+            select: { mobile: true, name: true, unitId: true, photoKey: true },
           })
         : Promise.resolve([]),
     ]);
 
     const clientByUnit = new Map(apptClients.map((c) => [c.unitId, c]));
-    const advByMobile = new Map<string, { name: string; unitId: string }>();
+    const advByMobile = new Map<
+      string,
+      { name: string; unitId: string; photoUrl?: string }
+    >();
     for (const a of apptAdvocates) {
       const ten = toTen(a.mobile);
-      const info = { name: a.name ?? "Advocate", unitId: a.unitId };
+      const info = {
+        name: personDisplayName({
+          name: a.name,
+          mobile: a.mobile,
+          unitId: a.unitId,
+        }),
+        unitId: a.unitId,
+        photoUrl: userPhotoUrl(a.unitId, Boolean(a.photoKey)),
+      };
       advByMobile.set(a.mobile, info);
       advByMobile.set(ten, info);
       advByMobile.set(`91${ten}`, info);
@@ -282,6 +295,7 @@ export const GET = apiHandler(async (request) => {
           : null,
         advocateName: adv?.name ?? null,
         advocateUnitId: adv?.unitId ?? null,
+        advocatePhotoUrl: adv?.photoUrl ?? null,
       };
     }
 
@@ -358,7 +372,7 @@ export const GET = apiHandler(async (request) => {
   if (isOfficeAdmin && (await can("employees", "view"))) {
     const advocates = await prisma.user.findMany({
       where: { isActive: true, roles: { has: "advocate" } },
-      select: { id: true, unitId: true, name: true, mobile: true },
+      select: { id: true, unitId: true, name: true, mobile: true, photoKey: true },
       orderBy: { name: "asc" },
     });
     const attendance = await prisma.attendance.findMany({
@@ -375,8 +389,13 @@ export const GET = apiHandler(async (request) => {
         const att = attByUser.get(a.id);
         return {
           unitId: a.unitId,
-          name: a.name ?? "Advocate",
+          name: personDisplayName({
+            name: a.name,
+            mobile: a.mobile,
+            unitId: a.unitId,
+          }),
           mobile: displayMobile(a.mobile),
+          photoUrl: userPhotoUrl(a.unitId, Boolean(a.photoKey)),
           checkedIn: Boolean(att?.checkInAt),
           checkedOut: Boolean(att?.checkOutAt),
         };

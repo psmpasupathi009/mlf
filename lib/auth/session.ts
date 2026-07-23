@@ -12,6 +12,7 @@ import {
 } from "@/lib/auth/jwt";
 import { getEffectivePermissionsForUser } from "@/lib/rbac";
 import { ACCESS_COOKIE, REFRESH_COOKIE } from "@/lib/auth/cookie-names";
+import { userPhotoUrl } from "@/lib/auth/user-photo";
 
 export { ACCESS_COOKIE, REFRESH_COOKIE } from "@/lib/auth/cookie-names";
 
@@ -46,11 +47,6 @@ export type PublicUser = {
   photoUrl?: string;
   permissions: string[];
 };
-
-export function userPhotoUrl(unitId: string, hasPhoto: boolean): string | undefined {
-  if (!hasPhoto) return undefined;
-  return `/api/v1/users/${unitId}/photo`;
-}
 
 export async function toPublicUser(user: AuthUser): Promise<PublicUser> {
   const permissions = await getEffectivePermissionsForUser({

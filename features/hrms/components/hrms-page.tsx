@@ -31,13 +31,16 @@ import type { PublicUser } from "@/lib/auth/session";
 import type { AttendanceSummary, LeaveSummary } from "@/features/hrms/server/serialize";
 import { LeaveApplyDialog } from "@/features/hrms/components/leave-apply-dialog";
 import { istDateKey } from "@/lib/utils/ist";
+import { personDisplayName } from "@/shared/lib/person";
 
 type AttendanceList = { data: AttendanceSummary[]; meta: { total: number } };
 type LeaveList = { data: LeaveSummary[]; meta: { total: number } };
 type EmployeeRow = {
   unitId: string;
   name: string | null;
+  displayName?: string;
   mobile: string;
+  photoUrl?: string;
   roles: string[];
   isActive: boolean;
 };
@@ -49,8 +52,8 @@ const LEAVE_VARIANT: Record<string, "warning" | "success" | "destructive"> = {
   rejected: "destructive",
 };
 
-function personLabel(unitId: string, name: string | null | undefined) {
-  return name?.trim() || unitId;
+function personLabel(unitId: string, name: string | null | undefined, mobile?: string | null) {
+  return personDisplayName({ name, mobile, unitId });
 }
 
 type PresenceStatus = "absent" | "in" | "out";
@@ -147,7 +150,7 @@ export function HrmsPage({ user }: { user: PublicUser }) {
               : "absent";
           return {
             key: adv.unitId,
-            name: personLabel(adv.unitId, adv.name),
+            name: personLabel(adv.unitId, adv.displayName || adv.name, adv.mobile),
             unitId: adv.unitId,
             mobile: adv.mobile || "—",
             status,

@@ -12,6 +12,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Table,
   TableBody,
   TableCell,
@@ -23,8 +30,35 @@ import { apiFetch, getErrorMessage } from "@/lib/api/client";
 import type { PublicUser } from "@/lib/auth/session";
 import type { EmployeeSummary } from "@/features/employees/server/serialize";
 import { EmployeeFormDialog } from "@/features/employees/components/employee-form-dialog";
+import { EmployeeRowActions } from "@/features/employees/components/employee-row-actions";
+import { ROLE_LABELS, roleLabel } from "@/config/company/permissions-defaults";
+import type { UserRole } from "@prisma/client";
+import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
+import { cn } from "@/lib/utils/cn";
+import { PersonChip } from "@/shared/components/user/person-chip";
 
-type ListResponse = { data: EmployeeSummary[]; meta: { page: number; pageSize: number; total: number } };
+type ListResponse = {
+  data: EmployeeSummary[];
+  meta: { page: number; pageSize: number; total: number };
+};
+
+function formatLastLogin(iso: string | null) {
+  if (!iso) return "Never";
+  try {
+    return new Date(iso).toLocaleDateString("en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return "—";
+  }
+}
+
+const ROLE_FILTER_OPTIONS = (Object.keys(ROLE_LABELS) as UserRole[]).map((value) => ({
+  value,
+  label: ROLE_LABELS[value],
+}));
 
 export function EmployeesPage({ user }: { user: PublicUser }) {
   const can = (action: string) => user.permissions.includes(`employees.${action}`);
@@ -34,15 +68,21 @@ export function EmployeesPage({ user }: { user: PublicUser }) {
   const [page, setPage] = useState(1);
   const pageSize = 20;
   const [search, setSearch] = useState("");
+  const debouncedSearch = useDebouncedValue(search, 300);
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<EmployeeSummary | null>(null);
+  const [actionBusyId, setActionBusyId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
-    if (search) params.set("q", search);
+    if (debouncedSearch) params.set("q", debouncedSearch);
+    if (statusFilter !== "all") params.set("status", statusFilter);
+    if (roleFilter !== "all") params.set("role", roleFilter);
     const { ok, data } = await apiFetch<ListResponse>(`/api/v1/employees?${params.toString()}`);
     setLoading(false);
     if (!ok) {
@@ -51,7 +91,7 @@ export function EmployeesPage({ user }: { user: PublicUser }) {
     }
     setRows((data as unknown as ListResponse).data ?? []);
     setTotal((data as unknown as ListResponse).meta?.total ?? 0);
-  }, [page, search]);
+  }, [page, debouncedSearch, statusFilter, roleFilter]);
 
   useEffect(() => {
     void (async () => {
@@ -61,22 +101,31 @@ export function EmployeesPage({ user }: { user: PublicUser }) {
   }, [load]);
 
   async function handleAction(unitId: string, action: "deactivate" | "reactivate" | "force-reset-pin") {
+    setActionBusyId(unitId);
     const { ok, data } = await apiFetch(`/api/v1/employees/${unitId}/${action}`, { method: "POST" });
+    setActionBusyId(null);
     if (!ok) {
       toast.error(getErrorMessage(data as Record<string, unknown>, "Action failed"));
       return;
     }
     toast.success(
-      action === "deactivate" ? "Employee deactivated" : action === "reactivate" ? "Employee reactivated" : "PIN reset — employee must set up a new PIN"
+      action === "deactivate"
+        ? "Employee deactivated"
+        : action === "reactivate"
+          ? "Employee reactivated"
+          : "PIN reset — employee must set up a new PIN"
     );
     void load();
   }
+
+  const showingFrom = total === 0 ? 0 : (page - 1) * pageSize + 1;
+  const showingTo = Math.min(page * pageSize, total);
 
   return (
     <section>
       <PageHeader
         title="Employees"
-        description="Manage staff, advocates and admin accounts."
+        description="Staff directory — designation is the job title; roles control app access."
         actions={
           <>
             {can("create") ? (
@@ -107,101 +156,171 @@ export function EmployeesPage({ user }: { user: PublicUser }) {
               setPage(1);
               setSearch(e.target.value);
             }}
-            placeholder="Search name, mobile, ID…"
+            placeholder="Search name, mobile, ID, designation…"
             className="w-full"
           />
+        }
+        filters={
+          <>
+            <Select
+              value={statusFilter}
+              onValueChange={(v) => {
+                setPage(1);
+                setStatusFilter(v as "all" | "active" | "inactive");
+              }}
+            >
+              <SelectTrigger className="w-full sm:w-36">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All status</SelectItem>
+                <SelectItem value="active">Active</SelectItem>
+                <SelectItem value="inactive">Inactive</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={roleFilter}
+              onValueChange={(v) => {
+                setPage(1);
+                setRoleFilter(v);
+              }}
+            >
+              <SelectTrigger className="w-full sm:w-40">
+                <SelectValue placeholder="Role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All roles</SelectItem>
+                {ROLE_FILTER_OPTIONS.map((r) => (
+                  <SelectItem key={r.value} value={r.value}>
+                    {r.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
         }
       />
 
       {!loading && rows.length === 0 ? (
         <EmptyState
-          title="No employees yet"
-          description="Add your first employee to get started."
+          title="No employees found"
+          description={
+            debouncedSearch || statusFilter !== "all" || roleFilter !== "all"
+              ? "Try clearing filters or search."
+              : "Add your first employee to get started."
+          }
+          action={
+            can("create") && !debouncedSearch && statusFilter === "all" && roleFilter === "all" ? (
+              <Button
+                type="button"
+                onClick={() => {
+                  setEditing(null);
+                  setFormOpen(true);
+                }}
+              >
+                Add employee
+              </Button>
+            ) : undefined
+          }
         />
       ) : (
         <>
+          <div className="mb-2 flex items-center justify-between gap-2 text-xs text-muted-foreground sm:text-sm">
+            <span>
+              {loading
+                ? "Loading…"
+                : total === 0
+                  ? "No results"
+                  : `Showing ${showingFrom}–${showingTo} of ${total}`}
+            </span>
+          </div>
+
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead>Person</TableHead>
                 <TableHead>ID</TableHead>
-                <TableHead>Name</TableHead>
                 <TableHead>Mobile</TableHead>
                 <TableHead>Designation</TableHead>
                 <TableHead>Roles</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead>Access</TableHead>
+                <TableHead>Last login</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {rows.map((emp) => (
-                <TableRow key={emp.unitId}>
-                  <TableCell><UnitIdBadge value={emp.unitId} /></TableCell>
-                  <TableCell className="font-medium text-navy">{emp.name ?? "—"}</TableCell>
-                  <TableCell>+91 {emp.mobile}</TableCell>
-                  <TableCell>{emp.designation ?? "—"}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {emp.roles.map((r) => (
-                        <Badge key={r} variant="outline">
-                          {r.replace("_", " ")}
-                        </Badge>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant={emp.isActive ? "success" : "muted"}>
-                      {emp.isActive ? "Active" : "Inactive"}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex flex-wrap justify-end gap-2">
-                      {can("edit") ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
+              {loading && rows.length === 0
+                ? Array.from({ length: 5 }).map((_, i) => (
+                    <TableRow key={`sk-${i}`}>
+                      <TableCell colSpan={8}>
+                        <div className="h-10 animate-pulse rounded-md bg-muted/60" />
+                      </TableCell>
+                    </TableRow>
+                  ))
+                : rows.map((emp) => (
+                    <TableRow key={emp.unitId} className={cn(!emp.isActive && "opacity-70")}>
+                      <TableCell>
+                        <PersonChip
+                          name={emp.displayName || emp.name}
+                          photoUrl={emp.photoUrl}
+                          mobile={emp.mobile}
+                          unitId={emp.unitId}
+                          subtitle={emp.email || emp.designation || undefined}
+                        />
+                      </TableCell>
+                      <TableCell>
+                        <UnitIdBadge value={emp.unitId} />
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap">+91 {emp.mobile}</TableCell>
+                      <TableCell>
+                        {emp.designation ? (
+                          <span className="rounded-md bg-muted px-2 py-0.5 text-xs text-foreground">
+                            {emp.designation}
+                          </span>
+                        ) : (
+                          "—"
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          {emp.roles.map((r) => (
+                            <Badge key={r} variant="outline" className="normal-case">
+                              {roleLabel(r)}
+                            </Badge>
+                          ))}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-wrap gap-1">
+                          <Badge variant={emp.isActive ? "success" : "muted"}>
+                            {emp.isActive ? "Active" : "Inactive"}
+                          </Badge>
+                          <Badge variant={emp.hasPin ? "outline" : "warning"} className="normal-case">
+                            {emp.hasPin ? "PIN set" : "Setup needed"}
+                          </Badge>
+                        </div>
+                      </TableCell>
+                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                        {formatLastLogin(emp.lastLoginAt)}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <EmployeeRowActions
+                          employee={emp}
+                          canEdit={can("edit")}
+                          canDeactivate={can("deactivate")}
+                          isSelf={emp.unitId === user.unitId}
+                          busy={actionBusyId === emp.unitId}
+                          onEdit={() => {
                             setEditing(emp);
                             setFormOpen(true);
                           }}
-                        >
-                          Edit
-                        </Button>
-                      ) : null}
-                      {can("edit") ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleAction(emp.unitId, "force-reset-pin")}
-                        >
-                          Reset PIN
-                        </Button>
-                      ) : null}
-                      {can("deactivate") && emp.unitId !== user.unitId ? (
-                        emp.isActive ? (
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleAction(emp.unitId, "deactivate")}
-                          >
-                            Deactivate
-                          </Button>
-                        ) : (
-                          <Button
-                            type="button"
-                            size="sm"
-                            onClick={() => handleAction(emp.unitId, "reactivate")}
-                          >
-                            Reactivate
-                          </Button>
-                        )
-                      ) : null}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
+                          onResetPin={() => handleAction(emp.unitId, "force-reset-pin")}
+                          onDeactivate={() => handleAction(emp.unitId, "deactivate")}
+                          onReactivate={() => handleAction(emp.unitId, "reactivate")}
+                        />
+                      </TableCell>
+                    </TableRow>
+                  ))}
             </TableBody>
           </Table>
 
@@ -223,7 +342,7 @@ export function EmployeesPage({ user }: { user: PublicUser }) {
         title="Import employees"
         endpoint="/api/v1/employees/import"
         sampleHref="/samples/employees.sample.csv"
-        columnsHint="Required: mobile, name, designation. Optional: roles, email…"
+        columnsHint="Required: mobile, name, designation (job title). Roles are assigned from designation defaults."
         onImported={load}
       />
     </section>

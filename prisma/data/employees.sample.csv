@@ -1,9 +1,13 @@
 unitId,name,designation,mobile,email,address
 ,Senniappan.M,Advocate,9841578862,Senniappan.m@gmail.com,"Nambiyur — Periyar Illam"
-,Vairal.G,Advocate,8760228622,vairalg18@gmail.com,Gobichettipalayam
-,Ajith.A,Advocate,9786570408,ajithbabl12347@gmail.com,Nambiyur
-,Matheswaran.R,Clerk,9842328723,Matheswaran1958@gmail.com,Gobichettipalayam
+,Vairal.G,Senior Advocate,8760228622,vairalg18@gmail.com,Gobichettipalayam
+,Ajith.A,Junior Advocate,9786570408,ajithbabl12347@gmail.com,Nambiyur
+,Matheswaran.R,Senior Clerk,9842328723,Matheswaran1958@gmail.com,Gobichettipalayam
 ,Vanaja.D,Typist,9245764933,Dvanaja1976@gmail.com,Modachur
-,Dheetchana.V,Administration,6381586200,Dheetchanadheetchana37@gmail.com,Uthandiyur
+,Dheetchana.V,Office Manager,6381586200,Dheetchanadheetchana37@gmail.com,Uthandiyur
 ,Jeevanantham.M,Driver,8056454255,Clmmahe1042@gmail.com,Gudakkarai
 ,Accounts Desk,Accountant,9000000099,accounts@manitham.local,Office
+,Reception Desk,Receptionist,9000000098,reception@manitham.local,Office
+,Intern Desk,Intern,9000000097,intern@manitham.local,Office
+,Steno Desk,Stenographer,9000000096,steno@manitham.local,Office
+,AOR Desk,Advocate on Record,9000000095,aor@manitham.local,Office

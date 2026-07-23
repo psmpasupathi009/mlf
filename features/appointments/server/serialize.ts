@@ -1,4 +1,5 @@
 import type { Appointment } from "@prisma/client";
+import { displayMobile as stripMobile } from "@/lib/auth/mobile";
 
 export type AppointmentSummary = {
   unitId: string;
@@ -6,6 +7,8 @@ export type AppointmentSummary = {
   clientName: string | null;
   advocateMobile: string | null;
   advocateName: string | null;
+  advocatePhotoUrl?: string | null;
+  advocateUnitId?: string | null;
   title: string;
   scheduledAt: string;
   durationMin: number;
@@ -16,23 +19,23 @@ export type AppointmentSummary = {
   createdAt: string;
 };
 
-function displayMobile(mobile: string | null | undefined): string | null {
-  if (!mobile) return null;
-  return mobile.startsWith("91") && mobile.length === 12
-    ? mobile.slice(2)
-    : mobile;
-}
-
 export function toAppointmentSummary(
   item: Appointment,
-  extras?: { clientName?: string | null; advocateName?: string | null }
+  extras?: {
+    clientName?: string | null;
+    advocateName?: string | null;
+    advocatePhotoUrl?: string | null;
+    advocateUnitId?: string | null;
+  }
 ): AppointmentSummary {
   return {
     unitId: item.unitId,
     clientUnitId: item.clientUnitId,
     clientName: extras?.clientName ?? null,
-    advocateMobile: displayMobile(item.advocateMobile),
+    advocateMobile: stripMobile(item.advocateMobile ?? "") || null,
     advocateName: extras?.advocateName ?? null,
+    advocatePhotoUrl: extras?.advocatePhotoUrl ?? null,
+    advocateUnitId: extras?.advocateUnitId ?? null,
     title: item.title,
     scheduledAt: item.scheduledAt.toISOString(),
     durationMin: item.durationMin,

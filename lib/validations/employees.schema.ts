@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { DESIGNATIONS } from "@/config/company/designations";
+import { DESIGNATIONS, normalizeDesignation } from "@/config/company/designations";
 
 export const employeeRoleEnum = z.enum([
   "admin",
@@ -9,10 +9,36 @@ export const employeeRoleEnum = z.enum([
   "accountant",
 ]);
 
+/** Accepts current designations and legacy aliases (e.g. Administration → Office Manager). */
+const designationField = z.preprocess(
+  (value) => {
+    if (value === "" || value === null || value === undefined) return undefined;
+    return typeof value === "string" ? value.trim() : value;
+  },
+  z
+    .string()
+    .optional()
+    .transform((value, ctx) => {
+      if (!value) return undefined;
+      const normalized = normalizeDesignation(value);
+      if (!normalized) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `Invalid designation. Use one of: ${DESIGNATIONS.join(", ")}`,
+        });
+        return z.NEVER;
+      }
+      return normalized;
+    })
+);
+
 export const createEmployeeSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(120),
   mobile: z.string().trim().min(10, "Enter a valid mobile number").max(15),
-  designation: z.enum(DESIGNATIONS).optional(),
+  designation: designationField.refine(
+    (value): value is NonNullable<typeof value> => Boolean(value),
+    { message: "Select a designation" }
+  ),
   roles: z.array(employeeRoleEnum).min(1, "Select at least one role"),
   email: z.string().trim().email("Enter a valid email").optional().or(z.literal("")),
   address: z.string().trim().max(500).optional().or(z.literal("")),
@@ -20,7 +46,7 @@ export const createEmployeeSchema = z.object({
 
 export const updateEmployeeSchema = z.object({
   name: z.string().trim().min(1).max(120).optional(),
-  designation: z.enum(DESIGNATIONS).optional(),
+  designation: designationField,
   roles: z.array(employeeRoleEnum).min(1, "Select at least one role").optional(),
   email: z.string().trim().email("Enter a valid email").optional().or(z.literal("")),
   address: z.string().trim().max(500).optional().or(z.literal("")),
@@ -30,7 +56,10 @@ export const updateEmployeeSchema = z.object({
 export const importEmployeesRowSchema = z.object({
   unitId: z.string().trim().optional().or(z.literal("")),
   name: z.string().trim().min(1, "Name is required"),
-  designation: z.enum(DESIGNATIONS).optional().or(z.literal("")),
+  designation: designationField.refine(
+    (value): value is NonNullable<typeof value> => Boolean(value),
+    { message: "Select a designation" }
+  ),
   mobile: z.string().trim().min(10, "Enter a valid mobile number").max(15),
   email: z.string().trim().optional().or(z.literal("")),
   address: z.string().trim().optional().or(z.literal("")),

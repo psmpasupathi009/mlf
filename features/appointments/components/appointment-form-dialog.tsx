@@ -39,12 +39,16 @@ import { AvailabilitySlotPicker } from "@/features/availability/components/avail
 import type { PublicUser } from "@/lib/auth/session";
 import { canBookForAnyAdvocate } from "@/lib/appointments/booking-rules";
 import { displayMobile } from "@/lib/auth/mobile";
+import { PersonChip } from "@/shared/components/user/person-chip";
+import { personDisplayName } from "@/shared/lib/person";
 
 type AdvocateOption = {
   unitId: string;
-  name: string;
+  name: string | null;
+  displayName?: string;
   mobile: string;
   designation?: string | null;
+  photoUrl?: string | null;
 };
 
 function toLocalInput(iso: string): string {
@@ -253,26 +257,52 @@ export function AppointmentFormDialog({
                 <SelectContent className="z-200 max-h-72">
                   {advocates.map((a) => {
                     const m = tenDigit(a.mobile);
+                    const label =
+                      a.displayName ||
+                      personDisplayName({
+                        name: a.name,
+                        mobile: a.mobile,
+                        unitId: a.unitId,
+                      });
                     return (
                       <SelectItem key={a.unitId} value={m}>
-                        {a.name}
-                        {a.designation ? ` · ${a.designation}` : ""}
+                        <span className="flex items-center gap-2">
+                          <PersonChip
+                            name={label}
+                            photoUrl={a.photoUrl}
+                            avatarOnly
+                            className="gap-0"
+                          />
+                          <span>
+                            {label}
+                            {a.designation ? ` · ${a.designation}` : ""}
+                          </span>
+                        </span>
                       </SelectItem>
                     );
                   })}
                 </SelectContent>
               </Select>
             ) : (
-              <div className="rounded-md border border-input bg-muted/30 px-3 py-2.5 text-sm">
-                <span className="font-medium text-navy">
-                  {user.name ?? "You"}
-                </span>
-                <span className="text-muted-foreground"> · {selfMobile10}</span>
+              <div className="rounded-md border border-input bg-muted/30 px-3 py-2.5">
+                <PersonChip
+                  name={user.name}
+                  photoUrl={user.photoUrl}
+                  mobile={user.mobile}
+                  unitId={user.unitId}
+                  subtitle={`+91 ${selfMobile10}`}
+                  fallback="You"
+                />
               </div>
             )}
             {bookAny && selectedAdvocate ? (
               <p className="text-xs text-muted-foreground">
-                Booking for {selectedAdvocate.name}
+                Booking for{" "}
+                {personDisplayName({
+                  name: selectedAdvocate.displayName || selectedAdvocate.name,
+                  mobile: selectedAdvocate.mobile,
+                  unitId: selectedAdvocate.unitId,
+                })}
               </p>
             ) : null}
           </div>

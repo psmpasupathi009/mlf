@@ -70,10 +70,10 @@ export const ROLE_LABELS: Record<UserRole, string> = {
 
 export const ROLE_BLURBS: Record<UserRole, string> = {
   admin: "Full office control — cannot be restricted",
-  sub_admin: "Runs day-to-day ops without full admin",
-  staff: "Clerks and office assistants",
-  advocate: "Case work and client matters",
-  accountant: "Cash book and fee tracking",
+  sub_admin: "Day-to-day ops — Office Manager / HR Manager access without full admin",
+  staff: "Clerks, PA, paralegals, receptionist, computer operator, messenger, driver, and interns",
+  advocate: "Case and client work for any counsel title (Advocate, AOR, Counsel, Senior Associate, Notary, …)",
+  accountant: "Cash book and fees — Accounts Manager, Accountant, Accounts Assistant, Cashier",
 };
 
 export function moduleLabel(module: string): string {

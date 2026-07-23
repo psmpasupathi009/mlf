@@ -14,6 +14,7 @@ import { apiFetch, getErrorMessage } from "@/lib/api/client";
 import type { PublicUser } from "@/lib/auth/session";
 import { displayMobile } from "@/lib/auth/mobile";
 import { ProfilePhotoCropDialog } from "@/features/profile/components/profile-photo-crop-dialog";
+import { personDisplayName } from "@/shared/lib/person";
 
 export function ProfilePage({ user: initial }: { user: PublicUser }) {
   const router = useRouter();
@@ -105,10 +106,23 @@ export function ProfilePage({ user: initial }: { user: PublicUser }) {
 
       <div className="space-y-6 rounded-xl border border-border/80 bg-white p-5 sm:p-6">
         <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
-          <UserAvatar name={name || user.name} photoUrl={photoSrc} size="lg" />
+          <UserAvatar
+            name={personDisplayName({
+              name: name || user.name,
+              mobile: user.mobile,
+              unitId: user.unitId,
+            })}
+            photoUrl={photoSrc}
+            size="lg"
+          />
           <div className="flex flex-1 flex-col items-center gap-2 sm:items-start">
             <p className="text-lg font-semibold text-navy">
-              {name.trim() || "Your name"}
+              {personDisplayName({
+                name: name || user.name,
+                mobile: user.mobile,
+                unitId: user.unitId,
+                fallback: "Your name",
+              })}
             </p>
             <p className="text-sm text-muted-foreground">
               {user.designation ?? user.roles.join(", ")} ·{" "}

@@ -8,6 +8,7 @@ import { LogoutButton } from "@/features/auth/components/logout-button";
 import { useUiStore } from "@/shared/stores/ui-store";
 import type { PublicUser } from "@/lib/auth/session";
 import { UserAvatar } from "@/shared/components/user/user-avatar";
+import { personDisplayName } from "@/shared/lib/person";
 
 type SiteHeaderProps = {
   brandName: string;
@@ -17,7 +18,12 @@ type SiteHeaderProps = {
 
 export function SiteHeader({ brandName, logoSrc, user }: SiteHeaderProps) {
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
-  const displayName = user.name?.trim() || "Profile";
+  const displayName = personDisplayName({
+    name: user.name,
+    mobile: user.mobile,
+    unitId: user.unitId,
+    fallback: "Profile",
+  });
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/80 bg-white/90 pt-[env(safe-area-inset-top)] backdrop-blur-md">

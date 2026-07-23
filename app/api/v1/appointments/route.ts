@@ -10,71 +10,7 @@ import {
 } from "@/lib/appointments/booking-rules";
 import { assertSlotBookable } from "@/lib/appointments/availability";
 import { createAppointmentSchema } from "@/lib/validations/appointments.schema";
-import { toAppointmentSummary } from "@/features/appointments/server/serialize";
-
-async function enrichAppointments(
-  rows: Awaited<ReturnType<typeof prisma.appointment.findMany>>
-) {
-  const clientUnitIds = [
-    ...new Set(rows.map((r) => r.clientUnitId).filter(Boolean) as string[]),
-  ];
-  const advocateMobiles = [
-    ...new Set(
-      rows
-        .map((r) => r.advocateMobile)
-        .filter(Boolean)
-        .flatMap((m) => {
-          const d = m!.replace(/\D/g, "");
-          const ten =
-            d.length === 12 && d.startsWith("91") ? d.slice(2) : d.slice(-10);
-          return [m!, ten, `91${ten}`];
-        }) as string[]
-    ),
-  ];
-
-  const [clients, advocates] = await Promise.all([
-    clientUnitIds.length
-      ? prisma.client.findMany({
-          where: { unitId: { in: clientUnitIds } },
-          select: { unitId: true, name: true },
-        })
-      : Promise.resolve([]),
-    advocateMobiles.length
-      ? prisma.user.findMany({
-          where: {
-            OR: advocateMobiles.map((m) => ({ mobile: m })),
-          },
-          select: { mobile: true, name: true },
-        })
-      : Promise.resolve([]),
-  ]);
-
-  const clientByUnit = new Map(clients.map((c) => [c.unitId, c.name]));
-  const advocateByMobile = new Map<string, string>();
-  for (const a of advocates) {
-    const d = a.mobile.replace(/\D/g, "");
-    const ten =
-      d.length === 12 && d.startsWith("91") ? d.slice(2) : d.slice(-10);
-    if (a.name) {
-      advocateByMobile.set(a.mobile, a.name);
-      advocateByMobile.set(ten, a.name);
-      advocateByMobile.set(`91${ten}`, a.name);
-    }
-  }
-
-  return rows.map((r) =>
-    toAppointmentSummary(r, {
-      clientName: r.clientUnitId
-        ? clientByUnit.get(r.clientUnitId) ?? null
-        : null,
-      advocateName: r.advocateMobile
-        ? advocateByMobile.get(r.advocateMobile) ??
-          advocateByMobile.get(r.advocateMobile.replace(/\D/g, "").slice(-10)) ??
-          null
-        : null,
-    })
-  );
-}
+import { enrichAppointments, enrichAppointment } from "@/features/appointments/server/enrich";
 
 export const GET = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "appointments", "view");
@@ -222,6 +158,5 @@ export const POST = apiHandler(async (request) => {
     entityUnitId: created.unitId,
   });
 
-  const [enriched] = await enrichAppointments([created]);
-  return jsonOk({ appointment: enriched }, 201);
+  return jsonOk({ appointment: await enrichAppointment(created) }, 201);
 });

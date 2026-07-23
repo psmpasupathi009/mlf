@@ -36,6 +36,7 @@ import {
 import { apiFetch, getErrorMessage } from "@/lib/api/client";
 import type { PublicUser } from "@/lib/auth/session";
 import { canBookForAnyAdvocate } from "@/lib/appointments/booking-rules";
+import { personDisplayName } from "@/shared/lib/person";
 import {
   bookingDefaults,
   rangesFromWorkAndBreak,
@@ -48,7 +49,7 @@ import { formatIstTime, istDateKey, istDisplayDate } from "@/lib/utils/ist";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { cn } from "@/lib/utils/cn";
 
-type AdvocateOption = { unitId: string; name: string; mobile: string };
+type AdvocateOption = { unitId: string; name: string | null; displayName?: string; mobile: string };
 
 type HoursDay = {
   weekday: number;
@@ -162,10 +163,20 @@ export function AvailabilityPage({ user }: { user: PublicUser }) {
   const [blockBusy, setBlockBusy] = useState(false);
 
   const targetLabel = useMemo(() => {
-    if (targetUnitId === user.unitId) return "Your schedule";
+    if (targetUnitId === user.unitId) {
+      return personDisplayName({
+        name: user.name,
+        mobile: user.mobile,
+        unitId: user.unitId,
+        fallback: "Your schedule",
+      });
+    }
     const a = advocates.find((x) => x.unitId === targetUnitId);
-    return a ? a.name || a.unitId : targetUnitId;
-  }, [advocates, targetUnitId, user.unitId]);
+    return a
+      ? a.displayName ||
+          personDisplayName({ name: a.name, mobile: a.mobile, unitId: a.unitId })
+      : targetUnitId;
+  }, [advocates, targetUnitId, user.mobile, user.name, user.unitId]);
 
   const loadHours = useCallback(async (unitId: string) => {
     const q = unitId !== user.unitId ? `?userUnitId=${encodeURIComponent(unitId)}` : "";
@@ -409,13 +420,24 @@ export function AvailabilityPage({ user }: { user: PublicUser }) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value={user.unitId}>
-                Yourself ({user.unitId})
+                Yourself (
+                {personDisplayName({
+                  name: user.name,
+                  mobile: user.mobile,
+                  unitId: user.unitId,
+                })}
+                )
               </SelectItem>
               {advocates
                 .filter((a) => a.unitId !== user.unitId)
                 .map((a) => (
                   <SelectItem key={a.unitId} value={a.unitId}>
-                    {a.name} · {a.unitId}
+                    {a.displayName ||
+                      personDisplayName({
+                        name: a.name,
+                        mobile: a.mobile,
+                        unitId: a.unitId,
+                      })}
                   </SelectItem>
                 ))}
             </SelectContent>

@@ -8,7 +8,7 @@ import {
 } from "@/lib/appointments/booking-rules";
 import { assertSlotBookable } from "@/lib/appointments/availability";
 import { updateAppointmentSchema } from "@/lib/validations/appointments.schema";
-import { toAppointmentSummary } from "@/features/appointments/server/serialize";
+import { enrichAppointment } from "@/features/appointments/server/enrich";
 
 export const GET = apiHandler(async (request, context) => {
   const { user, response } = await requirePerm(request, "appointments", "view");
@@ -28,7 +28,7 @@ export const GET = apiHandler(async (request, context) => {
     }
   }
 
-  return jsonOk({ appointment: toAppointmentSummary(item) });
+  return jsonOk({ appointment: await enrichAppointment(item) });
 });
 
 export const PATCH = apiHandler(async (request, context) => {
@@ -151,5 +151,5 @@ export const PATCH = apiHandler(async (request, context) => {
     entityUnitId: updated.unitId,
   });
 
-  return jsonOk({ appointment: toAppointmentSummary(updated) });
+  return jsonOk({ appointment: await enrichAppointment(updated) });
 });
