@@ -208,7 +208,7 @@ export function UploadDocumentDialog({
                   : "border-border bg-muted/30 hover:border-navy/40 hover:bg-muted/50"
               )}
             >
-              <span className="rounded-full bg-white p-3 shadow-sm ring-1 ring-border">
+              <span className="rounded-full bg-card p-3 shadow-sm ring-1 ring-border">
                 <Upload className="size-5 text-navy" />
               </span>
               <span className="text-sm font-medium text-navy">
@@ -220,7 +220,7 @@ export function UploadDocumentDialog({
             </button>
 
             {file ? (
-              <div className="flex items-center gap-3 rounded-lg border border-border bg-white px-3 py-2.5">
+              <div className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5">
                 <FileText className="size-4 shrink-0 text-navy" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium text-navy">

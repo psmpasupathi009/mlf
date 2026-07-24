@@ -84,7 +84,7 @@ export function SearchableSelect({
           aria-expanded={open}
           aria-haspopup="listbox"
           className={cn(
-            "flex h-11 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-input bg-white px-3 py-2 text-base text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
+            "flex h-11 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-input bg-card px-3 py-2 text-base text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
             className,
             !selected && !custom && "text-muted-foreground"
           )}

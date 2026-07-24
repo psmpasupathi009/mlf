@@ -181,7 +181,7 @@ export function DiaryPage({ user }: { user: PublicUser }) {
         </p>
       </div>
 
-      <div className="rounded-2xl border border-border/80 bg-white p-3 shadow-sm print:hidden sm:p-4">
+      <div className="rounded-2xl border border-border/80 bg-card p-3 shadow-sm print:hidden sm:p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-1.5">
             <Button
@@ -200,7 +200,7 @@ export function DiaryPage({ user }: { user: PublicUser }) {
               className={cn(
                 "shrink-0 rounded-xl px-3.5 py-2 text-left transition-colors",
                 isToday
-                  ? "bg-navy text-white shadow-sm"
+                  ? "bg-brand text-brand-foreground shadow-sm"
                   : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-navy"
               )}
             >

@@ -282,7 +282,7 @@ export function EmployeeFormDialog({
 
         <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-3 sm:px-5 sm:py-4 md:px-6 md:py-5">
           {isEdit && employee ? (
-            <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-border/80 bg-white px-3 py-2.5 text-xs sm:text-sm">
+            <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-border/80 bg-card px-3 py-2.5 text-xs sm:text-sm">
               <UnitIdBadge value={employee.unitId} />
               <Badge variant={employee.isActive ? "success" : "muted"}>
                 {employee.isActive ? "Active" : "Inactive"}
@@ -405,8 +405,8 @@ export function EmployeeFormDialog({
                         className={cn(
                           "rounded-xl border px-3 py-2.5 text-left transition-colors",
                           selected
-                            ? "border-navy bg-[#eef1f6] shadow-sm"
-                            : "border-border/80 bg-white hover:border-navy/40"
+                            ? "border-navy bg-secondary shadow-sm"
+                            : "border-border/80 bg-card hover:border-navy/40"
                         )}
                       >
                         <div className="flex items-start justify-between gap-2">
@@ -417,7 +417,7 @@ export function EmployeeFormDialog({
                           <span
                             className={cn(
                               "mt-0.5 size-4 shrink-0 rounded-sm border",
-                              selected ? "border-navy bg-navy" : "border-border bg-white"
+                              selected ? "border-brand bg-brand" : "border-border bg-card"
                             )}
                             aria-hidden
                           />
@@ -453,7 +453,7 @@ export function EmployeeFormDialog({
                 ) : (
                   <div className="space-y-3">
                     {roles.includes("advocate") ? (
-                      <p className="rounded-lg border border-navy/15 bg-white px-3 py-2 text-xs text-navy">
+                      <p className="rounded-lg border border-navy/15 bg-card px-3 py-2 text-xs text-navy">
                         Will appear in advocate lists for cases and appointments.
                       </p>
                     ) : null}

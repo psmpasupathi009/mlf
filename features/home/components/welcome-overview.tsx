@@ -551,13 +551,13 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
 
   return (
     <section className="space-y-6">
-      <div className="overflow-hidden rounded-2xl border border-border/80 bg-navy text-white shadow-sm">
+      <div className="overflow-hidden rounded-2xl border border-brand/20 bg-brand text-brand-foreground shadow-sm">
         <div className="relative px-5 py-6 sm:px-7 sm:py-7">
           <div
-            className="pointer-events-none absolute inset-0 opacity-[0.12]"
+            className="pointer-events-none absolute inset-0 opacity-[0.14]"
             style={{
               background:
-                "radial-gradient(ellipse at top right, #b8953f 0%, transparent 55%)",
+                "radial-gradient(ellipse at top right, var(--gold) 0%, transparent 55%)",
             }}
             aria-hidden
           />
@@ -569,7 +569,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
                   {isAdmin ? "Admin office board" : "My day"}
                 </span>
               </div>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight sm:text-3xl">
+              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
                 {greetingLabel()}
                 {firstName ? `, ${firstName}` : ""}
               </h1>
@@ -590,11 +590,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
                 </Button>
               ) : null}
               {moduleOn("clients") && can("clients.create") ? (
-                <Button
-                  asChild
-                  size="sm"
-                  className="border-0 bg-white text-navy hover:bg-white/90"
-                >
+                <Button asChild size="sm" variant="on-brand-solid">
                   <Link href="/clients?new=1">
                     <Plus className="size-4" />
                     New client
@@ -602,12 +598,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
                 </Button>
               ) : null}
               {moduleOn("cases") && can("cases.create") ? (
-                <Button
-                  asChild
-                  size="sm"
-                  variant="outline"
-                  className="border-white/25 bg-transparent text-white hover:bg-white/10 hover:text-white"
-                >
+                <Button asChild size="sm" variant="on-brand-solid">
                   <Link href="/cases?new=1">
                     <Plus className="size-4" />
                     Register case
@@ -615,12 +606,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
                 </Button>
               ) : null}
               {moduleOn("accounts") && can("accounts.create") ? (
-                <Button
-                  asChild
-                  size="sm"
-                  variant="outline"
-                  className="border-white/25 bg-transparent text-white hover:bg-white/10 hover:text-white"
-                >
+                <Button asChild size="sm" variant="on-brand-solid">
                   <Link href="/accounts?new=1">
                     <Plus className="size-4" />
                     Add payment
@@ -637,7 +623,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
           {Array.from({ length: 4 }).map((_, i) => (
             <div
               key={i}
-              className="h-24 animate-pulse rounded-xl border border-border/80 bg-white"
+              className="h-24 animate-pulse rounded-xl border border-border/80 bg-card"
             />
           ))}
         </div>
@@ -662,7 +648,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
                         </p>
                       ) : null}
                     </div>
-                    <span className="rounded-lg bg-[#eef1f6] p-2.5 text-navy transition-colors group-hover:bg-navy group-hover:text-white">
+                    <span className="rounded-lg bg-[#eef1f6] p-2.5 text-navy transition-colors group-hover:bg-brand group-hover:text-brand-foreground dark:bg-secondary dark:text-navy">
                       <Icon className="size-4" />
                     </span>
                   </CardContent>
@@ -683,8 +669,8 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
             </p>
           </div>
           {attention.length === 0 ? (
-            <div className="flex items-center gap-3 rounded-xl border border-emerald-200/80 bg-emerald-50/50 px-4 py-3.5 sm:px-5">
-              <CheckCircle2 className="size-5 shrink-0 text-emerald-700" />
+            <div className="flex items-center gap-3 rounded-xl border border-emerald-200/80 bg-emerald-50/50 px-4 py-3.5 dark:border-emerald-900/60 dark:bg-emerald-950/40 sm:px-5">
+              <CheckCircle2 className="size-5 shrink-0 text-emerald-700 dark:text-emerald-400" />
               <div>
                 <p className="text-sm font-medium text-navy">All clear</p>
                 <p className="text-xs text-muted-foreground">
@@ -709,10 +695,12 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
                         <span
                           className={cn(
                             "flex size-8 shrink-0 items-center justify-center rounded-lg",
-                            item.tone === "danger" && "bg-red-50 text-red-700",
+                            item.tone === "danger" &&
+                              "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-300",
                             item.tone === "warning" &&
-                              "bg-amber-50 text-amber-800",
-                            item.tone === "info" && "bg-[#eef1f6] text-navy"
+                              "bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
+                            item.tone === "info" &&
+                              "bg-[#eef1f6] text-navy dark:bg-secondary dark:text-navy"
                           )}
                         >
                           <AlertTriangle className="size-3.5" />
@@ -793,7 +781,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
                 className={cn(
                   "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
                   dayFilter === f.id
-                    ? "bg-navy text-white"
+                    ? "bg-brand text-brand-foreground"
                     : "bg-muted text-muted-foreground hover:bg-muted/80 hover:text-navy"
                 )}
               >
@@ -803,9 +791,9 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
           </div>
 
           {loading ? (
-            <div className="h-44 animate-pulse rounded-xl border border-border/80 bg-white" />
+            <div className="h-44 animate-pulse rounded-xl border border-border/80 bg-card" />
           ) : timelineRows.length === 0 ? (
-            <div className="rounded-xl border border-border/80 bg-white px-5 py-12 text-center shadow-sm shadow-black/2">
+            <div className="rounded-xl border border-border/80 bg-card px-5 py-12 text-center shadow-sm shadow-black/2">
               <CalendarClock className="mx-auto size-8 text-muted-foreground/50" />
               <p className="mt-3 text-sm font-medium text-navy">
                 Nothing scheduled today
@@ -826,11 +814,11 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-24">Time</TableHead>
-                  <TableHead className="w-28">Type</TableHead>
+                  <TableHead className="hidden w-28 sm:table-cell">Type</TableHead>
                   <TableHead>Title / client</TableHead>
-                  <TableHead>Advocate</TableHead>
-                  <TableHead>Detail</TableHead>
-                  <TableHead>Ref</TableHead>
+                  <TableHead className="hidden md:table-cell">Advocate</TableHead>
+                  <TableHead className="hidden lg:table-cell">Detail</TableHead>
+                  <TableHead className="hidden md:table-cell">Ref</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -839,7 +827,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
                     <TableCell className="whitespace-nowrap font-semibold text-navy">
                       {row.timeLabel}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       <Badge
                         variant={
                           row.kind === "hearing" ? "warning" : "muted"
@@ -867,12 +855,16 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
                           {row.client}
                         </p>
                       ) : null}
+                      <p className="mt-0.5 text-xs capitalize text-muted-foreground sm:hidden">
+                        {row.kind === "hearing" ? "Hearing" : "Appt"}
+                        {row.advocate ? ` · ${row.advocate}` : ""}
+                      </p>
                     </TableCell>
-                    <TableCell>{row.advocate}</TableCell>
-                    <TableCell className="max-w-52 truncate text-muted-foreground">
+                    <TableCell className="hidden md:table-cell">{row.advocate}</TableCell>
+                    <TableCell className="hidden max-w-52 truncate text-muted-foreground lg:table-cell">
                       {row.detail}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell">
                       <UnitIdBadge value={row.refId} />
                     </TableCell>
                   </TableRow>
@@ -887,7 +879,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
       {isAdmin && !loading && advocateBoard.some((a) => a.showAttendance) ? (
         <Link
           href="/hrms"
-          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/80 bg-white px-4 py-3 shadow-sm shadow-black/2 transition-colors hover:border-navy/30 sm:px-5"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/80 bg-card px-4 py-3 shadow-sm shadow-black/2 transition-colors hover:border-navy/30 sm:px-5"
         >
           <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
             <div className="min-w-0">
@@ -924,7 +916,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
       moduleOn("hrms") &&
       can("hrms.own_attendance") &&
       summary?.hrms ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/80 bg-white px-4 py-3.5 shadow-sm shadow-black/2 sm:px-5">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/80 bg-card px-4 py-3.5 shadow-sm shadow-black/2 sm:px-5">
           <div className="flex items-center gap-3">
             <ClipboardCheck className="size-5 text-navy" />
             <div>

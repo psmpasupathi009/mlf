@@ -26,7 +26,7 @@ export default async function LegalPageRoute({ params }: Props) {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-slate-100 via-white to-amber-50/40">
-      <header className="border-b border-border/80 bg-white/90">
+      <header className="border-b border-border/80 bg-background/90">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-4">
           <Link href="/login" className="text-sm font-semibold text-navy">
             {brand.name}

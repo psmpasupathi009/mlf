@@ -268,7 +268,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
         }
       />
 
-      <div className="rounded-2xl border border-border/80 bg-white p-3 shadow-sm sm:p-4">
+      <div className="rounded-2xl border border-border/80 bg-card p-3 shadow-sm sm:p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex gap-1.5 overflow-x-auto pb-0.5 [-webkit-overflow-scrolling:touch]">
             {chips.map((c) => (
@@ -282,7 +282,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                 className={cn(
                   "shrink-0 rounded-xl px-3.5 py-2 text-left transition-colors",
                   range === c.id
-                    ? "bg-navy text-white shadow-sm"
+                    ? "bg-brand text-brand-foreground shadow-sm"
                     : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-navy"
                 )}
               >
@@ -393,7 +393,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                 <li
                   key={a.unitId}
                   className={cn(
-                    "rounded-2xl border border-border/80 bg-white p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5",
+                    "rounded-2xl border border-border/80 bg-card p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5",
                     a.status === "cancelled" && "opacity-75"
                   )}
                 >

@@ -227,7 +227,7 @@ export function AvailabilitySlotPicker({
           disabled={{ before: today }}
         />
 
-        <div className="flex min-h-56 flex-col rounded-xl border border-border/80 bg-white shadow-sm">
+        <div className="flex min-h-56 flex-col rounded-xl border border-border/80 bg-card shadow-sm">
           <div className="shrink-0 border-b border-border/70 px-3 py-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
               Free slots
@@ -273,7 +273,7 @@ export function AvailabilitySlotPicker({
                             className={cn(
                               "rounded-lg px-2 py-2.5 text-xs font-semibold transition-colors",
                               active
-                                ? "bg-navy text-white shadow-sm"
+                                ? "bg-brand text-brand-foreground shadow-sm"
                                 : "bg-muted/60 text-navy hover:bg-muted"
                             )}
                           >
@@ -300,7 +300,7 @@ export function AvailabilitySlotPicker({
                             className={cn(
                               "rounded-lg px-2 py-2.5 text-xs font-semibold transition-colors",
                               active
-                                ? "bg-navy text-white shadow-sm"
+                                ? "bg-brand text-brand-foreground shadow-sm"
                                 : "bg-muted/60 text-navy hover:bg-muted"
                             )}
                           >

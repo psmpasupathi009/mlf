@@ -34,7 +34,7 @@ export function PhoneStep({
         >
           Phone number
         </Label>
-        <div className="flex h-12 overflow-hidden rounded-md border border-input bg-white transition-[border-color,box-shadow] focus-within:border-navy focus-within:ring-1 focus-within:ring-navy/25">
+        <div className="flex h-12 overflow-hidden rounded-md border border-input bg-card transition-[border-color,box-shadow] focus-within:border-navy focus-within:ring-1 focus-within:ring-navy/25">
           <span className="flex items-center border-r border-input bg-muted px-3.5 text-sm text-muted-foreground select-none">
             +91
           </span>

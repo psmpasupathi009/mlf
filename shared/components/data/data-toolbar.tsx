@@ -6,7 +6,7 @@ type DataToolbarProps = {
 
 export function DataToolbar({ search, filters, actions }: DataToolbarProps) {
   return (
-    <div className="mb-4 flex flex-col gap-3 rounded-xl border border-border/80 bg-white p-3 sm:p-3.5 lg:flex-row lg:items-center lg:justify-between">
+    <div className="mb-4 flex flex-col gap-3 rounded-xl border border-border/80 bg-card p-3 sm:p-3.5 lg:flex-row lg:items-center lg:justify-between">
       <div className="flex min-w-0 flex-1 flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
         {search ? (
           <div className="w-full min-w-0 md:max-w-sm md:flex-1">{search}</div>

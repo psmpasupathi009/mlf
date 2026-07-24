@@ -9,15 +9,20 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-navy text-navy-foreground hover:bg-[#16233d]",
-        destructive: "bg-destructive text-white hover:bg-destructive/90",
+          "bg-brand text-brand-foreground hover:brightness-110 dark:hover:brightness-125",
+        destructive: "bg-destructive text-destructive-foreground hover:bg-destructive/90",
         outline:
-          "border border-input bg-background hover:bg-muted",
+          "border border-input bg-background text-foreground hover:bg-muted",
         secondary:
           "bg-secondary text-secondary-foreground hover:bg-secondary/80",
-        ghost: "hover:bg-muted",
+        ghost: "text-foreground hover:bg-muted",
         link: "text-navy underline-offset-4 hover:underline",
-        gold: "bg-gold text-gold-foreground hover:bg-[#a68638]",
+        gold: "bg-gold text-gold-foreground hover:brightness-95 dark:hover:brightness-110",
+        /* For use on brand / navy panels */
+        "on-brand":
+          "border border-white/30 bg-transparent text-white hover:bg-white/12 hover:text-white",
+        "on-brand-solid":
+          "border-0 bg-white text-brand hover:bg-white/90",
       },
       size: {
         default: "h-10 px-4 py-2 sm:h-9",

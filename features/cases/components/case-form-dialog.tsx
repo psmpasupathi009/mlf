@@ -324,7 +324,7 @@ export function CaseFormDialog({
               description="Who this office represents"
             >
               {isEdit ? (
-                <div className="rounded-md border border-input bg-white px-3 py-3 text-sm">
+                <div className="rounded-md border border-input bg-card px-3 py-3 text-sm">
                   <span className="font-medium text-navy">{client?.name}</span>
                   <span className="text-muted-foreground">
                     {" "}

@@ -27,7 +27,7 @@ type PinStepProps = {
 };
 
 const slotClass =
-  "h-12 w-10 rounded-md border border-input bg-white text-base text-foreground shadow-none first:rounded-md first:border-l last:rounded-md data-[active=true]:border-navy data-[active=true]:ring-1 data-[active=true]:ring-navy/25 sm:h-12 sm:w-11";
+  "h-12 w-10 rounded-md border border-input bg-card text-base text-foreground shadow-none first:rounded-md first:border-l last:rounded-md data-[active=true]:border-navy data-[active=true]:ring-1 data-[active=true]:ring-navy/25 sm:h-12 sm:w-11";
 
 export function PinStep({
   pin,

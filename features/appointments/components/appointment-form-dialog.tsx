@@ -96,13 +96,13 @@ function FormSection({
   return (
     <div
       className={cn(
-        "space-y-3 rounded-2xl border border-border/70 bg-white p-4 shadow-sm sm:p-5",
+        "space-y-3 rounded-2xl border border-border/70 bg-card p-4 shadow-sm sm:p-5",
         className
       )}
     >
       <div className="flex items-start gap-3">
         {step != null ? (
-          <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-navy text-xs font-semibold text-white">
+          <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-brand text-xs font-semibold text-brand-foreground">
             {step}
           </span>
         ) : null}
@@ -137,7 +137,7 @@ function ModePicker({
             className={cn(
               "rounded-xl border px-2 py-2.5 text-center text-xs font-semibold transition-colors sm:text-sm",
               active
-                ? "border-navy bg-navy text-white shadow-sm"
+                ? "border-brand bg-brand text-brand-foreground shadow-sm"
                 : "border-border bg-muted/40 text-navy hover:bg-muted"
             )}
           >
@@ -702,7 +702,7 @@ export function AppointmentFormDialog({
           ) : null}
         </DialogBody>
 
-        <DialogFooter className="gap-2 bg-white sm:justify-between">
+        <DialogFooter className="gap-2 bg-card sm:justify-between">
           <p className="hidden text-xs text-muted-foreground sm:block">
             {isReschedule
               ? "Old slot opens for others after you move."
@@ -722,7 +722,7 @@ export function AppointmentFormDialog({
             </Button>
             <Button
               type="button"
-              className="h-11 min-w-40"
+              className="h-11 w-full sm:min-w-40 sm:w-auto"
               onClick={handleSubmit}
               disabled={busy}
             >

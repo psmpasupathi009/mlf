@@ -301,17 +301,26 @@ export function HrmsPage({ user }: { user: PublicUser }) {
               <TableHeader>
                 <TableRow>
                   <TableHead>From</TableHead>
-                  <TableHead>To</TableHead>
-                  <TableHead>Reason</TableHead>
+                  <TableHead className="hidden sm:table-cell">To</TableHead>
+                  <TableHead className="hidden md:table-cell">Reason</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {myLeave.map((l) => (
                   <TableRow key={l.unitId}>
-                    <TableCell className="whitespace-nowrap">{l.fromDate}</TableCell>
-                    <TableCell className="whitespace-nowrap">{l.toDate}</TableCell>
-                    <TableCell className="truncate">{l.reason ?? "—"}</TableCell>
+                    <TableCell className="whitespace-nowrap">
+                      <div>{l.fromDate}</div>
+                      <div className="text-xs text-muted-foreground sm:hidden">
+                        to {l.toDate}
+                      </div>
+                    </TableCell>
+                    <TableCell className="hidden whitespace-nowrap sm:table-cell">
+                      {l.toDate}
+                    </TableCell>
+                    <TableCell className="hidden truncate md:table-cell">
+                      {l.reason ?? "—"}
+                    </TableCell>
                     <TableCell>
                       <Badge variant={LEAVE_VARIANT[l.status] ?? "outline"}>{l.status}</Badge>
                     </TableCell>
@@ -338,9 +347,9 @@ export function HrmsPage({ user }: { user: PublicUser }) {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Employee</TableHead>
-                    <TableHead>From</TableHead>
-                    <TableHead>To</TableHead>
-                    <TableHead>Reason</TableHead>
+                    <TableHead className="hidden sm:table-cell">From</TableHead>
+                    <TableHead className="hidden md:table-cell">To</TableHead>
+                    <TableHead className="hidden lg:table-cell">Reason</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -354,10 +363,19 @@ export function HrmsPage({ user }: { user: PublicUser }) {
                         {l.userName ? (
                           <div className="text-xs text-muted-foreground">{l.userUnitId}</div>
                         ) : null}
+                        <div className="mt-1 text-xs text-muted-foreground sm:hidden">
+                          {l.fromDate} → {l.toDate}
+                        </div>
                       </TableCell>
-                      <TableCell className="whitespace-nowrap">{l.fromDate}</TableCell>
-                      <TableCell className="whitespace-nowrap">{l.toDate}</TableCell>
-                      <TableCell className="truncate">{l.reason ?? "—"}</TableCell>
+                      <TableCell className="hidden whitespace-nowrap sm:table-cell">
+                        {l.fromDate}
+                      </TableCell>
+                      <TableCell className="hidden whitespace-nowrap md:table-cell">
+                        {l.toDate}
+                      </TableCell>
+                      <TableCell className="hidden truncate lg:table-cell">
+                        {l.reason ?? "—"}
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="flex flex-col items-stretch gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
                           <Button
@@ -426,10 +444,10 @@ export function HrmsPage({ user }: { user: PublicUser }) {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Advocate</TableHead>
-                    <TableHead>Mobile</TableHead>
+                    <TableHead className="hidden md:table-cell">Mobile</TableHead>
                     <TableHead>Status</TableHead>
-                    <TableHead>Check in</TableHead>
-                    <TableHead>Check out</TableHead>
+                    <TableHead className="hidden sm:table-cell">Check in</TableHead>
+                    <TableHead className="hidden sm:table-cell">Check out</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -445,8 +463,11 @@ export function HrmsPage({ user }: { user: PublicUser }) {
                         <div className="text-xs text-muted-foreground">
                           {row.unitId}
                         </div>
+                        <div className="mt-1 text-xs text-muted-foreground md:hidden">
+                          {row.mobile}
+                        </div>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="hidden text-muted-foreground md:table-cell">
                         {row.mobile}
                       </TableCell>
                       <TableCell>
@@ -466,12 +487,12 @@ export function HrmsPage({ user }: { user: PublicUser }) {
                               : "Out"}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden sm:table-cell">
                         {row.checkInAt
                           ? new Date(row.checkInAt).toLocaleTimeString("en-IN")
                           : "—"}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden sm:table-cell">
                         {row.checkOutAt
                           ? new Date(row.checkOutAt).toLocaleTimeString("en-IN")
                           : "—"}

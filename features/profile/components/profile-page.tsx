@@ -104,7 +104,7 @@ export function ProfilePage({ user: initial }: { user: PublicUser }) {
         description="Update how your name appears in the office portal. Mobile login cannot be changed here."
       />
 
-      <div className="space-y-6 rounded-xl border border-border/80 bg-white p-5 sm:p-6">
+      <div className="space-y-6 rounded-xl border border-border/80 bg-card p-5 sm:p-6">
         <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
           <UserAvatar
             name={personDisplayName({

@@ -54,7 +54,7 @@ export function DiaryHearingCard({ item, canEdit, onAdjourn }: Props) {
   return (
     <li
       className={cn(
-        "rounded-2xl border border-border/80 bg-white p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5",
+        "rounded-2xl border border-border/80 bg-card p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5",
         "print:rounded-none print:border print:border-border print:p-3 print:shadow-none"
       )}
     >
@@ -111,8 +111,8 @@ export function DiaryHearingCard({ item, canEdit, onAdjourn }: Props) {
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1 print:hidden">
-          <Button asChild type="button" size="sm" variant="outline" className="h-9">
+        <div className="flex w-full shrink-0 flex-col gap-2 print:hidden sm:w-auto sm:flex-row sm:items-center">
+          <Button asChild type="button" size="sm" variant="outline" className="h-10 w-full sm:h-9 sm:w-auto">
             <Link href={`/cases/${item.caseUnitId}`}>
               <Scale className="size-3.5" />
               Open case
@@ -126,7 +126,7 @@ export function DiaryHearingCard({ item, canEdit, onAdjourn }: Props) {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="size-9 text-muted-foreground hover:text-navy"
+                  className="size-10 self-end text-muted-foreground hover:text-navy sm:size-9 sm:self-auto"
                   aria-label={`More actions for ${title}`}
                 >
                   <MoreHorizontal className="size-4" />

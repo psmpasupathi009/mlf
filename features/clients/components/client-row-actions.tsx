@@ -30,7 +30,7 @@ export function ClientRowActions({ client, canEdit, onEdit }: Props) {
           type="button"
           variant="ghost"
           size="icon"
-          className="size-8 text-navy hover:bg-navy/5"
+          className="size-8 text-navy hover:bg-brand/10"
           title="Edit client"
           aria-label={`Edit ${client.name}`}
           onClick={onEdit}

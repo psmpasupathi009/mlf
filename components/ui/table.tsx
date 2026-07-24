@@ -10,7 +10,7 @@ function Table({
     <div
       data-slot="table-wrap"
       className={cn(
-        "w-full max-w-full overflow-x-auto overscroll-x-contain rounded-xl border border-border/80 bg-white shadow-sm shadow-black/2 [-webkit-overflow-scrolling:touch]",
+        "w-full max-w-full overflow-x-auto overscroll-x-contain rounded-xl border border-border/80 bg-card shadow-sm shadow-black/2 [-webkit-overflow-scrolling:touch]",
         containerClassName
       )}
     >

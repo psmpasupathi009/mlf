@@ -1,12 +1,18 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 :root {
   /* Brand — restrained, professional */
   --background: #ffffff;
-  --foreground: #3a3a3a; /* dark grey text */
+  --foreground: #3a3a3a;
+  /* Brand surface (hero, primary buttons) — stays deep in both themes */
+  --brand: #1b2a4a;
+  --brand-foreground: #ffffff;
+  /* Readable brand-tinted text / accents */
   --navy: #1b2a4a;
   --navy-foreground: #ffffff;
-  --gold: #b8953f; /* muted gold accent — not flashy */
+  --gold: #b8953f;
   --gold-foreground: #1b2a4a;
   --muted: #f3f4f6;
   --muted-foreground: #5c5c5c;
@@ -21,14 +27,59 @@
   --secondary-foreground: #1b2a4a;
   --accent: #b8953f;
   --accent-foreground: #1b2a4a;
-  --destructive: #8f2f2f; /* muted red, not bright */
+  --destructive: #8f2f2f;
   --destructive-foreground: #ffffff;
   --radius: 0.5rem;
+  /* Sidebar kit */
+  --sidebar: #ffffff;
+  --sidebar-foreground: #3a3a3a;
+  --sidebar-primary: #1b2a4a;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #f3f4f6;
+  --sidebar-accent-foreground: #1b2a4a;
+  --sidebar-border: #e2e4e8;
+  --sidebar-ring: #1b2a4a;
+}
+
+.dark {
+  --background: #0f1419;
+  --foreground: #e6e8ec;
+  --brand: #1b2a4a;
+  --brand-foreground: #ffffff;
+  --navy: #9eb0d0;
+  --navy-foreground: #0f1419;
+  --gold: #c9a84a;
+  --gold-foreground: #1b2a4a;
+  --muted: #161b22;
+  --muted-foreground: #9aa3b2;
+  --border: #2a323d;
+  --input: #3a4452;
+  --ring: #9eb0d0;
+  --card: #0f1419;
+  --card-foreground: #e6e8ec;
+  --primary: #1b2a4a;
+  --primary-foreground: #ffffff;
+  --secondary: #222a35;
+  --secondary-foreground: #e6e8ec;
+  --accent: #c9a84a;
+  --accent-foreground: #1b2a4a;
+  --destructive: #c45c5c;
+  --destructive-foreground: #ffffff;
+  --sidebar: #1a212b;
+  --sidebar-foreground: #e6e8ec;
+  --sidebar-primary: #1b2a4a;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #222a35;
+  --sidebar-accent-foreground: #e6e8ec;
+  --sidebar-border: #2a323d;
+  --sidebar-ring: #9eb0d0;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
   --color-navy: var(--navy);
   --color-navy-foreground: var(--navy-foreground);
   --color-gold: var(--gold);
@@ -48,13 +99,20 @@
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
-  /* Stacking: dialog < select/popover so dropdowns work inside modals */
   --z-index-50: 50;
   --z-index-100: 100;
   --z-index-200: 200;
@@ -78,16 +136,20 @@ body {
   overflow-x: clip;
   padding-left: env(safe-area-inset-left);
   padding-right: env(safe-area-inset-right);
-  /* Prefer readable text on phones without accidental zoom from tiny inputs */
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }
 
-/* Comfortable tap feedback without flashy outlines on every element */
 @media (pointer: coarse) {
   button,
   a,
   [role="button"] {
     -webkit-tap-highlight-color: rgb(27 42 74 / 0.08);
+  }
+
+  .dark button,
+  .dark a,
+  .dark [role="button"] {
+    -webkit-tap-highlight-color: rgb(143 163 199 / 0.12);
   }
 }

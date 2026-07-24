@@ -425,7 +425,7 @@ export function AvailabilityPage({ user }: { user: PublicUser }) {
         </div>
       ) : null}
 
-      <section className="space-y-4 rounded-xl border border-border/80 bg-white p-4 sm:p-5">
+      <section className="space-y-4 rounded-xl border border-border/80 bg-card p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold text-navy">
@@ -467,7 +467,7 @@ export function AvailabilityPage({ user }: { user: PublicUser }) {
                         "flex min-h-11 cursor-pointer items-center gap-2 rounded-lg border px-3 py-2.5 text-sm transition-colors",
                         checked
                           ? "border-navy/40 bg-navy/5 text-navy"
-                          : "border-border bg-white text-muted-foreground"
+                          : "border-border bg-card text-muted-foreground"
                       )}
                     >
                       <Checkbox
@@ -555,7 +555,7 @@ export function AvailabilityPage({ user }: { user: PublicUser }) {
         )}
       </section>
 
-      <section className="space-y-4 rounded-xl border border-border/80 bg-white p-4 sm:p-5">
+      <section className="space-y-4 rounded-xl border border-border/80 bg-card p-4 sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold text-navy">

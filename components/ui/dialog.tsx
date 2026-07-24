@@ -66,7 +66,7 @@ function DialogContent({
       <DialogOverlay className={overlayClassName} />
       <DialogPrimitive.Content
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 flex min-h-0 w-full max-w-[calc(100dvw-1rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-0 overflow-hidden rounded-xl border border-border bg-white p-0 shadow-lg",
+          "fixed top-1/2 left-1/2 z-50 flex min-h-0 w-full max-w-[calc(100dvw-1rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-0 overflow-hidden rounded-xl border border-border bg-card p-0 shadow-lg",
           DIALOG_SIZE_CLASSES[size],
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
           className
@@ -112,7 +112,7 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       className={cn(
-        "flex w-full shrink-0 flex-col-reverse gap-2 border-t border-border/80 bg-white px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex-row sm:justify-end sm:px-5 [&_button]:w-full sm:[&_button]:w-auto",
+        "flex w-full shrink-0 flex-col-reverse gap-2 border-t border-border/80 bg-card px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:flex-row sm:justify-end sm:px-5 [&_button]:w-full sm:[&_button]:w-auto",
         className
       )}
       {...props}

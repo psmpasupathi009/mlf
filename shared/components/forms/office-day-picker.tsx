@@ -27,7 +27,7 @@ export function calendarClassNames(compact = false) {
       "hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-navy/30"
     ),
     selected:
-      "[&>button]:bg-navy [&>button]:font-semibold [&>button]:text-white [&>button]:shadow-sm [&>button]:hover:bg-navy [&>button]:hover:text-white",
+      "[&>button]:bg-brand [&>button]:font-semibold [&>button]:text-brand-foreground [&>button]:shadow-sm [&>button]:hover:bg-brand [&>button]:hover:text-brand-foreground",
     today:
       "[&>button]:font-semibold [&>button]:text-navy [&>button]:ring-1 [&>button]:ring-gold/70",
     outside: "[&>button]:text-muted-foreground/35",
@@ -52,7 +52,7 @@ export function OfficeDayPicker({
   return (
     <div
       className={cn(
-        "rounded-xl border border-border/80 bg-white shadow-sm",
+        "rounded-xl border border-border/80 bg-card shadow-sm",
         compact ? "p-2" : "p-2.5 sm:p-3",
         className
       )}

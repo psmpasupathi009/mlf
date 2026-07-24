@@ -264,8 +264,8 @@ export function CaseDetailPage({
                 <TableRow>
                   <TableHead>Date</TableHead>
                   <TableHead>Purpose</TableHead>
-                  <TableHead>Outcome</TableHead>
-                  <TableHead>SMS</TableHead>
+                  <TableHead className="hidden md:table-cell">Outcome</TableHead>
+                  <TableHead className="hidden sm:table-cell">SMS</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -276,10 +276,10 @@ export function CaseDetailPage({
                       {new Date(h.hearingDate).toLocaleDateString("en-IN")}
                     </TableCell>
                     <TableCell>{h.purpose ?? "—"}</TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell">
                       {h.outcome ?? (h.isAdjourned ? "Adjourned" : "—")}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden sm:table-cell">
                       <Badge variant={h.smsSentAt ? "success" : "muted"}>
                         {h.smsSentAt ? "Sent" : "Pending"}
                       </Badge>

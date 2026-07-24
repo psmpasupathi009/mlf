@@ -30,7 +30,7 @@ function SelectTrigger({
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       className={cn(
-        "flex h-11 w-full min-w-0 items-center justify-between rounded-md border border-input bg-white px-3 py-2 text-base text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm [&>span]:line-clamp-1",
+        "flex h-11 w-full min-w-0 items-center justify-between rounded-md border border-input bg-card px-3 py-2 text-base text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm [&>span]:line-clamp-1",
         className
       )}
       {...props}
@@ -53,7 +53,7 @@ function SelectContent({
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
         className={cn(
-          "relative z-300 max-h-[min(20rem,50dvh)] min-w-(--radix-select-trigger-width) overflow-hidden rounded-md border border-border bg-white text-foreground shadow-lg",
+          "relative z-300 max-h-[min(20rem,50dvh)] min-w-(--radix-select-trigger-width) overflow-hidden rounded-md border border-border bg-card text-foreground shadow-lg",
           position === "popper" &&
             "data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1",
           className

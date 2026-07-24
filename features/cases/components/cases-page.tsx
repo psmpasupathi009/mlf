@@ -10,9 +10,16 @@ import { PaginationBar } from "@/shared/components/data/pagination-bar";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { UnitIdBadge } from "@/shared/components/data/unit-id-badge";
 import { ImportDialog } from "@/shared/components/data/import-dialog";
+import { MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Select,
   SelectContent,
@@ -157,7 +164,7 @@ export function CasesPage({ user }: { user: PublicUser }) {
             className={cn(
               "shrink-0 rounded-full px-3.5 py-2 text-sm font-medium transition-colors",
               quick === c.id
-                ? "bg-navy text-white"
+                ? "bg-brand text-brand-foreground"
                 : "bg-muted text-muted-foreground hover:text-navy"
             )}
           >
@@ -200,39 +207,37 @@ export function CasesPage({ user }: { user: PublicUser }) {
           </Select>
         }
         actions={
-          <>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={async () => {
-                const result = await apiDownload(
-                  "/api/v1/exports?type=cases",
-                  "cases.xlsx"
-                );
-                if (!result.ok) toast.error(result.error ?? "Export failed");
-              }}
-            >
-              Export Excel
-            </Button>
-            {can("create") ? (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setImportOpen(true)}
-              >
-                Import cases
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" variant="outline" className="gap-2">
+                <MoreHorizontal className="size-4" />
+                Import / export
               </Button>
-            ) : null}
-            {can("edit") ? (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setHearingsImportOpen(true)}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem
+                onSelect={async () => {
+                  const result = await apiDownload(
+                    "/api/v1/exports?type=cases",
+                    "cases.xlsx"
+                  );
+                  if (!result.ok) toast.error(result.error ?? "Export failed");
+                }}
               >
-                Import hearings
-              </Button>
-            ) : null}
-          </>
+                Export Excel
+              </DropdownMenuItem>
+              {can("create") ? (
+                <DropdownMenuItem onSelect={() => setImportOpen(true)}>
+                  Import cases
+                </DropdownMenuItem>
+              ) : null}
+              {can("edit") ? (
+                <DropdownMenuItem onSelect={() => setHearingsImportOpen(true)}>
+                  Import hearings
+                </DropdownMenuItem>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
         }
       />
 
@@ -265,10 +270,10 @@ export function CasesPage({ user }: { user: PublicUser }) {
               <TableRow>
                 <TableHead>ID</TableHead>
                 <TableHead>Court no.</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead>Court</TableHead>
+                <TableHead className="hidden md:table-cell">Client</TableHead>
+                <TableHead className="hidden lg:table-cell">Court</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Next hearing</TableHead>
+                <TableHead className="hidden md:table-cell">Next hearing</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -287,20 +292,29 @@ export function CasesPage({ user }: { user: PublicUser }) {
                         <UnitIdBadge value={c.unitId} />
                       </TableCell>
                       <TableCell className="font-medium text-navy">
-                        {c.caseNumber ?? (
-                          <span className="font-normal text-amber-700">
-                            Pending
-                          </span>
-                        )}
+                        <div className="space-y-0.5">
+                          {c.caseNumber ?? (
+                            <span className="font-normal text-amber-700">
+                              Pending
+                            </span>
+                          )}
+                          <p className="text-xs font-normal text-muted-foreground md:hidden">
+                            {c.clientName ?? c.clientUnitId}
+                          </p>
+                        </div>
                       </TableCell>
-                      <TableCell>{c.clientName ?? c.clientUnitId}</TableCell>
-                      <TableCell>{c.courtName ?? "—"}</TableCell>
+                      <TableCell className="hidden md:table-cell">
+                        {c.clientName ?? c.clientUnitId}
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
+                        {c.courtName ?? "—"}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={STATUS_VARIANT[c.status] ?? "outline"}>
                           {c.status}
                         </Badge>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
                         {c.nextHearingAt
                           ? new Date(c.nextHearingAt).toLocaleDateString(
                               "en-IN"

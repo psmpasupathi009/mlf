@@ -167,7 +167,7 @@ export function ProfilePhotoCropDialog({
             </label>
           ) : (
             <>
-              <div className="relative h-72 overflow-hidden rounded-xl bg-navy/90">
+              <div className="relative h-72 overflow-hidden rounded-xl bg-brand">
                 <Cropper
                   image={src}
                   crop={crop}

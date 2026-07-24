@@ -33,9 +33,10 @@ export function UnitIdBadge({
       onClick={handleCopy}
       title={`Copy ${value}`}
       className={cn(
-        "inline-flex min-h-8 max-w-full items-center gap-1.5 truncate rounded-md border border-border bg-muted/50 px-2 py-1 font-mono text-xs text-navy transition-colors hover:border-navy/30 hover:bg-white",
+        "inline-flex min-h-8 max-w-full items-center gap-1.5 truncate rounded-md border border-border bg-muted/50 px-2 py-1 font-mono text-xs text-navy transition-colors hover:border-navy/30 hover:bg-card",
         className
       )}
+      data-unit-id-badge=""
     >
       <span className="truncate">{value}</span>
       {copied ? (

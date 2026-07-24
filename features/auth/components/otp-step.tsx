@@ -65,7 +65,7 @@ export function OtpStep({
               <InputOTPSlot
                 key={index}
                 index={index}
-                className="h-12 w-11 rounded-md border border-input bg-white text-lg text-foreground shadow-none first:rounded-md first:border-l last:rounded-md data-[active=true]:border-navy data-[active=true]:ring-1 data-[active=true]:ring-navy/25 sm:h-13 sm:w-12"
+                className="h-12 w-11 rounded-md border border-input bg-card text-lg text-foreground shadow-none first:rounded-md first:border-l last:rounded-md data-[active=true]:border-navy data-[active=true]:ring-1 data-[active=true]:ring-navy/25 sm:h-13 sm:w-12"
               />
             ))}
           </InputOTPGroup>

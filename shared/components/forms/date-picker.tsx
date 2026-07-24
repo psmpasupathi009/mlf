@@ -39,7 +39,7 @@ export function DatePicker({
         <button
           type="button"
           onClick={() => setExpanded((v) => !v)}
-          className="flex h-11 w-full items-center justify-between rounded-xl border border-input bg-white px-3 text-left text-sm shadow-sm transition-colors hover:bg-muted/40"
+          className="flex h-11 w-full items-center justify-between rounded-xl border border-input bg-card px-3 text-left text-sm shadow-sm transition-colors hover:bg-muted/40"
         >
           <span className="flex items-center gap-2 text-navy">
             <CalendarDays className="size-4 shrink-0 text-muted-foreground" />

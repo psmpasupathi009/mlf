@@ -231,7 +231,7 @@ export function PermissionsMatrixPage({ user }: { user: PublicUser }) {
       ) : null}
 
       {dirty ? (
-        <div className="mb-4 rounded-lg border border-navy/20 bg-[#eef1f6] px-4 py-3 text-sm text-navy">
+        <div className="mb-4 rounded-lg border border-navy/20 bg-secondary px-4 py-3 text-sm text-navy">
           You have unsaved changes. Staff will keep their previous access until you save.
         </div>
       ) : null}
@@ -248,7 +248,7 @@ export function PermissionsMatrixPage({ user }: { user: PublicUser }) {
                 className={cn(
                   "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
                   focusRole === "all"
-                    ? "bg-navy text-white"
+                    ? "bg-brand text-brand-foreground"
                     : "bg-muted text-muted-foreground hover:text-navy"
                 )}
               >
@@ -262,7 +262,7 @@ export function PermissionsMatrixPage({ user }: { user: PublicUser }) {
                   className={cn(
                     "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
                     focusRole === role
-                      ? "bg-navy text-white"
+                      ? "bg-brand text-brand-foreground"
                       : "bg-muted text-muted-foreground hover:text-navy"
                   )}
                 >
@@ -348,7 +348,7 @@ export function PermissionsMatrixPage({ user }: { user: PublicUser }) {
                     <table className="w-full min-w-160 text-sm">
                       <thead>
                         <tr className="border-b border-border/80 text-left">
-                          <th className="sticky left-0 z-10 bg-white px-4 py-3 font-medium text-muted-foreground">
+                          <th className="sticky left-0 z-10 bg-card px-4 py-3 font-medium text-muted-foreground">
                             Action
                           </th>
                           {visibleRoles.map((role) => (
@@ -385,7 +385,7 @@ export function PermissionsMatrixPage({ user }: { user: PublicUser }) {
                       <tbody>
                         {actions.map(({ action }) => (
                           <tr key={action} className="border-b border-border/60 last:border-0">
-                            <td className="sticky left-0 z-10 bg-white px-4 py-3">
+                            <td className="sticky left-0 z-10 bg-card px-4 py-3">
                               <div className="font-medium text-navy">{actionLabel(action)}</div>
                               <div className="text-[11px] text-muted-foreground">
                                 {module}.{action}

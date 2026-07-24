@@ -239,12 +239,12 @@ export function EmployeesPage({ user }: { user: PublicUser }) {
             <TableHeader>
               <TableRow>
                 <TableHead>Person</TableHead>
-                <TableHead>ID</TableHead>
-                <TableHead>Mobile</TableHead>
-                <TableHead>Designation</TableHead>
+                <TableHead className="hidden lg:table-cell">ID</TableHead>
+                <TableHead className="hidden md:table-cell">Mobile</TableHead>
+                <TableHead className="hidden lg:table-cell">Designation</TableHead>
                 <TableHead>Roles</TableHead>
-                <TableHead>Access</TableHead>
-                <TableHead>Last login</TableHead>
+                <TableHead className="hidden sm:table-cell">Access</TableHead>
+                <TableHead className="hidden md:table-cell">Last login</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -268,11 +268,13 @@ export function EmployeesPage({ user }: { user: PublicUser }) {
                           subtitle={emp.email || emp.designation || undefined}
                         />
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         <UnitIdBadge value={emp.unitId} />
                       </TableCell>
-                      <TableCell className="whitespace-nowrap">+91 {emp.mobile}</TableCell>
-                      <TableCell>
+                      <TableCell className="hidden whitespace-nowrap md:table-cell">
+                        +91 {emp.mobile}
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">
                         {emp.designation ? (
                           <span className="rounded-md bg-muted px-2 py-0.5 text-xs text-foreground">
                             {emp.designation}
@@ -290,7 +292,7 @@ export function EmployeesPage({ user }: { user: PublicUser }) {
                           ))}
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden sm:table-cell">
                         <div className="flex flex-wrap gap-1">
                           <Badge variant={emp.isActive ? "success" : "muted"}>
                             {emp.isActive ? "Active" : "Inactive"}
@@ -300,7 +302,7 @@ export function EmployeesPage({ user }: { user: PublicUser }) {
                           </Badge>
                         </div>
                       </TableCell>
-                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                      <TableCell className="hidden whitespace-nowrap text-muted-foreground md:table-cell">
                         {formatLastLogin(emp.lastLoginAt)}
                       </TableCell>
                       <TableCell className="text-right">

@@ -9,9 +9,9 @@ export const metadata: Metadata = {
 
 export default function LoginPage() {
   return (
-    <main className="grid min-h-dvh grid-cols-1 bg-white md:grid-cols-2">
+    <main className="grid min-h-dvh grid-cols-1 bg-background md:grid-cols-2">
       {/* Compact brand strip on phone; full hero from md */}
-      <aside className="flex items-center justify-center bg-navy px-4 py-4 sm:py-5 md:min-h-dvh md:px-8 md:py-8 lg:px-10 xl:px-14">
+      <aside className="flex items-center justify-center bg-brand px-4 py-4 sm:py-5 md:min-h-dvh md:px-8 md:py-8 lg:px-10 xl:px-14">
         <div className="flex w-full flex-row items-center justify-center gap-3 text-left md:flex-col md:text-center">
           <Image
             src="/images/mlf-logo-en.jpeg"

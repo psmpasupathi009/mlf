@@ -190,10 +190,10 @@ export function AccountsPage({ user }: { user: PublicUser }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>ID</TableHead>
+                <TableHead className="hidden lg:table-cell">ID</TableHead>
                 <TableHead>Client</TableHead>
-                <TableHead>Case</TableHead>
-                <TableHead>Type</TableHead>
+                <TableHead className="hidden md:table-cell">Case</TableHead>
+                <TableHead className="hidden sm:table-cell">Type</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -202,10 +202,24 @@ export function AccountsPage({ user }: { user: PublicUser }) {
             <TableBody>
               {rows.map((p) => (
                 <TableRow key={p.unitId}>
-                  <TableCell><UnitIdBadge value={p.unitId} /></TableCell>
-                  <TableCell>{p.clientName ?? p.clientUnitId}</TableCell>
-                  <TableCell>{p.caseUnitId ?? "—"}</TableCell>
-                  <TableCell className="capitalize">{p.type}</TableCell>
+                  <TableCell className="hidden lg:table-cell">
+                    <UnitIdBadge value={p.unitId} />
+                  </TableCell>
+                  <TableCell>
+                    <div className="space-y-0.5">
+                      <span>{p.clientName ?? p.clientUnitId}</span>
+                      <p className="text-xs text-muted-foreground md:hidden">
+                        {p.caseUnitId ?? "No case"} ·{" "}
+                        <span className="capitalize">{p.type}</span>
+                      </p>
+                    </div>
+                  </TableCell>
+                  <TableCell className="hidden md:table-cell">
+                    {p.caseUnitId ?? "—"}
+                  </TableCell>
+                  <TableCell className="hidden capitalize sm:table-cell">
+                    {p.type}
+                  </TableCell>
                   <TableCell className="font-medium text-navy">{rupee(p.amount)}</TableCell>
                   <TableCell>
                     <Badge variant={STATUS_VARIANT[p.status] ?? "outline"}>{p.status}</Badge>

@@ -55,7 +55,7 @@ export function EmployeeRowActions({
           type="button"
           variant="ghost"
           size="icon"
-          className="size-8 text-navy hover:bg-navy/5"
+          className="size-8 text-navy hover:bg-brand/10"
           disabled={busy}
           title="Edit employee"
           aria-label={`Edit ${employee.name ?? employee.unitId}`}

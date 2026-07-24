@@ -18,7 +18,7 @@ export function PageHeader({ title, description, actions }: PageHeaderProps) {
         ) : null}
       </div>
       {actions ? (
-        <div className="flex w-full shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center md:w-auto md:justify-end [&_button]:w-full sm:[&_button]:w-auto [&_a]:w-full sm:[&_a]:w-auto">
+        <div className="flex w-full shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center md:w-auto md:justify-end [&_a]:w-full sm:[&_a]:w-auto [&_button:not([data-unit-id-badge])]:w-full sm:[&_button:not([data-unit-id-badge])]:w-auto">
           {actions}
         </div>
       ) : null}
