@@ -215,7 +215,7 @@ export function AppointmentFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl sm:max-w-2xl">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>
             {isEdit ? "Edit appointment" : "Book appointment"}

@@ -133,7 +133,7 @@ export function UploadDocumentDialog({
         onOpenChange(v);
       }}
     >
-      <DialogContent className="max-w-lg">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>Upload case document</DialogTitle>
           <DialogDescription>

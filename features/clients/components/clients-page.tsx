@@ -191,7 +191,7 @@ export function ClientsPage({ user }: { user: PublicUser }) {
         title="Import clients"
         endpoint="/api/v1/clients/import"
         sampleHref="/samples/clients.sample.csv"
-        columnsHint="Required: name, mobile. Optional: address, city, district, aadhaarLast4…"
+        columnsHint="Required: name, mobile. Optional: address, city, district, state, referredBy…"
         onImported={load}
       />
     </section>

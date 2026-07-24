@@ -1,3 +1,3 @@
 unitId,clientMobile,clientUnitId,caseNumber,cnr,state,district,city,courtName,advocateMobiles,primaryAdvocateMobile,opposingParty,caseType,status,filingDate,nextHearingAt,agreedFee,notes
 ,9123456780,,OS/123/2024,,Tamil Nadu,Chennai,Chennai,City Civil Court — Main (Madras High Court Campus),9876543210,9876543210,Opposite Party Name,Civil,pending,2024-06-15,2024-08-20,25000,Existing matter
-,,CLI-00002,,,,,Tamil Nadu,Erode,Gobichettipalayam,JMFC, Gobichettipalayam,9876543210;9876543211,9876543210,,Criminal,listed,,,15000,Court number not yet allotted
+,,CLI-00002,,,Tamil Nadu,Erode,Gobichettipalayam,"JMFC, Gobichettipalayam",9876543210;9876543211,9876543210,,Criminal,listed,,,15000,Court number not yet allotted

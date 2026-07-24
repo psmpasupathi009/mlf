@@ -71,7 +71,7 @@ function Section({
   return (
     <div
       className={cn(
-        "flex h-full flex-col gap-3 rounded-xl border border-border/80 bg-muted/15 p-4 sm:p-5",
+        "flex min-w-0 flex-col gap-3 rounded-xl border border-border/80 bg-muted/15 p-4 sm:p-5",
         className
       )}
     >
@@ -81,7 +81,7 @@ function Section({
           <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
         ) : null}
       </div>
-      <div className="grid flex-1 content-start gap-3">{children}</div>
+      <div className="grid min-w-0 content-start gap-3">{children}</div>
     </div>
   );
 }
@@ -296,24 +296,19 @@ export function CaseFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        className={cn(
-          "flex w-[min(100%,calc(100dvw-1.25rem))] max-w-7xl flex-col gap-0 overflow-hidden p-0",
-          "h-[min(94vh,calc(100dvh-1.25rem))] max-h-[min(94vh,calc(100dvh-1.25rem))] rounded-xl sm:w-[min(98vw,1280px)]"
-        )}
-      >
+      <DialogContent size="lg" className="p-0">
         <DialogHeader className="shrink-0 border-b border-border/80 px-3 py-3 pr-11 sm:px-5 sm:py-4 md:px-6">
-          <DialogTitle className="text-base sm:text-lg">
+          <DialogTitle>
             {isEdit ? "Edit case register" : "Case register — new entry"}
           </DialogTitle>
-          <DialogDescription className="text-xs sm:text-sm">
+          <DialogDescription>
             Full office register — State → District → City → Court, then parties
             and numbers. Documents upload after save on the case page.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-5 sm:py-4 md:px-6 md:py-5">
-          <div className="grid gap-4 md:grid-cols-2 md:gap-5">
+        <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-3 sm:px-5 sm:py-4 md:px-6 md:py-5">
+          <div className="grid min-w-0 gap-4 md:grid-cols-2 md:gap-5">
             <Section
               title="1. Court location"
               description="State → District → City / town → Court"

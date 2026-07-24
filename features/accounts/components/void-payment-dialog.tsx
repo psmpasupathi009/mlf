@@ -55,7 +55,7 @@ export function VoidPaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>Void cash entry</DialogTitle>
           <DialogDescription>

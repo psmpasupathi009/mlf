@@ -64,7 +64,7 @@ export function LeaveApplyDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>Apply for leave</DialogTitle>
           <DialogDescription>

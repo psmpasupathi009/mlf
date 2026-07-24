@@ -8,7 +8,7 @@ import {
 } from "@/lib/courts/local-catalog";
 
 /**
- * Offline court hierarchy for Register Case (office seed only — no external API).
+ * Offline court hierarchy for Register Case (all-India office seed + used cases).
  *
  * GET ?level=states|districts|complexes|courts
  */
@@ -20,7 +20,7 @@ export const GET = apiHandler(async (request) => {
   const level = (searchParams.get("level") ?? "states").trim();
   const attribution = {
     provider: "office-seed",
-    note: "Office-maintained court list. Type “Other” for any court not listed. Verify filings on official eCourts if needed.",
+    note: "All-India court list (seed + courts used on existing cases). Type “Other” for any court not listed. Verify filings on official eCourts if needed.",
     liveApiConfigured: false,
   };
 
@@ -32,7 +32,7 @@ export const GET = apiHandler(async (request) => {
   if (level === "districts") {
     const state = searchParams.get("state")?.trim();
     if (!state) return jsonFail("VALIDATION", "state is required", 400);
-    const { options, source } = listIndiaDistricts(state);
+    const { options, source } = await listIndiaDistricts(state);
     return jsonOk({ level, state, source, attribution, options });
   }
 
@@ -42,7 +42,7 @@ export const GET = apiHandler(async (request) => {
     if (!state || !district) {
       return jsonFail("VALIDATION", "state and district are required", 400);
     }
-    const { options, source } = listIndiaComplexes(state, district);
+    const { options, source } = await listIndiaComplexes(state, district);
     return jsonOk({ level, state, district, source, attribution, options });
   }
 
@@ -57,7 +57,11 @@ export const GET = apiHandler(async (request) => {
         400
       );
     }
-    const { options, source } = listIndiaCourts(state, district, complex);
+    const { options, source } = await listIndiaCourts(
+      state,
+      district,
+      complex
+    );
     return jsonOk({
       level,
       state,

@@ -78,7 +78,7 @@ export const legalPages: LegalPage[] = [
       {
         heading: "8. Court lists and third-party data",
         paragraphs: [
-          "Court / district pickers use an office-maintained list (and free-text “Other” entries). This portal does not scrape or republish the Government of India eCourts portals (services.ecourts.gov.in / ecourts.gov.in) and does not call third-party court-data APIs for the case register.",
+          "Court / district pickers use an office-maintained all-India seed (and free-text “Other” entries). Client address uses a separate locations seed. This portal does not scrape or republish the Government of India eCourts portals (services.ecourts.gov.in / ecourts.gov.in) and does not call third-party court-data APIs for the case register.",
           "Court names entered here are for internal case-register convenience only. Staff must verify CNR, cause list, and filings against official court / eCourts records before relying on them.",
         ],
       },
@@ -148,7 +148,7 @@ export const legalPages: LegalPage[] = [
       {
         heading: "1. What we collect",
         paragraphs: [
-          "Client intake may include name, parent/spouse name, mobile, alternate mobile, email, address, district/state, occupation, Aadhaar last-4 only, matter brief, and notes needed for the case.",
+          "Client intake may include name, parent/spouse name, mobile, alternate mobile, email, address, city, district, state, occupation, matter brief, and notes needed for the case.",
           "Case files may include court location, case type, opposing party, CNR, hearings, uploaded PDFs/images (judgments, orders, pleadings), and payment records.",
         ],
       },

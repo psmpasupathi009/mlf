@@ -138,7 +138,10 @@ export const LEAVE_REASON_OPTIONS: FormOption[] = [
   { value: "Festival / holiday travel", label: "Festival / holiday travel" },
 ];
 
-/** Common districts for office practice (TN/KA seed + nearby). */
+/**
+ * @deprecated Client intake uses locations-seed cascade instead.
+ * Kept for any legacy references.
+ */
 export const OFFICE_DISTRICT_OPTIONS: FormOption[] = [
   { value: "Erode", label: "Erode" },
   { value: "Coimbatore", label: "Coimbatore" },

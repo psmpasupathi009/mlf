@@ -10,6 +10,26 @@ const DialogTrigger = DialogPrimitive.Trigger;
 const DialogClose = DialogPrimitive.Close;
 const DialogPortal = DialogPrimitive.Portal;
 
+export type DialogContentSize = "sm" | "md" | "lg";
+
+const DIALOG_SIZE_CLASSES: Record<DialogContentSize, string> = {
+  /** Short confirms / small forms — larger than old max-w-lg */
+  sm: [
+    "w-[calc(100dvw-1rem)] max-w-xl",
+    "max-h-[min(90dvh,calc(100dvh-1rem))]",
+  ].join(" "),
+  /** Medium forms (appointment, import, upload) */
+  md: [
+    "w-[calc(100dvw-1rem)] max-w-3xl",
+    "max-h-[min(92dvh,calc(100dvh-1rem))]",
+  ].join(" "),
+  /** Large multi-section registers (client, employee, case) */
+  lg: [
+    "w-[calc(100dvw-1rem)] max-w-[min(1440px,calc(100dvw-1rem))]",
+    "h-[min(92dvh,calc(100dvh-1rem))] max-h-[min(92dvh,calc(100dvh-1rem))]",
+  ].join(" "),
+};
+
 function DialogOverlay({
   className,
   ...props
@@ -26,22 +46,25 @@ function DialogOverlay({
 }
 
 /**
- * Shell: fixed viewport size, no page overflow.
+ * Shell: responsive viewport-safe size, no page overflow.
  * Use DialogHeader + DialogBody + DialogFooter inside.
- * Large forms may override with p-0 and their own scroll region.
+ * Large forms may pass className="p-0" and their own scroll region.
  */
 function DialogContent({
   className,
   children,
+  size = "sm",
   ...props
-}: React.ComponentProps<typeof DialogPrimitive.Content>) {
+}: React.ComponentProps<typeof DialogPrimitive.Content> & {
+  size?: DialogContentSize;
+}) {
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 flex w-[min(100%,calc(100dvw-1.25rem))] max-w-lg -translate-x-1/2 -translate-y-1/2 flex-col gap-0 overflow-hidden rounded-xl border border-border bg-white p-0 shadow-lg",
-          "max-h-[min(92dvh,calc(100dvh-1.25rem))]",
+          "fixed top-1/2 left-1/2 z-50 flex min-h-0 max-w-[calc(100dvw-1rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-0 overflow-hidden rounded-xl border border-border bg-white p-0 shadow-lg",
+          DIALOG_SIZE_CLASSES[size],
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
           className
         )}

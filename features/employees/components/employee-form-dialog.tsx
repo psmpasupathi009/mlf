@@ -273,18 +273,18 @@ export function EmployeeFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[min(90vh,calc(100dvh-1.25rem))] max-h-[min(90vh,calc(100dvh-1.25rem))] w-[min(100%,calc(100dvw-1.25rem))] max-w-275 flex-col gap-0 overflow-hidden rounded-xl p-0 sm:w-[min(96vw,1100px)]">
+      <DialogContent size="lg" className="p-0">
         <DialogHeader className="shrink-0 border-b border-border/80 px-3 py-3 pr-11 sm:px-5 sm:py-4 md:px-6">
-          <DialogTitle className="text-base sm:text-lg">
+          <DialogTitle>
             {isEdit ? "Edit employee" : "Add employee"}
           </DialogTitle>
-          <DialogDescription className="text-xs sm:text-sm">
+          <DialogDescription>
             Designation is the job title. Roles control what they can do in the app.
             {isEdit && employee ? ` Updating ${employee.unitId}.` : null}
           </DialogDescription>
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-5 sm:py-4 md:px-6 md:py-5">
+        <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-3 sm:px-5 sm:py-4 md:px-6 md:py-5">
           {isEdit && employee ? (
             <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-border/80 bg-white px-3 py-2.5 text-xs sm:text-sm">
               <UnitIdBadge value={employee.unitId} />

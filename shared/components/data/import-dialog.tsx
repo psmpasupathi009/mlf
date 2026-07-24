@@ -112,7 +112,7 @@ export function ImportDialog({
         if (!next) reset();
       }}
     >
-      <DialogContent className="max-w-lg">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>

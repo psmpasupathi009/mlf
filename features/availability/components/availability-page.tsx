@@ -667,7 +667,7 @@ export function AvailabilityPage({ user }: { user: PublicUser }) {
       </section>
 
       <Dialog open={blockDialogOpen} onOpenChange={setBlockDialogOpen}>
-        <DialogContent>
+        <DialogContent size="sm">
           <DialogHeader>
             <DialogTitle>
               {editingBlock ? "Edit break" : "Add break"}

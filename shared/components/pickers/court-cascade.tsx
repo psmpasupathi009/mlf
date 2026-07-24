@@ -384,8 +384,8 @@ export function CourtCascade({
         Free office list (no external court API). TN/KA seeded; any other place
         — choose Other and type the name.
       </p>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <div className="grid gap-2">
+      <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <div className="grid min-w-0 gap-2">
           <Label>
             State <span className="text-destructive">*</span>
           </Label>
@@ -406,7 +406,7 @@ export function CourtCascade({
           </Select>
         </div>
 
-        <div className="grid gap-2">
+        <div className="grid min-w-0 gap-2">
           <Label>
             District <span className="text-destructive">*</span>
           </Label>
@@ -453,7 +453,7 @@ export function CourtCascade({
           )}
         </div>
 
-        <div className="grid gap-2">
+        <div className="grid min-w-0 gap-2">
           <Label>
             City / court complex <span className="text-destructive">*</span>
           </Label>
@@ -500,7 +500,7 @@ export function CourtCascade({
           )}
         </div>
 
-        <div className="grid gap-2">
+        <div className="grid min-w-0 gap-2">
           <Label>
             Court <span className="text-destructive">*</span>
           </Label>

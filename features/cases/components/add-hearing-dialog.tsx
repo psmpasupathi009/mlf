@@ -68,7 +68,7 @@ export function AddHearingDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>Add hearing</DialogTitle>
           <DialogDescription>

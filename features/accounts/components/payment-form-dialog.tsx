@@ -101,7 +101,7 @@ export function PaymentFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>Record cash entry</DialogTitle>
           <DialogDescription>Advance, partial or full payment from a client.</DialogDescription>

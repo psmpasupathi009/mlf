@@ -496,7 +496,7 @@ export function HrmsPage({ user }: { user: PublicUser }) {
           }
         }}
       >
-        <DialogContent>
+        <DialogContent size="sm">
           <DialogHeader>
             <DialogTitle>Reject leave</DialogTitle>
             <DialogDescription>

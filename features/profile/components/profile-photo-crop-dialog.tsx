@@ -144,7 +144,7 @@ export function ProfilePhotoCropDialog({
         onOpenChange(v);
       }}
     >
-      <DialogContent className="max-w-lg">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>Profile photo</DialogTitle>
           <DialogDescription>

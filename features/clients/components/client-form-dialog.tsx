@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -30,12 +30,11 @@ import {
 import { office } from "@/config/company/office";
 import {
   OCCUPATION_OPTIONS,
-  OFFICE_DISTRICT_OPTIONS,
   REFERRED_BY_OPTIONS,
   RELATION_PREFIX_OPTIONS,
 } from "@/config/company/form-options";
-import { INDIA_STATES } from "@/lib/courts/india-states";
 import { SelectOrOther } from "@/shared/components/forms/select-or-other";
+import { LocationCascade } from "@/shared/components/pickers/location-cascade";
 
 type Props = {
   open: boolean;
@@ -85,7 +84,6 @@ export function ClientFormDialog({
   const [city, setCity] = useState("");
   const [district, setDistrict] = useState(CLIENT_INTAKE_DEFAULTS.district);
   const [state, setState] = useState(CLIENT_INTAKE_DEFAULTS.state);
-  const [aadhaarLast4, setAadhaarLast4] = useState("");
   const [referredBy, setReferredBy] = useState("");
   const [matterBrief, setMatterBrief] = useState("");
   const [notes, setNotes] = useState("");
@@ -93,10 +91,14 @@ export function ClientFormDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  const townOptions = office.practiceTowns.map((t) => ({
-    value: t,
-    label: t,
-  }));
+  const onLocationChange = useCallback(
+    (next: { state: string; district: string; city: string }) => {
+      setState(next.state);
+      setDistrict(next.district);
+      setCity(next.city);
+    },
+    []
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -122,7 +124,6 @@ export function ClientFormDialog({
       setCity(client?.city ?? "");
       setDistrict(client?.district ?? CLIENT_INTAKE_DEFAULTS.district);
       setState(client?.state ?? CLIENT_INTAKE_DEFAULTS.state);
-      setAadhaarLast4(client?.aadhaarLast4 ?? "");
       setReferredBy(client?.referredBy ?? "");
       setMatterBrief(client?.matterBrief ?? "");
       setNotes(client?.notes ?? "");
@@ -139,10 +140,6 @@ export function ClientFormDialog({
     }
     if (mobile.replace(/\D/g, "").length < 10) {
       setError("Enter a valid mobile number");
-      return;
-    }
-    if (aadhaarLast4 && !/^\d{4}$/.test(aadhaarLast4)) {
-      setError("Aadhaar last 4 must be exactly 4 digits");
       return;
     }
 
@@ -164,7 +161,6 @@ export function ClientFormDialog({
       city: city || undefined,
       district: district || undefined,
       state: state || undefined,
-      aadhaarLast4: aadhaarLast4 || undefined,
       referredBy: referredBy || undefined,
       matterBrief: matterBrief || undefined,
       notes: notes || undefined,
@@ -191,254 +187,220 @@ export function ClientFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex h-[min(90vh,calc(100dvh-1.25rem))] max-h-[min(90vh,calc(100dvh-1.25rem))] w-[min(100%,calc(100dvw-1.25rem))] max-w-275 flex-col gap-0 overflow-hidden rounded-xl p-0 sm:w-[min(96vw,1100px)]">
+      <DialogContent size="lg" className="p-0">
         <DialogHeader className="shrink-0 border-b border-border/80 px-3 py-3 pr-11 sm:px-5 sm:py-4 md:px-6">
-          <DialogTitle className="text-base sm:text-lg">
+          <DialogTitle>
             {isEdit ? "Edit client intake" : "Client intake"}
           </DialogTitle>
-          <DialogDescription className="text-xs sm:text-sm">
-            Collect identity and contact for the office register. Full Aadhaar
-            is never stored — last 4 only. Defaults: {office.defaultDistrict},{" "}
+          <DialogDescription>
+            Collect identity and contact for the office register. Pick state and
+            district; type town / city freely. Defaults: {office.defaultDistrict},{" "}
             {office.defaultState}.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-3 sm:px-5 sm:py-4 md:px-6 md:py-5">
-          <div className="grid gap-4 md:grid-cols-2">
-          <Section
-            title="1. Identity"
-            description="As on petition / vakalat — name and parent or spouse"
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2 sm:col-span-2">
-                <Label htmlFor="cl-name">
-                  Full name <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="cl-name"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="As in Aadhaar / petition"
-                />
+        <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-3 sm:px-5 sm:py-4 md:px-6 md:py-5">
+          <div className="grid min-w-0 gap-4 md:grid-cols-2">
+            <Section
+              title="1. Identity"
+              description="As on petition / vakalat — name and parent or spouse"
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2 sm:col-span-2">
+                  <Label htmlFor="cl-name">
+                    Full name <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="cl-name"
+                    className="h-10"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="As in petition / ID"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Relation</Label>
+                  <Select
+                    value={relationPrefix || undefined}
+                    onValueChange={setRelationPrefix}
+                  >
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="S/o · W/o…" />
+                    </SelectTrigger>
+                    <SelectContent className="z-200">
+                      {RELATION_PREFIX_OPTIONS.map((p) => (
+                        <SelectItem key={p.value} value={p.value}>
+                          {p.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="cl-father">
+                    Father / spouse / guardian name
+                  </Label>
+                  <Input
+                    id="cl-father"
+                    className="h-10"
+                    value={relationName}
+                    onChange={(e) => setRelationName(e.target.value)}
+                    placeholder="Name"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Gender</Label>
+                  <Select
+                    value={gender || undefined}
+                    onValueChange={setGender}
+                  >
+                    <SelectTrigger className="h-10">
+                      <SelectValue placeholder="Optional" />
+                    </SelectTrigger>
+                    <SelectContent className="z-200">
+                      {CLIENT_GENDER_OPTIONS.map((g) => (
+                        <SelectItem key={g.value} value={g.value}>
+                          {g.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label>Occupation</Label>
+                  <SelectOrOther
+                    value={occupation}
+                    onChange={setOccupation}
+                    options={OCCUPATION_OPTIONS}
+                    placeholder="Select occupation"
+                    className="h-10"
+                  />
+                </div>
               </div>
-              <div className="grid gap-2">
-                <Label>Relation</Label>
-                <Select
-                  value={relationPrefix || undefined}
-                  onValueChange={setRelationPrefix}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="S/o · W/o…" />
-                  </SelectTrigger>
-                  <SelectContent className="z-200">
-                    {RELATION_PREFIX_OPTIONS.map((p) => (
-                      <SelectItem key={p.value} value={p.value}>
-                        {p.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="cl-father">Father / spouse / guardian name</Label>
-                <Input
-                  id="cl-father"
-                  value={relationName}
-                  onChange={(e) => setRelationName(e.target.value)}
-                  placeholder="Name"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>Gender</Label>
-                <Select
-                  value={gender || undefined}
-                  onValueChange={setGender}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Optional" />
-                  </SelectTrigger>
-                  <SelectContent className="z-200">
-                    {CLIENT_GENDER_OPTIONS.map((g) => (
-                      <SelectItem key={g.value} value={g.value}>
-                        {g.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label>Occupation</Label>
-                <SelectOrOther
-                  value={occupation}
-                  onChange={setOccupation}
-                  options={OCCUPATION_OPTIONS}
-                  placeholder="Select occupation"
-                  className="h-10"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="cl-aadhaar">Aadhaar last 4 only</Label>
-                <Input
-                  id="cl-aadhaar"
-                  value={aadhaarLast4}
-                  maxLength={4}
-                  inputMode="numeric"
-                  onChange={(e) =>
-                    setAadhaarLast4(e.target.value.replace(/\D/g, "").slice(0, 4))
-                  }
-                  placeholder="••••"
-                />
-              </div>
-            </div>
-          </Section>
+            </Section>
 
-          <Section
-            title="2. Contact"
-            description="Primary mobile is used for hearing SMS"
-          >
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="cl-mobile">
-                  Mobile <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="cl-mobile"
-                  value={mobile}
-                  onChange={(e) => setMobile(e.target.value)}
-                  placeholder="10-digit mobile"
-                  inputMode="numeric"
-                />
+            <Section
+              title="2. Contact"
+              description="Primary mobile is used for hearing SMS"
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="grid gap-2">
+                  <Label htmlFor="cl-mobile">
+                    Mobile <span className="text-destructive">*</span>
+                  </Label>
+                  <Input
+                    id="cl-mobile"
+                    className="h-10"
+                    value={mobile}
+                    onChange={(e) => setMobile(e.target.value)}
+                    placeholder="10-digit mobile"
+                    inputMode="numeric"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="cl-alt-mobile">Alt mobile</Label>
+                  <Input
+                    id="cl-alt-mobile"
+                    className="h-10"
+                    value={altMobile}
+                    onChange={(e) => setAltMobile(e.target.value)}
+                  />
+                </div>
+                <div className="grid gap-2 sm:col-span-2">
+                  <Label htmlFor="cl-email">Email</Label>
+                  <Input
+                    id="cl-email"
+                    className="h-10"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+                <label className="flex items-start gap-2 text-sm sm:col-span-2">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={smsConsent}
+                    onChange={(e) => setSmsConsent(e.target.checked)}
+                  />
+                  <span>
+                    Client consents to hearing / office SMS on the primary
+                    mobile (see Privacy policy).
+                  </span>
+                </label>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="cl-alt-mobile">Alt mobile</Label>
-                <Input
-                  id="cl-alt-mobile"
-                  value={altMobile}
-                  onChange={(e) => setAltMobile(e.target.value)}
-                />
-              </div>
-              <div className="grid gap-2 sm:col-span-2">
-                <Label htmlFor="cl-email">Email</Label>
-                <Input
-                  id="cl-email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <label className="flex items-start gap-2 text-sm sm:col-span-2">
-                <input
-                  type="checkbox"
-                  className="mt-1"
-                  checked={smsConsent}
-                  onChange={(e) => setSmsConsent(e.target.checked)}
-                />
-                <span>
-                  Client consents to hearing / office SMS on the primary mobile
-                  (see Privacy policy).
-                </span>
-              </label>
-            </div>
-          </Section>
+            </Section>
 
-          <Section
-            title="3. Address"
-            description="For notices and vakalat — town / district / state"
-          >
-            <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-              <div className="grid gap-2 sm:col-span-2 md:col-span-3">
-                <Label htmlFor="cl-address">Door / street / area</Label>
-                <Textarea
-                  id="cl-address"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  rows={2}
-                  placeholder="Door no., street, village / locality"
+            <Section
+              title="3. Address"
+              description="For notices and vakalat — select state and district; type town / city"
+            >
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="cl-address">Door / street / area</Label>
+                  <Textarea
+                    id="cl-address"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    rows={2}
+                    placeholder="Door no., street, village / locality"
+                  />
+                </div>
+                <LocationCascade
+                  state={state}
+                  district={district}
+                  city={city}
+                  onChange={onLocationChange}
                 />
               </div>
-              <div className="grid gap-2">
-                <Label>Town / city</Label>
-                <SelectOrOther
-                  value={city}
-                  onChange={setCity}
-                  options={townOptions}
-                  placeholder="Select town"
-                  className="h-10"
-                  otherPlaceholder="Type town / city"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>District</Label>
-                <SelectOrOther
-                  value={district}
-                  onChange={setDistrict}
-                  options={OFFICE_DISTRICT_OPTIONS}
-                  placeholder="Select district"
-                  className="h-10"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label>State</Label>
-                <Select value={state || undefined} onValueChange={setState}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="State" />
-                  </SelectTrigger>
-                  <SelectContent className="z-200 max-h-72">
-                    {INDIA_STATES.map((s) => (
-                      <SelectItem key={s.code} value={s.name}>
-                        {s.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </Section>
+            </Section>
 
-          <Section
-            title="4. Matter at intake"
-            description="Short facts before case register — opposite party goes on the case form"
-          >
-            <div className="grid gap-4">
-              <div className="grid gap-2">
-                <Label htmlFor="cl-matter">Matter brief</Label>
-                <Textarea
-                  id="cl-matter"
-                  value={matterBrief}
-                  onChange={(e) => setMatterBrief(e.target.value)}
-                  rows={3}
-                  placeholder="What happened, relief sought, urgency, papers brought…"
-                />
+            <Section
+              title="4. Matter at intake"
+              description="Short facts before case register — opposite party goes on the case form"
+            >
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="cl-matter">Matter brief</Label>
+                  <Textarea
+                    id="cl-matter"
+                    value={matterBrief}
+                    onChange={(e) => setMatterBrief(e.target.value)}
+                    rows={3}
+                    placeholder="What happened, relief sought, urgency, papers brought…"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Referred by</Label>
+                  <SelectOrOther
+                    value={referredBy}
+                    onChange={setReferredBy}
+                    options={REFERRED_BY_OPTIONS}
+                    placeholder="How they found us"
+                    className="h-10"
+                    otherPlaceholder="Name / source"
+                  />
+                </div>
+                <div className="grid gap-2">
+                  <Label htmlFor="cl-notes">Internal notes</Label>
+                  <Textarea
+                    id="cl-notes"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={2}
+                    placeholder="Clerk notes — not for SMS"
+                  />
+                </div>
               </div>
-              <div className="grid gap-2">
-                <Label>Referred by</Label>
-                <SelectOrOther
-                  value={referredBy}
-                  onChange={setReferredBy}
-                  options={REFERRED_BY_OPTIONS}
-                  placeholder="How they found us"
-                  className="h-10"
-                  otherPlaceholder="Name / source"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="cl-notes">Internal notes</Label>
-                <Textarea
-                  id="cl-notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  rows={2}
-                  placeholder="Clerk notes — not for SMS"
-                />
-              </div>
-            </div>
-          </Section>
+            </Section>
 
-          {error ? <p className="mt-4 text-sm text-destructive">{error}</p> : null}
+            {error ? (
+              <p className="text-sm text-destructive md:col-span-2">{error}</p>
+            ) : null}
           </div>
         </div>
 
-        <DialogFooter className="shrink-0 border-t border-border/80 bg-muted/30 px-4 py-3 sm:px-6 sm:py-4">
+        <DialogFooter className="shrink-0 border-t border-border/80 bg-muted/30 px-3 py-3 sm:px-5 sm:py-4 md:px-6">
           <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
             <Button
               type="button"

@@ -1,8 +1,16 @@
 /**
- * TN + KA courts for Case Register:
+ * All-India courts for Case Register:
  * State → District → City → Court
- * City level is required when that town has its own courts (not only district HQ).
+ *
+ * Base: every Indian district gets STANDARD courts at HQ (court-districts.json).
+ * Overlay: detailed TN/KA multi-city complexes (office practice).
+ * Plus: all 25 High Courts + benches, and Supreme Court of India.
+ *
+ * Court-only — does not import address locations-seed.
+ * No third-party live API. Edit this file to add courts / towns.
  */
+import courtDistrictsRaw from "@/config/company/court-districts.json";
+
 export type CourtSeed = {
   state: string;
   district: string;
@@ -11,8 +19,13 @@ export type CourtSeed = {
   courtName: string;
 };
 
+type CourtDistrict = { state: string; district: string };
+
+const courtDistricts = courtDistrictsRaw as CourtDistrict[];
+
 const TN = "Tamil Nadu";
 const KA = "Karnataka";
+const SC_STATE = "Supreme Court of India";
 
 const STANDARD = [
   "Principal District & Sessions Court",
@@ -62,81 +75,6 @@ function cityCourts(
   return pack(state, district, city, courts);
 }
 
-const TN_DISTRICTS = [
-  "Ariyalur",
-  "Chengalpattu",
-  "Chennai",
-  "Coimbatore",
-  "Cuddalore",
-  "Dharmapuri",
-  "Dindigul",
-  "Erode",
-  "Kallakurichi",
-  "Kancheepuram",
-  "Kanniyakumari",
-  "Karur",
-  "Krishnagiri",
-  "Madurai",
-  "Mayiladuthurai",
-  "Nagapattinam",
-  "Namakkal",
-  "Nilgiris",
-  "Perambalur",
-  "Pudukkottai",
-  "Ramanathapuram",
-  "Ranipet",
-  "Salem",
-  "Sivaganga",
-  "Tenkasi",
-  "Thanjavur",
-  "Theni",
-  "Thoothukudi",
-  "Tiruchirappalli",
-  "Tirunelveli",
-  "Tirupathur",
-  "Tiruppur",
-  "Tiruvallur",
-  "Tiruvannamalai",
-  "Tiruvarur",
-  "Vellore",
-  "Viluppuram",
-  "Virudhunagar",
-] as const;
-
-const KA_DISTRICTS = [
-  "Bagalkot",
-  "Ballari",
-  "Belagavi",
-  "Bengaluru Rural",
-  "Bengaluru Urban",
-  "Bidar",
-  "Chamarajanagar",
-  "Chikkaballapur",
-  "Chikkamagaluru",
-  "Chitradurga",
-  "Dakshina Kannada",
-  "Davangere",
-  "Dharwad",
-  "Gadag",
-  "Hassan",
-  "Haveri",
-  "Kalaburagi",
-  "Kodagu",
-  "Kolar",
-  "Koppal",
-  "Mandya",
-  "Mysuru",
-  "Raichur",
-  "Ramanagara",
-  "Shivamogga",
-  "Tumakuru",
-  "Udupi",
-  "Uttara Kannada",
-  "Vijayanagara",
-  "Vijayapura",
-  "Yadgir",
-] as const;
-
 /** Districts that also have separate city court complexes */
 const TN_MULTI_CITY: Record<string, { city: string; courts: string[] }[]> = {
   Erode: [
@@ -177,15 +115,18 @@ const TN_MULTI_CITY: Record<string, { city: string; courts: string[] }[]> = {
     { city: "Coimbatore", courts: [...STANDARD, ...CITY_EXTRA, "Labour Court"] },
     {
       city: "Pollachi",
-      courts: ["Sub Court, Pollachi", "District Munsif Court, Pollachi", "JMFC, Pollachi"],
-    },
-    {
-      city: "Tiruppur",
-      courts: ["District Court, Tiruppur", "JMFC, Tiruppur"],
+      courts: [
+        "Sub Court, Pollachi",
+        "District Munsif Court, Pollachi",
+        "JMFC, Pollachi",
+      ],
     },
     {
       city: "Mettupalayam",
-      courts: ["District Munsif Court, Mettupalayam", "JMFC, Mettupalayam"],
+      courts: [
+        "District Munsif Court, Mettupalayam",
+        "JMFC, Mettupalayam",
+      ],
     },
   ],
   Chennai: [
@@ -245,7 +186,10 @@ const TN_MULTI_CITY: Record<string, { city: string; courts: string[] }[]> = {
     },
     {
       city: "Padmanabhapuram",
-      courts: ["District Munsif Court, Padmanabhapuram", "JMFC, Padmanabhapuram"],
+      courts: [
+        "District Munsif Court, Padmanabhapuram",
+        "JMFC, Padmanabhapuram",
+      ],
     },
   ],
   Tiruppur: [
@@ -354,29 +298,6 @@ const KA_MULTI_CITY: Record<string, { city: string; courts: string[] }[]> = {
   ],
 };
 
-function buildState(
-  state: string,
-  districts: readonly string[],
-  multi: Record<string, { city: string; courts: string[] }[]>,
-  cityDistricts: Set<string>
-): CourtSeed[] {
-  const rows: CourtSeed[] = [];
-  for (const district of districts) {
-    const multiCities = multi[district];
-    if (multiCities) {
-      for (const { city, courts } of multiCities) {
-        rows.push(...cityCourts(state, district, city, courts));
-      }
-      continue;
-    }
-    const courts = cityDistricts.has(district)
-      ? [...STANDARD, ...CITY_EXTRA]
-      : [...STANDARD];
-    rows.push(...hq(state, district, courts));
-  }
-  return rows;
-}
-
 const TN_CITY_DISTRICTS = new Set([
   "Coimbatore",
   "Madurai",
@@ -398,9 +319,361 @@ const KA_CITY_DISTRICTS = new Set([
   "Davangere",
 ]);
 
-export const courtsSeed: CourtSeed[] = [
-  ...buildState(TN, TN_DISTRICTS, TN_MULTI_CITY, TN_CITY_DISTRICTS),
-  ...buildState(KA, KA_DISTRICTS, KA_MULTI_CITY, KA_CITY_DISTRICTS),
+/**
+ * All 25 High Courts + permanent/circuit benches (public directory).
+ * Rows sit in the same seed as district courts.
+ */
+const HIGH_COURT_BENCHES: CourtSeed[] = [
+  // Allahabad
+  {
+    state: "Uttar Pradesh",
+    district: "Prayagraj",
+    city: "Prayagraj",
+    courtName: "Allahabad High Court (Principal Seat)",
+  },
+  {
+    state: "Uttar Pradesh",
+    district: "Lucknow",
+    city: "Lucknow",
+    courtName: "Allahabad High Court — Lucknow Bench",
+  },
+  // Andhra Pradesh
+  {
+    state: "Andhra Pradesh",
+    district: "Guntur",
+    city: "Amaravati",
+    courtName: "Andhra Pradesh High Court (Principal Seat)",
+  },
+  // Bombay
+  {
+    state: "Maharashtra",
+    district: "Mumbai City",
+    city: "Mumbai",
+    courtName: "Bombay High Court (Principal Seat)",
+  },
+  {
+    state: "Maharashtra",
+    district: "Aurangabad",
+    city: "Aurangabad",
+    courtName: "Bombay High Court — Aurangabad Bench",
+  },
+  {
+    state: "Maharashtra",
+    district: "Nagpur",
+    city: "Nagpur",
+    courtName: "Bombay High Court — Nagpur Bench",
+  },
+  {
+    state: "Goa",
+    district: "North Goa",
+    city: "Panaji",
+    courtName: "Bombay High Court — Goa Bench (Panaji)",
+  },
+  {
+    state: "Maharashtra",
+    district: "Kolhapur",
+    city: "Kolhapur",
+    courtName: "Bombay High Court — Kolhapur Bench",
+  },
+  // Calcutta
+  {
+    state: "West Bengal",
+    district: "Kolkata",
+    city: "Kolkata",
+    courtName: "Calcutta High Court (Principal Seat)",
+  },
+  {
+    state: "Andaman and Nicobar Islands",
+    district: "South Andaman",
+    city: "Port Blair",
+    courtName: "Calcutta High Court — Port Blair Circuit Bench",
+  },
+  {
+    state: "West Bengal",
+    district: "Jalpaiguri",
+    city: "Jalpaiguri",
+    courtName: "Calcutta High Court — Jalpaiguri Bench",
+  },
+  // Chhattisgarh
+  {
+    state: "Chhattisgarh",
+    district: "Bilaspur",
+    city: "Bilaspur",
+    courtName: "Chhattisgarh High Court (Principal Seat)",
+  },
+  // Delhi
+  {
+    state: "Delhi",
+    district: "New Delhi",
+    city: "New Delhi",
+    courtName: "Delhi High Court (Principal Seat)",
+  },
+  // Gauhati
+  {
+    state: "Assam",
+    district: "Kamrup Metropolitan",
+    city: "Guwahati",
+    courtName: "Gauhati High Court (Principal Seat)",
+  },
+  {
+    state: "Nagaland",
+    district: "Kohima",
+    city: "Kohima",
+    courtName: "Gauhati High Court — Kohima Bench",
+  },
+  {
+    state: "Mizoram",
+    district: "Aizawl",
+    city: "Aizawl",
+    courtName: "Gauhati High Court — Aizawl Bench",
+  },
+  {
+    state: "Arunachal Pradesh",
+    district: "Papum Pare",
+    city: "Itanagar",
+    courtName: "Gauhati High Court — Itanagar Bench",
+  },
+  // Gujarat
+  {
+    state: "Gujarat",
+    district: "Ahmedabad",
+    city: "Ahmedabad",
+    courtName: "Gujarat High Court (Principal Seat)",
+  },
+  {
+    state: "Gujarat",
+    district: "Rajkot",
+    city: "Rajkot",
+    courtName: "Gujarat High Court — Rajkot Bench",
+  },
+  // Himachal Pradesh
+  {
+    state: "Himachal Pradesh",
+    district: "Shimla",
+    city: "Shimla",
+    courtName: "Himachal Pradesh High Court (Principal Seat)",
+  },
+  // J&K and Ladakh
+  {
+    state: "Jammu and Kashmir",
+    district: "Srinagar",
+    city: "Srinagar",
+    courtName: "High Court of Jammu & Kashmir and Ladakh — Srinagar",
+  },
+  {
+    state: "Jammu and Kashmir",
+    district: "Jammu",
+    city: "Jammu",
+    courtName: "High Court of Jammu & Kashmir and Ladakh — Jammu",
+  },
+  // Jharkhand
+  {
+    state: "Jharkhand",
+    district: "Ranchi",
+    city: "Ranchi",
+    courtName: "Jharkhand High Court (Principal Seat)",
+  },
+  // Karnataka (also listed in KA_MULTI_CITY — deduped below)
+  {
+    state: KA,
+    district: "Bengaluru Urban",
+    city: "Bengaluru",
+    courtName: "High Court of Karnataka (Principal Bench)",
+  },
+  {
+    state: KA,
+    district: "Dharwad",
+    city: "Hubballi",
+    courtName: "High Court of Karnataka — Dharwad Bench",
+  },
+  {
+    state: KA,
+    district: "Kalaburagi",
+    city: "Kalaburagi",
+    courtName: "High Court of Karnataka — Kalaburagi Bench",
+  },
+  // Kerala
+  {
+    state: "Kerala",
+    district: "Ernakulam",
+    city: "Ernakulam",
+    courtName: "Kerala High Court (Principal Seat)",
+  },
+  // Madhya Pradesh
+  {
+    state: "Madhya Pradesh",
+    district: "Jabalpur",
+    city: "Jabalpur",
+    courtName: "Madhya Pradesh High Court (Principal Seat)",
+  },
+  {
+    state: "Madhya Pradesh",
+    district: "Indore",
+    city: "Indore",
+    courtName: "Madhya Pradesh High Court — Indore Bench",
+  },
+  {
+    state: "Madhya Pradesh",
+    district: "Gwalior",
+    city: "Gwalior",
+    courtName: "Madhya Pradesh High Court — Gwalior Bench",
+  },
+  // Madras (also in TN_MULTI_CITY — deduped)
+  {
+    state: TN,
+    district: "Chennai",
+    city: "Chennai",
+    courtName: "Madras High Court (Principal Seat)",
+  },
+  {
+    state: TN,
+    district: "Madurai",
+    city: "Madurai",
+    courtName: "Madurai Bench of Madras High Court",
+  },
+  // Manipur
+  {
+    state: "Manipur",
+    district: "Imphal West",
+    city: "Imphal",
+    courtName: "Manipur High Court (Principal Seat)",
+  },
+  // Meghalaya
+  {
+    state: "Meghalaya",
+    district: "East Khasi Hills",
+    city: "Shillong",
+    courtName: "Meghalaya High Court (Principal Seat)",
+  },
+  // Orissa
+  {
+    state: "Odisha",
+    district: "Cuttack",
+    city: "Cuttack",
+    courtName: "Orissa High Court (Principal Seat)",
+  },
+  // Patna
+  {
+    state: "Bihar",
+    district: "Patna",
+    city: "Patna",
+    courtName: "Patna High Court (Principal Seat)",
+  },
+  // Punjab and Haryana
+  {
+    state: "Chandigarh",
+    district: "Chandigarh",
+    city: "Chandigarh",
+    courtName: "Punjab and Haryana High Court (Principal Seat)",
+  },
+  // Rajasthan
+  {
+    state: "Rajasthan",
+    district: "Jodhpur",
+    city: "Jodhpur",
+    courtName: "Rajasthan High Court (Principal Seat)",
+  },
+  {
+    state: "Rajasthan",
+    district: "Jaipur",
+    city: "Jaipur",
+    courtName: "Rajasthan High Court — Jaipur Bench",
+  },
+  // Sikkim
+  {
+    state: "Sikkim",
+    district: "East Sikkim",
+    city: "Gangtok",
+    courtName: "Sikkim High Court (Principal Seat)",
+  },
+  // Telangana
+  {
+    state: "Telangana",
+    district: "Hyderabad",
+    city: "Hyderabad",
+    courtName: "Telangana High Court (Principal Seat)",
+  },
+  // Tripura
+  {
+    state: "Tripura",
+    district: "West Tripura",
+    city: "Agartala",
+    courtName: "Tripura High Court (Principal Seat)",
+  },
+  // Uttarakhand
+  {
+    state: "Uttarakhand",
+    district: "Nainital",
+    city: "Nainital",
+    courtName: "Uttarakhand High Court (Principal Seat)",
+  },
 ];
 
-export const COURT_STATES = [TN, KA] as const;
+const SUPREME_COURT: CourtSeed[] = [
+  {
+    state: SC_STATE,
+    district: "New Delhi",
+    city: "New Delhi",
+    courtName: "Supreme Court of India",
+  },
+];
+
+function buildOverlay(
+  state: string,
+  multi: Record<string, { city: string; courts: string[] }[]>
+): CourtSeed[] {
+  const rows: CourtSeed[] = [];
+  for (const [district, cities] of Object.entries(multi)) {
+    for (const { city, courts } of cities) {
+      rows.push(...cityCourts(state, district, city, courts));
+    }
+  }
+  return rows;
+}
+
+function buildAllIndiaDistrictCourts(): CourtSeed[] {
+  const overlayDistricts = new Set<string>([
+    ...Object.keys(TN_MULTI_CITY).map((d) => `${TN}::${d}`),
+    ...Object.keys(KA_MULTI_CITY).map((d) => `${KA}::${d}`),
+  ]);
+
+  const rows: CourtSeed[] = [];
+  for (const loc of courtDistricts) {
+    const key = `${loc.state}::${loc.district}`;
+    if (overlayDistricts.has(key)) continue;
+
+    const cityPack =
+      (loc.state === TN && TN_CITY_DISTRICTS.has(loc.district)) ||
+      (loc.state === KA && KA_CITY_DISTRICTS.has(loc.district))
+        ? [...STANDARD, ...CITY_EXTRA]
+        : [...STANDARD];
+
+    rows.push(...pack(loc.state, loc.district, loc.district, cityPack));
+  }
+  return rows;
+}
+
+function dedupe(rows: CourtSeed[]): CourtSeed[] {
+  const seen = new Set<string>();
+  const out: CourtSeed[] = [];
+  for (const row of rows) {
+    const k = `${row.state}|${row.district}|${row.city}|${row.courtName}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(row);
+  }
+  return out;
+}
+
+export const courtsSeed: CourtSeed[] = dedupe([
+  ...buildAllIndiaDistrictCourts(),
+  ...buildOverlay(TN, TN_MULTI_CITY),
+  ...buildOverlay(KA, KA_MULTI_CITY),
+  ...HIGH_COURT_BENCHES,
+  ...SUPREME_COURT,
+]);
+
+/** States present in the courts seed (includes Supreme Court path). */
+export const COURT_STATES = Array.from(
+  new Set(courtsSeed.map((r) => r.state))
+).sort((a, b) => a.localeCompare(b));
