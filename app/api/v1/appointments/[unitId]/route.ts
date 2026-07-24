@@ -69,6 +69,23 @@ export const PATCH = apiHandler(async (request, context) => {
     if (!client) return jsonFail("VALIDATION", "Client not found", 400);
   }
 
+  let caseId: string | null | undefined = undefined;
+  let caseUnitId: string | null | undefined = undefined;
+  if (input.caseUnitId !== undefined) {
+    if (input.caseUnitId === "") {
+      caseId = null;
+      caseUnitId = null;
+    } else {
+      const caseItem = await prisma.case.findUnique({
+        where: { unitId: input.caseUnitId },
+        select: { id: true, unitId: true },
+      });
+      if (!caseItem) return jsonFail("VALIDATION", "Case not found", 400);
+      caseId = caseItem.id;
+      caseUnitId = caseItem.unitId;
+    }
+  }
+
   let advocateMobile: string | null | undefined = undefined;
   if (input.advocateMobile !== undefined) {
     if (input.advocateMobile === "") {
@@ -130,6 +147,7 @@ export const PATCH = apiHandler(async (request, context) => {
     where: { id: item.id },
     data: {
       clientUnitId: input.clientUnitId === "" ? null : input.clientUnitId,
+      ...(input.caseUnitId !== undefined ? { caseId, caseUnitId } : {}),
       advocateMobile,
       title: input.title,
       scheduledAt: input.scheduledAt,

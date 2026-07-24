@@ -6,6 +6,11 @@ import { writeAudit } from "@/lib/audit";
 import { hasPermission, requireModuleEnabled } from "@/lib/rbac";
 import { applyLeaveSchema } from "@/lib/validations/hrms.schema";
 import { toLeaveSummary } from "@/features/hrms/server/serialize";
+import {
+  findUsersWithPermission,
+  notifyUsers,
+  scheduleNotify,
+} from "@/lib/notifications/notify";
 import type { LeaveStatus } from "@prisma/client";
 
 export const GET = apiHandler(async (request) => {
@@ -126,6 +131,23 @@ export const POST = apiHandler(async (request) => {
     action: "leave.apply",
     entity: "LeaveRequest",
     entityUnitId: created.unitId,
+  });
+
+  scheduleNotify(async () => {
+    const approvers = await findUsersWithPermission("hrms", "approve_leave");
+    await notifyUsers(
+      approvers
+        .filter((u) => u.id !== user.id)
+        .map((u) => ({
+          userId: u.id,
+          userUnitId: u.unitId,
+          type: "leave_request",
+          title: `Leave request from ${user.name ?? user.unitId}`,
+          body: `${created.fromDate} → ${created.toDate}`,
+          href: "/hrms?section=leave",
+          meta: { leaveUnitId: created.unitId },
+        }))
+    );
   });
 
   return jsonOk({ leave: toLeaveSummary(created) }, 201);

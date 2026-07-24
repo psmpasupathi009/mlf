@@ -1,7 +1,3 @@
-/**
- * Common case types for TN/KA advocate offices (eCourts-style short names).
- * Free-text “Other” still allowed via custom value in the form.
- */
 export const CASE_TYPE_GROUPS = [
   {
     group: "Civil",
@@ -49,13 +45,13 @@ export type CaseTypeValue = (typeof CASE_TYPE_GROUPS)[number]["types"][number]["
 export const CASE_TYPES: { value: string; label: string }[] =
   CASE_TYPE_GROUPS.flatMap((g) => [...g.types]);
 
-export const CASE_STATUS_OPTIONS = [
-  { value: "pending", label: "Pending (filed / to be listed)" },
-  { value: "listed", label: "Listed (on board)" },
-  { value: "disposed", label: "Disposed" },
-  { value: "withdrawn", label: "Withdrawn" },
-  { value: "transferred", label: "Transferred" },
-] as const;
+/** @deprecated Prefer CASE_STATUS_OPTIONS from case-pipeline.ts */
+export {
+  CASE_STATUS_OPTIONS,
+  CASE_STATUS_LABEL,
+  CASE_STATUS_VARIANT,
+  normalizeCaseStatus,
+} from "@/config/company/case-pipeline";
 
 /** Normalize CNR: strip spaces/dashes, uppercase. Empty → "". */
 export function normalizeCnr(input: string): string {

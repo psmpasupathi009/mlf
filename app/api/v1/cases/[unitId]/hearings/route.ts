@@ -5,6 +5,13 @@ import { nextUnitId } from "@/lib/ids";
 import { writeAudit } from "@/lib/audit";
 import { addHearingSchema } from "@/lib/validations/cases.schema";
 import { toHearingSummary } from "@/features/cases/server/serialize";
+import {
+  findCaseNotifyRecipients,
+  isHearingWithinNextIstDays,
+  notifyUsers,
+  scheduleNotify,
+} from "@/lib/notifications/notify";
+import { istDisplayDate } from "@/lib/utils/ist";
 
 export const POST = apiHandler(async (request, context) => {
   const { user, response } = await requirePerm(request, "cases", "edit");
@@ -38,7 +45,12 @@ export const POST = apiHandler(async (request, context) => {
       where: { id: item.id },
       data: {
         nextHearingAt: input.hearingDate,
-        status: item.status === "pending" ? "listed" : undefined,
+        // Do not auto-promote pipeline status on hearing create.
+        // Legacy pending/listed → active only when already numbered.
+        ...((item.status === "pending" || item.status === "listed") &&
+        (item.caseNumber || item.cnr)
+          ? { status: "active" as const }
+          : {}),
       },
     }),
   ]);
@@ -50,6 +62,33 @@ export const POST = apiHandler(async (request, context) => {
     entityUnitId: hearing.unitId,
     meta: { caseUnitId: item.unitId },
   });
+
+  if (isHearingWithinNextIstDays(hearing.hearingDate, 2)) {
+    scheduleNotify(async () => {
+      const recipients = await findCaseNotifyRecipients([
+        ...item.advocateMobiles,
+        item.primaryAdvocateMobile,
+      ]);
+      const label =
+        item.caseNumber || item.filingNumber || item.unitId;
+      await notifyUsers(
+        recipients
+          .filter((u) => u.id !== user.id)
+          .map((u) => ({
+            userId: u.id,
+            userUnitId: u.unitId,
+            type: "hearing_tomorrow",
+            title: `Hearing soon: ${label}`,
+            body: istDisplayDate(hearing.hearingDate),
+            href: `/cases/${item.unitId}`,
+            meta: {
+              hearingUnitId: hearing.unitId,
+              caseUnitId: item.unitId,
+            },
+          }))
+      );
+    });
+  }
 
   return jsonOk({ hearing: toHearingSummary(hearing) }, 201);
 });

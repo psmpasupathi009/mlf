@@ -4,10 +4,12 @@ import type { OfficePresenceData } from "@/features/home/components/welcome-help
 
 export type WelcomeOfficePresenceProps = {
   officePresence: OfficePresenceData;
+  officeHoliday?: { title: string; notes: string | null } | null;
 };
 
 export function WelcomeOfficePresence({
   officePresence,
+  officeHoliday,
 }: WelcomeOfficePresenceProps) {
   if (!officePresence.rows.some((a) => a.showAttendance)) return null;
 
@@ -21,10 +23,17 @@ export function WelcomeOfficePresence({
           <div className="min-w-0">
             <p className="text-sm font-semibold text-navy">Who’s in today</p>
             <p className="text-xs text-muted-foreground">
-              Full office · open HRMS for the list
+              {officeHoliday
+                ? `Office closed — ${officeHoliday.title}`
+                : "Full office · open HRMS for the list"}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-1.5">
+            {officeHoliday ? (
+              <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900 dark:bg-amber-950/50 dark:text-amber-300">
+                Office closed
+              </span>
+            ) : null}
             <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900 dark:bg-amber-950/50 dark:text-amber-300">
               <UserX className="size-3.5" />
               {officePresence.presenceStats.absent} absent

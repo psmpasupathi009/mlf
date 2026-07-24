@@ -8,6 +8,7 @@ import {
   type PresenceStatus,
 } from "@/features/hrms/lib/status";
 import type { BusyTodayBlock } from "@/features/availability/lib/busy-labels";
+import { findOfficeHolidayForDate } from "@/features/hrms/lib/office-holiday";
 
 export type { PresenceStatus };
 
@@ -43,6 +44,8 @@ export type PresenceBoard = {
   date: string;
   people: PresencePerson[];
   counts: PresenceCounts;
+  /** When set, office is closed that day (festival / holiday). */
+  officeHoliday: { unitId: string; title: string; notes: string | null } | null;
 };
 
 const STATUS_RANK: Record<PresenceStatus, number> = {
@@ -87,7 +90,7 @@ export async function buildPresenceBoard(dateKey: string): Promise<PresenceBoard
     new Set(staff.flatMap((s) => mobileVariants(s.mobile)))
   );
 
-  const [attendance, leaves, timeBlocks, appointments] = await Promise.all([
+  const [attendance, leaves, timeBlocks, appointments, holiday] = await Promise.all([
     userIds.length
       ? prisma.attendance.findMany({
           where: { date: dateKey, userId: { in: userIds } },
@@ -146,6 +149,7 @@ export async function buildPresenceBoard(dateKey: string): Promise<PresenceBoard
           orderBy: { scheduledAt: "asc" },
         })
       : Promise.resolve([]),
+    findOfficeHolidayForDate(dateKey),
   ]);
 
   const attByUser = new Map(attendance.map((a) => [a.userId, a]));
@@ -207,7 +211,7 @@ export async function buildPresenceBoard(dateKey: string): Promise<PresenceBoard
     const leaveUnitId = leaveByUnit.get(s.unitId) ?? null;
     const att = attByUser.get(s.id);
     const status = derivePresenceStatus({
-      onApprovedLeave: Boolean(leaveUnitId),
+      onApprovedLeave: Boolean(leaveUnitId) || Boolean(holiday),
       checkInAt: att?.checkInAt,
       checkOutAt: att?.checkOutAt,
     });
@@ -243,5 +247,16 @@ export async function buildPresenceBoard(dateKey: string): Promise<PresenceBoard
     absent: people.filter((p) => p.status === "absent").length,
   };
 
-  return { date: dateKey, people, counts };
+  return {
+    date: dateKey,
+    people,
+    counts,
+    officeHoliday: holiday
+      ? {
+          unitId: holiday.unitId,
+          title: holiday.title,
+          notes: holiday.notes ?? null,
+        }
+      : null,
+  };
 }

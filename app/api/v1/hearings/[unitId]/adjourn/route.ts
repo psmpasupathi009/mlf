@@ -5,6 +5,13 @@ import { nextUnitId } from "@/lib/ids";
 import { writeAudit } from "@/lib/audit";
 import { adjournHearingSchema } from "@/lib/validations/cases.schema";
 import { toHearingSummary } from "@/features/cases/server/serialize";
+import {
+  findCaseNotifyRecipients,
+  isHearingWithinNextIstDays,
+  notifyUsers,
+  scheduleNotify,
+} from "@/lib/notifications/notify";
+import { istDisplayDate } from "@/lib/utils/ist";
 
 export const POST = apiHandler(async (request, context) => {
   const { user, response } = await requirePerm(request, "cases", "edit");
@@ -25,6 +32,7 @@ export const POST = apiHandler(async (request, context) => {
   const input = parsed.data;
 
   const nextHearingUnitId = await nextUnitId("hearing");
+  const caseItem = await prisma.case.findUnique({ where: { id: hearing.caseId } });
 
   const [, nextHearing] = await prisma.$transaction([
     prisma.hearing.update({
@@ -47,7 +55,15 @@ export const POST = apiHandler(async (request, context) => {
     }),
     prisma.case.update({
       where: { id: hearing.caseId },
-      data: { nextHearingAt: input.nextHearingDate, status: "listed" },
+      data: {
+        nextHearingAt: input.nextHearingDate,
+        // Leave pipeline status unchanged; only normalize legacy pending/listed when numbered.
+        ...(caseItem &&
+        (caseItem.status === "pending" || caseItem.status === "listed") &&
+        (caseItem.caseNumber || caseItem.cnr)
+          ? { status: "active" as const }
+          : {}),
+      },
     }),
   ]);
 
@@ -58,6 +74,33 @@ export const POST = apiHandler(async (request, context) => {
     entityUnitId: hearing.unitId,
     meta: { nextHearingUnitId: nextHearing.unitId },
   });
+
+  if (caseItem && isHearingWithinNextIstDays(nextHearing.hearingDate, 2)) {
+    scheduleNotify(async () => {
+      const recipients = await findCaseNotifyRecipients([
+        ...caseItem.advocateMobiles,
+        caseItem.primaryAdvocateMobile,
+      ]);
+      const label =
+        caseItem.caseNumber || caseItem.filingNumber || caseItem.unitId;
+      await notifyUsers(
+        recipients
+          .filter((u) => u.id !== user.id)
+          .map((u) => ({
+            userId: u.id,
+            userUnitId: u.unitId,
+            type: "hearing_tomorrow",
+            title: `Hearing soon: ${label}`,
+            body: istDisplayDate(nextHearing.hearingDate),
+            href: `/cases/${caseItem.unitId}`,
+            meta: {
+              hearingUnitId: nextHearing.unitId,
+              caseUnitId: caseItem.unitId,
+            },
+          }))
+      );
+    });
+  }
 
   return jsonOk({ hearing: toHearingSummary(nextHearing) });
 });

@@ -12,6 +12,12 @@ import { assertSlotBookable } from "@/lib/appointments/availability";
 import { createAppointmentSchema } from "@/lib/validations/appointments.schema";
 import { enrichAppointments, enrichAppointment } from "@/features/appointments/server/enrich";
 import { containsInsensitive } from "@/lib/db/search";
+import {
+  findUsersByMobiles,
+  notifyUsers,
+  scheduleNotify,
+} from "@/lib/notifications/notify";
+import { formatIstTime, istDisplayDate } from "@/lib/utils/ist";
 
 export const GET = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "appointments", "view");
@@ -93,6 +99,18 @@ export const POST = apiHandler(async (request) => {
     if (!client) return jsonFail("VALIDATION", "Client not found", 400);
   }
 
+  let caseId: string | undefined;
+  let caseUnitId: string | undefined;
+  if (input.caseUnitId) {
+    const caseItem = await prisma.case.findUnique({
+      where: { unitId: input.caseUnitId },
+      select: { id: true, unitId: true },
+    });
+    if (!caseItem) return jsonFail("VALIDATION", "Case not found", 400);
+    caseId = caseItem.id;
+    caseUnitId = caseItem.unitId;
+  }
+
   const resolved = resolveBookingAdvocateMobile({
     roles: user.roles,
     actorMobile: user.mobile,
@@ -141,6 +159,8 @@ export const POST = apiHandler(async (request) => {
     data: {
       unitId,
       clientUnitId: input.clientUnitId || undefined,
+      caseId,
+      caseUnitId,
       advocateMobile: resolved.mobile,
       title: input.title,
       scheduledAt: input.scheduledAt,
@@ -157,6 +177,24 @@ export const POST = apiHandler(async (request) => {
     action: "appointment.create",
     entity: "Appointment",
     entityUnitId: created.unitId,
+  });
+
+  scheduleNotify(async () => {
+    if (!created.advocateMobile) return;
+    const advocates = await findUsersByMobiles([created.advocateMobile]);
+    await notifyUsers(
+      advocates
+        .filter((u) => u.id !== user.id)
+        .map((u) => ({
+          userId: u.id,
+          userUnitId: u.unitId,
+          type: "appointment",
+          title: `Appointment: ${created.title}`,
+          body: `${istDisplayDate(created.scheduledAt)} · ${formatIstTime(created.scheduledAt)}`,
+          href: "/appointments",
+          meta: { appointmentUnitId: created.unitId },
+        }))
+    );
   });
 
   return jsonOk({ appointment: await enrichAppointment(created) }, 201);

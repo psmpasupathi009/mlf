@@ -12,6 +12,8 @@ export const modules = {
     cases: true,
     accounts: true,
     hrms: true,
+    dak: true,
+    tasks: true,
     reports: false,
   },
 } as const;

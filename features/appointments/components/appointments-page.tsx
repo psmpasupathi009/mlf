@@ -1,8 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
+  Briefcase,
   CalendarPlus,
   Check,
   MoreHorizontal,
@@ -38,6 +41,7 @@ import {
 import { apiFetch, getErrorMessage } from "@/lib/api/client";
 import type { PublicUser } from "@/lib/auth/session";
 import type { AppointmentSummary } from "@/features/appointments/server/serialize";
+import type { CaseSummary } from "@/features/cases/server/serialize";
 import {
   AppointmentFormDialog,
   type AppointmentFormMode,
@@ -104,8 +108,12 @@ function modeLabel(mode: string | null | undefined): string {
 }
 
 export function AppointmentsPage({ user }: { user: PublicUser }) {
+  const router = useRouter();
   const can = (action: string) =>
     user.permissions.includes(`appointments.${action}`);
+  const canOpenCase =
+    user.permissions.includes("appointments.edit") ||
+    user.permissions.includes("cases.create");
   const bookAny = canBookForAnyAdvocate(user.roles);
 
   const [rows, setRows] = useState<AppointmentSummary[]>([]);
@@ -241,6 +249,34 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
     }
     toast.success("Marked completed");
     void load();
+  }
+
+  async function handleOpenCase(a: AppointmentSummary) {
+    if (!a.clientUnitId) {
+      toast.error("Link a client before opening a case");
+      return;
+    }
+    const okConfirm = window.confirm(
+      "Open an enquiry case from this consultation and link them?"
+    );
+    if (!okConfirm) return;
+
+    setActionBusy(a.unitId);
+    const { ok, data } = await apiFetch<{
+      case: CaseSummary;
+      appointment: AppointmentSummary;
+    }>(`/api/v1/appointments/${a.unitId}/convert-case`, { method: "POST" });
+    setActionBusy(null);
+    if (!ok) {
+      toast.error(
+        getErrorMessage(data as Record<string, unknown>, "Failed to open case")
+      );
+      return;
+    }
+    const body = data as unknown as { case: CaseSummary };
+    toast.success("Case opened");
+    void load();
+    router.push(`/cases/${body.case.unitId}`);
   }
 
   const chips: { id: Range; label: string; hint: string }[] = [
@@ -451,6 +487,19 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                               {a.clientName ?? a.clientUnitId ?? "Walk-in / TBD"}
                             </p>
                           </div>
+                          {a.caseUnitId ? (
+                            <div className="min-w-0">
+                              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                                Case
+                              </p>
+                              <Link
+                                href={`/cases/${a.caseUnitId}`}
+                                className="mt-0.5 inline-block font-medium text-navy underline-offset-2 hover:underline"
+                              >
+                                {a.caseUnitId}
+                              </Link>
+                            </div>
+                          ) : null}
                           <div className="hidden sm:block">
                             <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
                               Ref
@@ -464,6 +513,18 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                     </div>
 
                     <div className="flex shrink-0 flex-wrap items-center gap-2 lg:flex-col lg:items-stretch xl:flex-row xl:items-center">
+                      {canOpenCase && a.clientUnitId && !a.caseUnitId ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-10 flex-1 gap-2 lg:flex-none"
+                          disabled={busy}
+                          onClick={() => void handleOpenCase(a)}
+                        >
+                          <Briefcase className="size-3.5" />
+                          Open case
+                        </Button>
+                      ) : null}
                       {can("edit") && scheduled ? (
                         <>
                           <Button

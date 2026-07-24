@@ -15,6 +15,11 @@ import {
 import { UnitIdBadge } from "@/shared/components/data/unit-id-badge";
 import { PersonChip } from "@/shared/components/user/person-chip";
 import { cn } from "@/lib/utils/cn";
+import {
+  CASE_STATUS_LABEL,
+  CASE_STATUS_VARIANT,
+  normalizeCaseStatus,
+} from "@/config/company/case-pipeline";
 
 export type DiaryItem = {
   hearingUnitId: string;
@@ -33,15 +38,6 @@ export type DiaryItem = {
   advocateName: string | null;
 };
 
-const STATUS_VARIANT: Record<
-  string,
-  "default" | "success" | "warning" | "muted" | "outline"
-> = {
-  pending: "warning",
-  listed: "default",
-  disposed: "muted",
-};
-
 type Props = {
   item: DiaryItem;
   canEdit: boolean;
@@ -50,6 +46,7 @@ type Props = {
 
 export function DiaryHearingCard({ item, canEdit, onAdjourn }: Props) {
   const title = item.caseNumber || item.caseUnitId;
+  const status = item.caseStatus ? normalizeCaseStatus(item.caseStatus) : null;
 
   return (
     <li
@@ -70,12 +67,12 @@ export function DiaryHearingCard({ item, canEdit, onAdjourn }: Props) {
                 </span>
               ) : null}
             </h3>
-            {item.caseStatus ? (
+            {status ? (
               <Badge
-                variant={STATUS_VARIANT[item.caseStatus] ?? "outline"}
+                variant={CASE_STATUS_VARIANT[status] ?? "outline"}
                 className="print:border print:border-border"
               >
-                {item.caseStatus}
+                {CASE_STATUS_LABEL[status]}
               </Badge>
             ) : null}
             <Badge

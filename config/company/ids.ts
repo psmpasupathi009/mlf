@@ -12,6 +12,10 @@ export const idConfig = {
     attendance: "ATT",
     weeklyHours: "AWH",
     timeBlock: "ATB",
+    dak: "DAK",
+    officeTask: "TSK",
+    notification: "NTF",
+    holiday: "HOL",
   },
 } as const;
 

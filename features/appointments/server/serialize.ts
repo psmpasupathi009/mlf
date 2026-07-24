@@ -5,6 +5,7 @@ export type AppointmentSummary = {
   unitId: string;
   clientUnitId: string | null;
   clientName: string | null;
+  caseUnitId: string | null;
   advocateMobile: string | null;
   advocateName: string | null;
   advocatePhotoUrl?: string | null;
@@ -32,6 +33,7 @@ export function toAppointmentSummary(
     unitId: item.unitId,
     clientUnitId: item.clientUnitId,
     clientName: extras?.clientName ?? null,
+    caseUnitId: item.caseUnitId,
     advocateMobile: stripMobile(item.advocateMobile ?? "") || null,
     advocateName: extras?.advocateName ?? null,
     advocatePhotoUrl: extras?.advocatePhotoUrl ?? null,

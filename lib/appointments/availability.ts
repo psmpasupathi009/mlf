@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { normalizeMobile } from "@/lib/auth/mobile";
 import { istDateKey, istDayBounds } from "@/lib/utils/ist";
 import { busySegmentLabel } from "@/features/availability/lib/busy-labels";
+import { findOfficeHolidayForDate } from "@/features/hrms/lib/office-holiday";
 
 export type ConflictCode =
   | "ADVOCATE_BUSY"
@@ -10,6 +11,7 @@ export type ConflictCode =
   | "OUTSIDE_HOURS"
   | "BLOCKED"
   | "ON_LEAVE"
+  | "OFFICE_CLOSED"
   | "IN_PAST"
   | "NO_ADVOCATE";
 
@@ -32,6 +34,33 @@ export type BusySegment = {
   label?: string;
 };
 
+/** Full-day closed payload when an office holiday covers the date. */
+export function buildOfficeClosedDayAvailability(input: {
+  dateKey: string;
+  advocateMobile: string;
+  durationMin: number;
+  holidayTitle: string;
+  dayStart: Date;
+  dayEnd: Date;
+}): DayAvailability {
+  return {
+    date: input.dateKey,
+    advocateMobile: input.advocateMobile,
+    durationMin: input.durationMin,
+    onLeave: false,
+    windows: [],
+    freeSlots: [],
+    busy: [
+      {
+        start: input.dayStart.toISOString(),
+        end: input.dayEnd.toISOString(),
+        reason: "closed",
+        label: `Office closed — ${input.holidayTitle}`,
+      },
+    ],
+  };
+}
+
 export type DayAvailability = {
   date: string;
   advocateMobile: string;
@@ -48,6 +77,7 @@ const CONFLICT_MESSAGES: Record<ConflictCode, string> = {
   OUTSIDE_HOURS: "That time is outside the advocate’s working hours",
   BLOCKED: "That time is blocked on the advocate’s diary (court, travel, or break)",
   ON_LEAVE: "The advocate is on approved leave that day",
+  OFFICE_CLOSED: "Office is closed that day (holiday)",
   IN_PAST: "Cannot book a time in the past",
   NO_ADVOCATE: "Advocate not found",
 };
@@ -246,6 +276,13 @@ export async function assertSlotBookable(
   if (!advocate) return conflictFail("NO_ADVOCATE");
 
   const dateKey = istDateKey(input.start);
+  const holiday = await findOfficeHolidayForDate(dateKey);
+  if (holiday) {
+    return conflictFail(
+      "OFFICE_CLOSED",
+      `Office closed — ${holiday.title}`
+    );
+  }
   if (await isOnApprovedLeave(advocate.id, dateKey)) {
     return conflictFail("ON_LEAVE");
   }
@@ -340,12 +377,23 @@ export async function getDayAvailability(
   if (!advocate) return conflictFail("NO_ADVOCATE");
 
   const onLeave = await isOnApprovedLeave(advocate.id, input.dateKey);
+  const holiday = await findOfficeHolidayForDate(input.dateKey);
   const { rows: hours } = await loadWeeklyHours(advocate.id);
   const weekday = istWeekday(input.dateKey);
   const windows = windowsForDay(hours, weekday);
   const { start: dayStart, end: dayEnd } = istDayBounds(input.dateKey);
 
   const busy: BusySegment[] = [];
+  if (holiday) {
+    return buildOfficeClosedDayAvailability({
+      dateKey: input.dateKey,
+      advocateMobile: advocate.mobile,
+      durationMin,
+      holidayTitle: holiday.title,
+      dayStart,
+      dayEnd,
+    });
+  }
   if (onLeave) {
     busy.push({
       start: dayStart.toISOString(),

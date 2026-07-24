@@ -18,6 +18,8 @@ const APP_MODULES = new Set<string>([
   "cases",
   "accounts",
   "hrms",
+  "dak",
+  "tasks",
   "reports",
 ]);
 

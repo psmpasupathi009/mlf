@@ -297,7 +297,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
     metrics.push({
       label: "Open cases",
       value: String(summary.cases.open),
-      hint: `${summary.cases.pending} pending · ${summary.cases.listed} listed`,
+      hint: `${summary.cases.pending} pre-filing · ${summary.cases.listed} active`,
       href: "/cases",
       icon: Scale,
     });
@@ -399,7 +399,10 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
       ) : null}
 
       {isAdmin && !loading ? (
-        <WelcomeOfficePresence officePresence={officePresence} />
+        <WelcomeOfficePresence
+          officePresence={officePresence}
+          officeHoliday={summary?.adminBoard?.officeHoliday}
+        />
       ) : null}
 
       {moduleOn("hrms") && can("hrms.own_attendance") && summary?.hrms ? (

@@ -13,16 +13,45 @@ function databaseUrl(): string | undefined {
   return `${base}${sep}serverSelectionTimeoutMS=5000`;
 }
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
+function createClient() {
+  return new PrismaClient({
     datasources: { db: { url: databaseUrl() } },
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
-
-if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = prisma;
 }
+
+/**
+ * After `prisma generate`, Next.js can keep a stale global client missing new
+ * delegates (e.g. officeHoliday). Drop and recreate when required models lack.
+ */
+function clientHasRequiredModels(client: PrismaClient): boolean {
+  const c = client as unknown as Record<string, unknown>;
+  return (
+    typeof c.officeHoliday === "object" &&
+    c.officeHoliday != null &&
+    typeof c.notification === "object" &&
+    c.notification != null &&
+    typeof c.dakEntry === "object" &&
+    c.dakEntry != null &&
+    typeof c.officeTask === "object" &&
+    c.officeTask != null
+  );
+}
+
+function resolveClient(): PrismaClient {
+  const existing = globalForPrisma.prisma;
+  if (existing && clientHasRequiredModels(existing)) return existing;
+  if (existing) {
+    void existing.$disconnect().catch(() => undefined);
+  }
+  const next = createClient();
+  if (process.env.NODE_ENV !== "production") {
+    globalForPrisma.prisma = next;
+  }
+  return next;
+}
+
+export const prisma = resolveClient();
 
 export type {
   User,

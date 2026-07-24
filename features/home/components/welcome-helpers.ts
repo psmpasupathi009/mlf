@@ -67,6 +67,7 @@ export type DashboardSummary = {
     pending: number;
     listed: number;
     open: number;
+    active?: number;
     weekHearings: number;
     missingCourtNumber: number;
     todayHearings: TodayHearing[];
@@ -87,6 +88,7 @@ export type DashboardSummary = {
     checkedInToday: boolean;
     checkedOutToday: boolean;
     onApprovedLeaveToday?: boolean;
+    officeHolidayToday?: { title: string; notes: string | null } | null;
     pendingLeaveApprovals: number | null;
   };
   adminBoard?: {
@@ -101,6 +103,7 @@ export type DashboardSummary = {
     };
     checkedInCount: number;
     advocateCount: number;
+    officeHoliday?: { title: string; notes: string | null } | null;
   };
 };
 

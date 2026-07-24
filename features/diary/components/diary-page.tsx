@@ -2,13 +2,22 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Printer, Search } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  MessageSquareWarning,
+  Phone,
+  Printer,
+  Search,
+  Send,
+} from "lucide-react";
 import { toast } from "sonner";
 import { apiFetch, getErrorMessage } from "@/lib/api/client";
 import { PageHeader } from "@/shared/components/data/page-header";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
 import { DatePicker } from "@/shared/components/forms/date-picker";
 import { AdvocatePicker } from "@/features/employees/components/advocate-picker";
 import { AdjournHearingDialog } from "@/features/cases/components/adjourn-hearing-dialog";
@@ -33,6 +42,31 @@ type DiaryResponse = {
   meta: { truncated: boolean; limit: number };
 };
 
+type TomorrowNotifyItem = {
+  hearingUnitId: string;
+  hearingDate: string;
+  purpose: string | null;
+  smsSentAt: string | null;
+  caseUnitId: string;
+  caseNumber: string | null;
+  courtName: string | null;
+  clientUnitId: string | null;
+  clientName: string | null;
+  clientMobile: string | null;
+  smsConsent: boolean | null;
+};
+
+type TomorrowNotifyResponse = {
+  date: string;
+  items: TomorrowNotifyItem[];
+  summary: {
+    total: number;
+    smsPending: number;
+    smsSent: number;
+    withMobile: number;
+  };
+};
+
 function courtLabel(name: string | null) {
   return name?.trim() || "Court TBD";
 }
@@ -54,6 +88,19 @@ export function DiaryPage({ user }: { user: PublicUser }) {
     bookAny ? null : user.name ?? displayMobile(user.mobile)
   );
   const [adjourning, setAdjourning] = useState<string | null>(null);
+  const tomorrowKey = istAddCalendarDays(todayKey, 1);
+  const [tomorrowNotify, setTomorrowNotify] =
+    useState<TomorrowNotifyResponse | null>(null);
+  const [tomorrowLoading, setTomorrowLoading] = useState(true);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [smsSending, setSmsSending] = useState(false);
+
+  async function reloadTomorrowNotify() {
+    const res = await apiFetch<TomorrowNotifyResponse>(
+      "/api/v1/diary/tomorrow-notify"
+    );
+    if (res.ok) setTomorrowNotify(res.data);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -85,6 +132,31 @@ export function DiaryPage({ user }: { user: PublicUser }) {
     };
   }, [date, advocateFilter]);
 
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setTomorrowLoading(true);
+      const res = await apiFetch<TomorrowNotifyResponse>(
+        "/api/v1/diary/tomorrow-notify"
+      );
+      if (cancelled) return;
+      setTomorrowLoading(false);
+      if (!res.ok) {
+        setTomorrowNotify(null);
+        return;
+      }
+      setTomorrowNotify(res.data);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const pendingClients = useMemo(() => {
+    if (!tomorrowNotify) return [];
+    return tomorrowNotify.items.filter((i) => !i.smsSentAt);
+  }, [tomorrowNotify]);
+
   const reload = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams({ date });
@@ -105,6 +177,34 @@ export function DiaryPage({ user }: { user: PublicUser }) {
     setItems(res.data.items ?? []);
     setTruncated(Boolean(res.data.meta?.truncated));
   }, [date, advocateFilter]);
+
+  async function sendTomorrowSms() {
+    if (!canEdit || smsSending) return;
+    setSmsSending(true);
+    const res = await apiFetch<{
+      date: string;
+      total: number;
+      sent: number;
+      failed: number;
+      skipped: number;
+    }>("/api/v1/diary/send-hearing-sms", { method: "POST" });
+    setSmsSending(false);
+    if (!res.ok) {
+      toast.error(
+        getErrorMessage(
+          res.data as Record<string, unknown>,
+          "Failed to send hearing SMS"
+        )
+      );
+      return;
+    }
+    const { sent, failed, skipped, total } = res.data;
+    toast.success(
+      `Hearing SMS: ${sent} sent, ${failed} failed, ${skipped} skipped (${total} due)`
+    );
+    await reloadTomorrowNotify();
+    if (date === tomorrowKey) await reload();
+  }
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return items;
@@ -180,6 +280,108 @@ export function DiaryPage({ user }: { user: PublicUser }) {
           {weekday}, {displayDate} · Court cause list
         </p>
       </div>
+
+      {!tomorrowLoading && tomorrowNotify && tomorrowNotify.summary.total > 0 ? (
+        <div className="rounded-2xl border border-amber-200/80 bg-amber-50/80 p-3 shadow-sm print:hidden sm:p-4 dark:border-amber-900/50 dark:bg-amber-950/30">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <MessageSquareWarning className="size-4 shrink-0 text-amber-800 dark:text-amber-200" />
+                <h2 className="text-sm font-semibold text-navy dark:text-amber-50">
+                  Tomorrow — inform clients
+                </h2>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {tomorrowNotify.summary.total} hearing
+                {tomorrowNotify.summary.total === 1 ? "" : "s"} on{" "}
+                {istDisplayDate(
+                  new Date(`${tomorrowNotify.date}T12:00:00+05:30`)
+                )}
+                {" · "}
+                {tomorrowNotify.summary.smsPending} SMS not yet sent
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {canEdit ? (
+                <Button
+                  type="button"
+                  className="h-10 gap-2"
+                  disabled={smsSending || tomorrowNotify.summary.smsPending === 0}
+                  onClick={() => void sendTomorrowSms()}
+                >
+                  <Send className="size-4" />
+                  {smsSending ? "Sending…" : "Send tomorrow SMS now"}
+                </Button>
+              ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10"
+                onClick={() => setDate(tomorrowKey)}
+              >
+                Open tomorrow’s list
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                className="h-10"
+                onClick={() => setPreviewOpen((v) => !v)}
+              >
+                {previewOpen ? "Hide SMS list" : "Preview tomorrow SMS list"}
+              </Button>
+            </div>
+          </div>
+
+          {pendingClients.length > 0 ? (
+            <ul className="mt-3 space-y-2 border-t border-amber-200/70 pt-3 dark:border-amber-900/40">
+              {pendingClients.slice(0, previewOpen ? 40 : 5).map((item) => (
+                <li
+                  key={item.hearingUnitId}
+                  className="flex flex-wrap items-center justify-between gap-2 text-sm"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium text-navy dark:text-amber-50">
+                      {item.clientName || "Client"}
+                      {item.caseNumber || item.caseUnitId
+                        ? ` · ${item.caseNumber || item.caseUnitId}`
+                        : ""}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.courtName || "Court TBD"}
+                      {item.purpose ? ` · ${item.purpose}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="warning">SMS pending</Badge>
+                    {item.clientMobile ? (
+                      <a
+                        href={`tel:+91${item.clientMobile}`}
+                        className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-2.5 text-xs font-medium text-navy"
+                      >
+                        <Phone className="size-3.5" />
+                        {item.clientMobile}
+                      </a>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">
+                        No mobile
+                      </span>
+                    )}
+                  </div>
+                </li>
+              ))}
+              {!previewOpen && pendingClients.length > 5 ? (
+                <li className="text-xs text-muted-foreground">
+                  +{pendingClients.length - 5} more — preview full SMS list
+                </li>
+              ) : null}
+            </ul>
+          ) : (
+            <p className="mt-3 border-t border-amber-200/70 pt-3 text-sm text-muted-foreground dark:border-amber-900/40">
+              All tomorrow’s clients already have SMS marked sent.
+            </p>
+          )}
+        </div>
+      ) : null}
 
       <div className="rounded-2xl border border-border/80 bg-card p-3 shadow-sm print:hidden sm:p-4">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

@@ -27,6 +27,7 @@ import {
   getErrorMessage,
 } from "@/lib/api/client";
 import { ClientPicker } from "@/features/clients/components/client-picker";
+import { CasePicker } from "@/features/cases/components/case-picker";
 import {
   AdvocatePicker,
   type AdvocateSummary,
@@ -77,6 +78,7 @@ const CONFLICT_HINTS: Record<string, string> = {
   OUTSIDE_HOURS: "Outside working hours — check Availability.",
   BLOCKED: "Blocked on the advocate’s diary (court, travel, or break).",
   ON_LEAVE: "Advocate is on approved leave that day.",
+  OFFICE_CLOSED: "Office is closed that day (holiday) — pick another date.",
   IN_PAST: "Choose a future time.",
 };
 
@@ -173,6 +175,10 @@ export function AppointmentFormDialog({
   const [client, setClient] = useState<{ unitId: string; name: string } | null>(
     null
   );
+  const [linkedCase, setLinkedCase] = useState<{
+    unitId: string;
+    label: string;
+  } | null>(null);
   const [selectedAdvocate, setSelectedAdvocate] =
     useState<AdvocateSummary | null>(null);
   const [advocateMobile, setAdvocateMobile] = useState("");
@@ -196,6 +202,14 @@ export function AppointmentFormDialog({
           ? {
               unitId: appointment.clientUnitId,
               name: appointment.clientName ?? appointment.clientUnitId,
+            }
+          : null
+      );
+      setLinkedCase(
+        appointment?.caseUnitId
+          ? {
+              unitId: appointment.caseUnitId,
+              label: appointment.caseUnitId,
             }
           : null
       );
@@ -268,6 +282,7 @@ export function AppointmentFormDialog({
     if (isEditOnly) {
       payload = {
         clientUnitId: client?.unitId || "",
+        caseUnitId: linkedCase?.unitId || "",
         title,
         durationMin: Number(durationMin) || 30,
         mode,
@@ -276,6 +291,7 @@ export function AppointmentFormDialog({
     } else {
       payload = {
         clientUnitId: client?.unitId || undefined,
+        caseUnitId: linkedCase?.unitId || undefined,
         advocateMobile: bookAny ? tenDigit(advocateMobile) : selfMobile10,
         title,
         scheduledAt: new Date(scheduledAt).toISOString(),
@@ -506,6 +522,13 @@ export function AppointmentFormDialog({
                     otherPlaceholder="Custom title"
                   />
                 </div>
+                <div className="md:col-span-2">
+                  <CasePicker
+                    value={linkedCase}
+                    onChange={setLinkedCase}
+                    clientUnitId={client?.unitId}
+                  />
+                </div>
               </div>
             </FormSection>
           ) : null}
@@ -540,6 +563,13 @@ export function AppointmentFormDialog({
                     placeholder="Select title"
                     className="h-11"
                     otherPlaceholder="Custom title"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <CasePicker
+                    value={linkedCase}
+                    onChange={setLinkedCase}
+                    clientUnitId={client?.unitId}
                   />
                 </div>
                 <div className="grid gap-2 md:col-span-2">

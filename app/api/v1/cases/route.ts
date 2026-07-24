@@ -8,6 +8,10 @@ import { createCaseSchema } from "@/lib/validations/cases.schema";
 import { toCaseSummary } from "@/features/cases/server/serialize";
 import { istDateKey, istDayBounds } from "@/lib/utils/ist";
 import { containsInsensitive } from "@/lib/db/search";
+import {
+  OPEN_CASE_STATUSES,
+  PRE_NUMBER_STATUSES,
+} from "@/config/company/case-pipeline";
 
 export const GET = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "cases", "view");
@@ -20,10 +24,14 @@ export const GET = apiHandler(async (request) => {
   const clientUnitId = searchParams.get("clientUnitId")?.trim();
   const hearing = searchParams.get("hearing")?.trim(); // today | week
   const missingCourtNumber = searchParams.get("missingCourtNumber") === "1";
+  const battaDue =
+    searchParams.get("battaDue") === "1" ||
+    searchParams.get("battaDue") === "true";
 
   const where: Prisma.CaseWhereInput = {
     ...(clientUnitId ? { clientUnitId } : {}),
     ...(status ? { status: status as never } : {}),
+    ...(battaDue ? { battaDue: true } : {}),
     ...(q
       ? {
           OR: [
@@ -41,7 +49,7 @@ export const GET = apiHandler(async (request) => {
     where.AND = [
       ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
       { OR: [{ caseNumber: null }, { caseNumber: "" }] },
-      { status: { in: ["pending", "listed"] } },
+      { status: { in: [...PRE_NUMBER_STATUSES] } },
     ];
   }
 
@@ -57,7 +65,7 @@ export const GET = apiHandler(async (request) => {
       lte: hearing === "today" ? end : rangeEnd,
     };
     if (!status) {
-      where.status = { in: ["pending", "listed"] };
+      where.status = { in: [...OPEN_CASE_STATUSES] };
     }
   }
 
@@ -123,11 +131,14 @@ export const POST = apiHandler(async (request) => {
       firNumber: input.firNumber || undefined,
       stage: input.stage || undefined,
       caseType: input.caseType || undefined,
-      status: input.status ?? "pending",
+      status: input.status ?? "enquiry",
       filingDate: input.filingDate,
       nextHearingAt: input.nextHearingAt,
       agreedFee: input.agreedFee,
       notes: input.notes || undefined,
+      battaDue: input.battaDue,
+      awaitingService: input.awaitingService,
+      filingChecklist: input.filingChecklist as Prisma.InputJsonValue | undefined,
       createdById: user.id,
     },
   });

@@ -5,6 +5,7 @@ import { writeAudit } from "@/lib/audit";
 import { decideLeaveSchema } from "@/lib/validations/hrms.schema";
 import { toLeaveSummary } from "@/features/hrms/server/serialize";
 import { istDateKey } from "@/lib/utils/ist";
+import { notifyUser, scheduleNotify } from "@/lib/notifications/notify";
 
 export const POST = apiHandler(async (request, context) => {
   const { user, response } = await requirePerm(request, "hrms", "approve_leave");
@@ -101,6 +102,19 @@ export const POST = apiHandler(async (request, context) => {
     action: `leave.${input.decision}`,
     entity: "LeaveRequest",
     entityUnitId: updated.unitId,
+  });
+
+  scheduleNotify(async () => {
+    const label = input.decision === "approved" ? "approved" : "rejected";
+    await notifyUser({
+      userId: leave.userId,
+      userUnitId: leave.userUnitId,
+      type: "leave_decided",
+      title: `Leave ${label}`,
+      body: `${leave.fromDate} → ${leave.toDate}`,
+      href: "/hrms?section=leave",
+      meta: { leaveUnitId: updated.unitId, decision: input.decision },
+    });
   });
 
   return jsonOk({ leave: toLeaveSummary(updated) });

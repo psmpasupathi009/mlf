@@ -91,6 +91,20 @@ export const navItems: NavItem[] = [
     permission: { module: "hrms", action: "view" },
   },
   {
+    href: "/dak",
+    label: "Dak / Postal",
+    module: "dak",
+    group: "office",
+    permission: { module: "dak", action: "view" },
+  },
+  {
+    href: "/tasks",
+    label: "Work allotment",
+    module: "tasks",
+    group: "office",
+    permission: { module: "tasks", action: "view" },
+  },
+  {
     href: "/employees",
     label: "Employees",
     module: "employees",

@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
@@ -6,6 +7,22 @@ import { updateCaseSchema } from "@/lib/validations/cases.schema";
 import { toCaseSummary, toHearingSummary } from "@/features/cases/server/serialize";
 import { toClientSummary } from "@/features/clients/server/serialize";
 import { toDocumentSummary } from "@/features/documents/server/serialize";
+import {
+  canTransitionStatus,
+  normalizeCaseStatus,
+  PRE_NUMBER_STATUSES,
+  type FilingChecklistState,
+} from "@/config/company/case-pipeline";
+import {
+  findCaseNotifyRecipients,
+  notifyUsers,
+  scheduleNotify,
+} from "@/lib/notifications/notify";
+
+function parseChecklist(raw: Prisma.JsonValue | null | undefined): FilingChecklistState {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  return raw as FilingChecklistState;
+}
 
 export const GET = apiHandler(async (request, context) => {
   const { user, response } = await requirePerm(request, "cases", "view");
@@ -54,6 +71,40 @@ export const PATCH = apiHandler(async (request, context) => {
     if (dupe) return jsonFail("CONFLICT", "A case with this case number already exists", 409);
   }
 
+  const caseNumberNewlySet = Boolean(input.caseNumber) && !item.caseNumber;
+  const cnrNewlySet = Boolean(input.cnr) && !item.cnr;
+  const isPreNumber = PRE_NUMBER_STATUSES.includes(normalizeCaseStatus(item.status));
+
+  let nextStatus = input.status;
+  let nextChecklist: FilingChecklistState | undefined = input.filingChecklist
+    ? {
+        ...parseChecklist(item.filingChecklist),
+        ...(input.filingChecklist as FilingChecklistState),
+      }
+    : undefined;
+
+  if (nextStatus && nextStatus !== item.status) {
+    if (!canTransitionStatus(item.status, nextStatus)) {
+      return jsonFail(
+        "VALIDATION",
+        `Cannot move case from “${normalizeCaseStatus(item.status)}” to “${normalizeCaseStatus(nextStatus)}”. Use the pipeline steps on the case page.`,
+        400
+      );
+    }
+  }
+
+  if (
+    !nextStatus &&
+    (caseNumberNewlySet || cnrNewlySet) &&
+    isPreNumber
+  ) {
+    nextStatus = "active";
+    nextChecklist = {
+      ...(nextChecklist ?? parseChecklist(item.filingChecklist)),
+      numbered: true,
+    };
+  }
+
   const updated = await prisma.case.update({
     where: { id: item.id },
     data: {
@@ -74,11 +125,18 @@ export const PATCH = apiHandler(async (request, context) => {
       firNumber: input.firNumber === "" ? null : input.firNumber,
       stage: input.stage === "" ? null : input.stage,
       caseType: input.caseType === "" ? null : input.caseType,
-      status: input.status,
+      status: nextStatus,
       filingDate: input.filingDate,
       nextHearingAt: input.nextHearingAt,
       agreedFee: input.agreedFee,
       notes: input.notes === "" ? null : input.notes,
+      ...(input.battaDue !== undefined ? { battaDue: input.battaDue } : {}),
+      ...(input.awaitingService !== undefined
+        ? { awaitingService: input.awaitingService }
+        : {}),
+      ...(nextChecklist
+        ? { filingChecklist: nextChecklist as Prisma.InputJsonValue }
+        : {}),
     },
   });
 
@@ -88,6 +146,29 @@ export const PATCH = apiHandler(async (request, context) => {
     entity: "Case",
     entityUnitId: updated.unitId,
   });
+
+  if (input.battaDue === true && !item.battaDue) {
+    scheduleNotify(async () => {
+      const recipients = await findCaseNotifyRecipients([
+        ...updated.advocateMobiles,
+        updated.primaryAdvocateMobile,
+      ]);
+      const label =
+        updated.caseNumber || updated.filingNumber || updated.unitId;
+      await notifyUsers(
+        recipients
+          .filter((u) => u.id !== user.id)
+          .map((u) => ({
+            userId: u.id,
+            userUnitId: u.unitId,
+            type: "batta_due",
+            title: `Batta due: ${label}`,
+            href: `/cases/${updated.unitId}`,
+            meta: { caseUnitId: updated.unitId },
+          }))
+      );
+    });
+  }
 
   return jsonOk({ case: toCaseSummary(updated) });
 });

@@ -5,6 +5,10 @@ import { istDateKey, istDayBounds, formatIstTime } from "@/lib/utils/ist";
 import { displayMobile } from "@/lib/auth/mobile";
 import { personDisplayName } from "@/shared/lib/person";
 import { userPhotoUrl } from "@/lib/auth/user-photo";
+import {
+  OPEN_CASE_STATUSES,
+  PRE_NUMBER_STATUSES,
+} from "@/config/company/case-pipeline";
 
 function toTen(mobile: string): string {
   const d = mobile.replace(/\D/g, "");
@@ -35,27 +39,28 @@ export async function buildDashboardSummary(
   };
 
   if (await can("cases", "view")) {
-    const [total, pending, listed, weekHearings, missingCourtNumber, todayCases] =
+    const [total, preNumber, active, open, weekHearings, missingCourtNumber, todayCases] =
       await Promise.all([
         prisma.case.count(),
-        prisma.case.count({ where: { status: "pending" } }),
-        prisma.case.count({ where: { status: "listed" } }),
+        prisma.case.count({ where: { status: { in: [...PRE_NUMBER_STATUSES] } } }),
+        prisma.case.count({ where: { status: "active" } }),
+        prisma.case.count({ where: { status: { in: [...OPEN_CASE_STATUSES] } } }),
         prisma.case.count({
           where: {
             nextHearingAt: { gte: todayStart, lt: weekEnd },
-            status: { in: ["pending", "listed"] },
+            status: { in: [...OPEN_CASE_STATUSES] },
           },
         }),
         prisma.case.count({
           where: {
             OR: [{ caseNumber: null }, { caseNumber: "" }],
-            status: { in: ["pending", "listed"] },
+            status: { in: [...PRE_NUMBER_STATUSES] },
           },
         }),
         prisma.case.findMany({
           where: {
             nextHearingAt: { gte: todayStart, lte: todayEnd },
-            status: { in: ["pending", "listed"] },
+            status: { in: [...OPEN_CASE_STATUSES] },
           },
           orderBy: { nextHearingAt: "asc" },
           take: 20,
@@ -137,9 +142,11 @@ export async function buildDashboardSummary(
 
     summary.cases = {
       total,
-      pending,
-      listed,
-      open: pending + listed,
+      // Legacy keys: pending ≈ pre-number pipeline, listed ≈ active/numbered
+      pending: preNumber,
+      listed: active,
+      open,
+      active,
       weekHearings,
       missingCourtNumber,
       todayHearings,
@@ -351,63 +358,92 @@ export async function buildDashboardSummary(
   }
 
   if (await can("hrms", "view")) {
-    const [myAttendance, pendingLeave, onLeaveToday] = await Promise.all([
-      prisma.attendance.findUnique({
-        where: { userId_date: { userId: user.id, date: todayKey } },
-      }),
-      (await can("hrms", "approve_leave"))
-        ? prisma.leaveRequest.count({ where: { status: "pending" } })
-        : Promise.resolve(null),
-      prisma.leaveRequest.findFirst({
-        where: {
-          userId: user.id,
-          status: "approved",
-          fromDate: { lte: todayKey },
-          toDate: { gte: todayKey },
-        },
-        select: { unitId: true },
-      }),
-    ]);
-    summary.hrms = {
-      checkedInToday: Boolean(myAttendance?.checkInAt),
-      checkedOutToday: Boolean(myAttendance?.checkOutAt),
-      onApprovedLeaveToday: Boolean(onLeaveToday),
-      pendingLeaveApprovals: pendingLeave,
-    };
+    try {
+      const [myAttendance, pendingLeave, onLeaveToday, holiday] =
+        await Promise.all([
+          prisma.attendance.findUnique({
+            where: { userId_date: { userId: user.id, date: todayKey } },
+          }),
+          (await can("hrms", "approve_leave"))
+            ? prisma.leaveRequest.count({ where: { status: "pending" } })
+            : Promise.resolve(null),
+          prisma.leaveRequest.findFirst({
+            where: {
+              userId: user.id,
+              status: "approved",
+              fromDate: { lte: todayKey },
+              toDate: { gte: todayKey },
+            },
+            select: { unitId: true },
+          }),
+          (async () => {
+            try {
+              return await (
+                await import("@/features/hrms/lib/office-holiday")
+              ).findOfficeHolidayForDate(todayKey);
+            } catch {
+              return null;
+            }
+          })(),
+        ]);
+      summary.hrms = {
+        checkedInToday: Boolean(myAttendance?.checkInAt),
+        checkedOutToday: Boolean(myAttendance?.checkOutAt),
+        onApprovedLeaveToday: Boolean(onLeaveToday),
+        officeHolidayToday: holiday
+          ? { title: holiday.title, notes: holiday.notes ?? null }
+          : null,
+        pendingLeaveApprovals: pendingLeave,
+      };
+    } catch {
+      // Keep home usable if attendance/holiday queries fail.
+    }
   }
 
   // Admin / sub-admin office board — same gate as HRMS presence API
   if (isOfficeAdmin && (await can("hrms", "manage_attendance"))) {
-    const { buildPresenceBoard } = await import("@/features/hrms/server/presence");
-    const board = await buildPresenceBoard(todayKey);
-    summary.adminBoard = {
-      staff: board.people.map((p) => ({
-        unitId: p.unitId,
-        name: p.displayName,
-        mobile: p.mobile,
-        photoUrl: p.photoUrl,
-        checkedIn: p.status === "in" || p.status === "out",
-        checkedOut: p.status === "out",
-        status: p.status,
-        notes: p.notes,
-        busyToday: p.busyToday,
-      })),
-      counts: board.counts,
-      // Legacy keys used by older home widgets
-      advocates: board.people.map((p) => ({
-        unitId: p.unitId,
-        name: p.displayName,
-        mobile: p.mobile,
-        photoUrl: p.photoUrl,
-        checkedIn: p.status === "in" || p.status === "out",
-        checkedOut: p.status === "out",
-        status: p.status,
-        notes: p.notes,
-        busyToday: p.busyToday,
-      })),
-      checkedInCount: board.counts.present + board.counts.out,
-      advocateCount: board.counts.total,
-    };
+    try {
+      const { buildPresenceBoard } = await import(
+        "@/features/hrms/server/presence"
+      );
+      const board = await buildPresenceBoard(todayKey);
+      summary.adminBoard = {
+        staff: board.people.map((p) => ({
+          unitId: p.unitId,
+          name: p.displayName,
+          mobile: p.mobile,
+          photoUrl: p.photoUrl,
+          checkedIn: p.status === "in" || p.status === "out",
+          checkedOut: p.status === "out",
+          status: p.status,
+          notes: p.notes,
+          busyToday: p.busyToday,
+        })),
+        counts: board.counts,
+        officeHoliday: board.officeHoliday
+          ? {
+              title: board.officeHoliday.title,
+              notes: board.officeHoliday.notes,
+            }
+          : null,
+        // Legacy keys used by older home widgets
+        advocates: board.people.map((p) => ({
+          unitId: p.unitId,
+          name: p.displayName,
+          mobile: p.mobile,
+          photoUrl: p.photoUrl,
+          checkedIn: p.status === "in" || p.status === "out",
+          checkedOut: p.status === "out",
+          status: p.status,
+          notes: p.notes,
+          busyToday: p.busyToday,
+        })),
+        checkedInCount: board.counts.present + board.counts.out,
+        advocateCount: board.counts.total,
+      };
+    } catch {
+      // Presence board is optional on home — don't fail the whole dashboard.
+    }
   }
 
   return summary;

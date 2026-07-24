@@ -29,7 +29,7 @@ export type AttendanceList = {
   meta: { total: number };
 };
 export type LeaveList = { data: LeaveSummary[]; meta: { total: number } };
-export type DeskSection = "today" | "history" | "leave";
+export type DeskSection = "today" | "history" | "leave" | "holidays";
 
 export const LEAVE_VARIANT: Record<
   string,
@@ -57,6 +57,15 @@ export const PRESENCE_LABEL: Record<PresenceStatus, string> = {
   in: "Present",
   out: "Checked out",
 };
+
+/** Status label; when office is closed, on_leave rows read as office closed. */
+export function presenceStatusLabel(
+  status: PresenceStatus,
+  officeClosed?: boolean
+) {
+  if (officeClosed && status === "on_leave") return "Office closed";
+  return PRESENCE_LABEL[status];
+}
 
 export const STATUS_ROW: Record<PresenceStatus, string> = {
   absent: "border-l-[3px] border-l-amber-400/90",
@@ -135,7 +144,13 @@ export function busyChip(row: PresencePerson): string | null {
   return summarizeBusyToday(row.busyToday ?? []);
 }
 
-export function PresenceCard({ row }: { row: PresencePerson }) {
+export function PresenceCard({
+  row,
+  officeClosed,
+}: {
+  row: PresencePerson;
+  officeClosed?: boolean;
+}) {
   const busy = busyChip(row);
   return (
     <div className={cn("flex items-start gap-3 px-4 py-3", STATUS_ROW[row.status])}>
@@ -169,7 +184,7 @@ export function PresenceCard({ row }: { row: PresencePerson }) {
         variant={PRESENCE_VARIANT[row.status]}
         className="shrink-0 normal-case"
       >
-        {PRESENCE_LABEL[row.status]}
+        {presenceStatusLabel(row.status, officeClosed)}
       </Badge>
     </div>
   );

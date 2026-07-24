@@ -17,18 +17,26 @@ export function WelcomePersonalAttendance({
         <div>
           <p className="text-sm font-semibold text-navy">Your attendance</p>
           <p className="text-xs text-muted-foreground">
-            {hrms.onApprovedLeaveToday
-              ? "On approved leave today"
-              : hrms.checkedOutToday
-                ? "Checked out"
-                : hrms.checkedInToday
-                  ? "Checked in"
-                  : "Not checked in"}
+            {hrms.officeHolidayToday
+              ? `Office closed — ${hrms.officeHolidayToday.title}`
+              : hrms.onApprovedLeaveToday
+                ? "On approved leave today"
+                : hrms.checkedOutToday
+                  ? "Checked out"
+                  : hrms.checkedInToday
+                    ? "Checked in"
+                    : "Not checked in"}
           </p>
         </div>
       </div>
       <Button asChild variant="outline" size="sm">
-        <Link href="/hrms">Open HRMS</Link>
+        <Link
+          href={
+            hrms.officeHolidayToday ? "/hrms?section=holidays" : "/hrms"
+          }
+        >
+          Open HRMS
+        </Link>
       </Button>
     </div>
   );

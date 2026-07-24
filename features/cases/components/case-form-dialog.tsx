@@ -116,7 +116,7 @@ export function CaseFormDialog({
   const [firNumber, setFirNumber] = useState("");
   const [stage, setStage] = useState("");
   const [caseType, setCaseType] = useState("");
-  const [status, setStatus] = useState("pending");
+  const [status, setStatus] = useState("enquiry");
   const [filingDate, setFilingDate] = useState("");
   const [nextHearingAt, setNextHearingAt] = useState("");
   const [agreedFee, setAgreedFee] = useState("");
@@ -183,7 +183,7 @@ export function CaseFormDialog({
         setFirNumber("");
         setStage("");
         setCaseType("");
-        setStatus("pending");
+        setStatus("enquiry");
         setFilingDate("");
         setNextHearingAt("");
         setAgreedFee("");

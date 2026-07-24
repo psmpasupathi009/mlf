@@ -1,13 +1,11 @@
 import { z } from "zod";
 import { isValidCnr, normalizeCnr } from "@/config/company/case-types";
+import {
+  CASE_PIPELINE_STATUSES,
+  type FilingChecklistState,
+} from "@/config/company/case-pipeline";
 
-export const caseStatusEnum = z.enum([
-  "pending",
-  "listed",
-  "disposed",
-  "withdrawn",
-  "transferred",
-]);
+export const caseStatusEnum = z.enum(CASE_PIPELINE_STATUSES);
 
 export const ourSideEnum = z.enum([
   "petitioner",
@@ -68,11 +66,28 @@ export const createCaseSchema = z.object({
   nextHearingAt: dateStringOrDate.optional(),
   agreedFee: z.coerce.number().nonnegative().optional(),
   notes: z.string().trim().max(2000).optional().or(z.literal("")),
+  battaDue: z.boolean().optional(),
+  awaitingService: z.boolean().optional(),
+  filingChecklist: z.record(z.string(), z.union([z.boolean(), z.string()])).optional(),
 });
 
 export const updateCaseSchema = createCaseSchema.partial().omit({
   clientUnitId: true,
 });
+
+export const updateCaseStatusSchema = z.object({
+  status: caseStatusEnum,
+});
+
+export const updateFilingChecklistSchema = z.object({
+  filingChecklist: z.record(z.string(), z.union([z.boolean(), z.string()])),
+  battaDue: z.boolean().optional(),
+  awaitingService: z.boolean().optional(),
+  /** When true and numbered/CNR present, promote to active if still pre-number. */
+  promoteIfNumbered: z.boolean().optional(),
+});
+
+export type { FilingChecklistState };
 
 export const addHearingSchema = z.object({
   hearingDate: dateStringOrDate,

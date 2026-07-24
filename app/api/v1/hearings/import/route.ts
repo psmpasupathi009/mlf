@@ -100,7 +100,11 @@ export const POST = apiHandler(async (request) => {
           where: { id: caseItem.id },
           data: {
             nextHearingAt: hearingDate,
-            status: caseItem.status === "pending" ? "listed" : undefined,
+            // Do not auto-promote pipeline status on hearing import.
+            ...((caseItem.status === "pending" || caseItem.status === "listed") &&
+            (caseItem.caseNumber || caseItem.cnr)
+              ? { status: "active" as const }
+              : {}),
           },
         }),
       ]);

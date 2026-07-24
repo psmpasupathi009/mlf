@@ -1,11 +1,11 @@
 import { timingSafeEqual } from "crypto";
 import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
-import { prisma } from "@/lib/db/prisma";
-import { writeAudit } from "@/lib/audit";
-import { normalizeMobile } from "@/lib/auth/mobile";
-import { sendTransactionalSms } from "@/lib/services/two-factor.service";
-import { smsTemplates } from "@/config/company/sms-templates";
-import { istDateKey, istDayBounds, istDisplayDate, istAddCalendarDays } from "@/lib/utils/ist";
+import { runHearingSmsJob } from "@/lib/services/hearing-sms.job";
+import {
+  findUsersByRoles,
+  notifyUsers,
+  scheduleNotify,
+} from "@/lib/notifications/notify";
 
 function secretsEqual(provided: string, expected: string): boolean {
   const a = Buffer.from(provided);
@@ -14,136 +14,59 @@ function secretsEqual(provided: string, expected: string): boolean {
   return timingSafeEqual(a, b);
 }
 
-/**
- * Day-before hearing SMS reminders (IST calendar day).
- * Trigger via an external scheduler (e.g. Vercel Cron) once daily:
- *   POST /api/v1/cron/hearing-sms  with header  x-cron-secret: <CRON_SECRET>
- */
-export const POST = apiHandler(async (request) => {
+function authorizeCron(request: Request): Response | null {
   const secret = process.env.CRON_SECRET;
   if (!secret) {
     return jsonFail("SERVER_ERROR", "CRON_SECRET is not configured", 500);
   }
-  const provided = request.headers.get("x-cron-secret");
+  const header =
+    request.headers.get("x-cron-secret") ??
+    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
+    "";
+  const urlSecret = new URL(request.url).searchParams.get("secret") ?? "";
+  const provided = header || urlSecret;
   if (!provided || !secretsEqual(provided, secret)) {
     return jsonFail("UNAUTHORIZED", "Unauthorized", 401);
   }
+  return null;
+}
 
-  const tomorrowKey = istAddCalendarDays(istDateKey(), 1);
-  const { start, end } = istDayBounds(tomorrowKey);
+/**
+ * Day-before hearing SMS reminders (IST).
+ * Vercel Cron: GET /api/v1/cron/hearing-sms (secret via x-cron-secret or ?secret=)
+ * Manual / external: POST with header x-cron-secret: <CRON_SECRET>
+ */
+async function handleCron(request: Request) {
+  const denied = authorizeCron(request);
+  if (denied) return denied;
+  const result = await runHearingSmsJob();
 
-  const dueHearings = await prisma.hearing.findMany({
-    where: {
-      smsSentAt: null,
-      isAdjourned: false,
-      hearingDate: { gte: start, lte: end },
-    },
-    orderBy: { hearingDate: "asc" },
-    take: 500,
+  scheduleNotify(async () => {
+    const admins = await findUsersByRoles(["admin", "sub_admin"]);
+    const title = `Hearing SMS: ${result.sent} sent for ${result.date}`;
+    const body = `Total ${result.total} · failed ${result.failed} · skipped ${result.skipped}`;
+    await notifyUsers(
+      admins.map((u) => ({
+        userId: u.id,
+        userUnitId: u.unitId,
+        type: "system",
+        title,
+        body,
+        href: "/diary",
+        meta: {
+          date: result.date,
+          sent: result.sent,
+          failed: result.failed,
+          skipped: result.skipped,
+          total: result.total,
+          source: "cron",
+        },
+      }))
+    );
   });
 
-  let sent = 0;
-  let failed = 0;
-  const details: { hearingUnitId: string; caseUnitId: string; ok: boolean; message: string }[] = [];
+  return jsonOk(result);
+}
 
-  if (dueHearings.length === 0) {
-    await writeAudit({
-      action: "cron.hearing_sms",
-      entity: "Hearing",
-      meta: { tomorrowKey, total: 0, sent: 0, failed: 0 },
-    });
-    return jsonOk({ date: tomorrowKey, total: 0, sent: 0, failed: 0, details: [] });
-  }
-
-  const caseIds = Array.from(new Set(dueHearings.map((h) => h.caseId)));
-  const cases = await prisma.case.findMany({ where: { id: { in: caseIds } } });
-  const caseById = new Map(cases.map((c) => [c.id, c]));
-
-  const clientIds = Array.from(new Set(cases.map((c) => c.clientId)));
-  const clients = await prisma.client.findMany({
-    where: { id: { in: clientIds } },
-  });
-  const clientById = new Map(clients.map((c) => [c.id, c]));
-
-  for (const hearing of dueHearings) {
-    try {
-      const caseItem = caseById.get(hearing.caseId);
-      if (!caseItem) {
-        failed++;
-        details.push({
-          hearingUnitId: hearing.unitId,
-          caseUnitId: hearing.caseUnitId,
-          ok: false,
-          message: "Case not found",
-        });
-        continue;
-      }
-      const client = clientById.get(caseItem.clientId);
-      if (!client) {
-        failed++;
-        details.push({
-          hearingUnitId: hearing.unitId,
-          caseUnitId: hearing.caseUnitId,
-          ok: false,
-          message: "Client not found",
-        });
-        continue;
-      }
-
-      if (client.smsConsent === false) {
-        // Mark skipped so cron doesn't retry the same opt-out forever.
-        await prisma.hearing.update({
-          where: { id: hearing.id },
-          data: { smsSentAt: new Date() },
-        });
-        details.push({
-          hearingUnitId: hearing.unitId,
-          caseUnitId: hearing.caseUnitId,
-          ok: true,
-          message: "Skipped — client opted out of SMS",
-        });
-        continue;
-      }
-
-      const mobile = normalizeMobile(client.mobile) ?? client.mobile;
-      const message = smsTemplates.hearingReminder({
-        clientName: client.name,
-        caseLabel: caseItem.caseNumber ?? caseItem.unitId,
-        hearingDateIst: istDisplayDate(hearing.hearingDate),
-        courtName: caseItem.courtName ?? "the court",
-      });
-
-      const result = await sendTransactionalSms(mobile, message);
-
-      await prisma.hearing.update({
-        where: { id: hearing.id },
-        data: { smsSentAt: result.ok ? new Date() : undefined },
-      });
-
-      if (result.ok) sent++;
-      else failed++;
-      details.push({
-        hearingUnitId: hearing.unitId,
-        caseUnitId: hearing.caseUnitId,
-        ok: result.ok,
-        message: result.details,
-      });
-    } catch (error) {
-      failed++;
-      details.push({
-        hearingUnitId: hearing.unitId,
-        caseUnitId: hearing.caseUnitId,
-        ok: false,
-        message: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
-  }
-
-  await writeAudit({
-    action: "cron.hearing_sms",
-    entity: "Hearing",
-    meta: { tomorrowKey, total: dueHearings.length, sent, failed },
-  });
-
-  return jsonOk({ date: tomorrowKey, total: dueHearings.length, sent, failed, details });
-});
+export const GET = apiHandler(async (request) => handleCron(request));
+export const POST = apiHandler(async (request) => handleCron(request));

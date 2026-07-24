@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { PageHeader } from "@/shared/components/data/page-header";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -27,7 +28,10 @@ import { LeaveApplyDialog } from "@/features/hrms/components/leave-apply-dialog"
 import { PresenceTodaySection } from "@/features/hrms/components/presence-today-section";
 import { AttendanceHistorySection } from "@/features/hrms/components/attendance-history-section";
 import { LeaveSection } from "@/features/hrms/components/leave-section";
+import { OfficeHolidayDialog } from "@/features/hrms/components/office-holiday-dialog";
+import { OfficeHolidaysSection } from "@/features/hrms/components/office-holidays-section";
 import { useHrmsSectionFromUrl } from "@/features/hrms/components/use-hrms-section-from-url";
+import type { OfficeHolidaySummary } from "@/features/hrms/lib/office-holiday";
 import {
   type AttendanceList,
   type DeskSection,
@@ -42,14 +46,23 @@ import {
   type HistoryPeriod,
 } from "@/features/hrms/lib/period";
 import { leaveCoversDate } from "@/features/hrms/lib/status";
-import { istDateKey } from "@/lib/utils/ist";
+import { dateIsOfficeHoliday } from "@/features/hrms/lib/office-holiday";
+import { istAddCalendarDays, istDateKey } from "@/lib/utils/ist";
 import { cn } from "@/lib/utils/cn";
 
+type HolidayList = {
+  data: OfficeHolidaySummary[];
+  meta: { total: number };
+};
 export function HrmsPage({ user }: { user: PublicUser }) {
   const canManageAttendance = user.permissions.includes("hrms.manage_attendance");
   const canApproveLeave = user.permissions.includes("hrms.approve_leave");
   const canOwnAttendance = user.permissions.includes("hrms.own_attendance");
   const canOwnLeave = user.permissions.includes("hrms.own_leave");
+  const canViewHolidays =
+    canManageAttendance ||
+    user.permissions.includes("hrms.view") ||
+    canOwnAttendance;
 
   const { section, setSection, applyOpen, setApplyOpen } =
     useHrmsSectionFromUrl(canOwnLeave);
@@ -58,6 +71,11 @@ export function HrmsPage({ user }: { user: PublicUser }) {
   const [history, setHistory] = useState<AttendanceSummary[]>([]);
   const [historyTotal, setHistoryTotal] = useState(0);
   const [presence, setPresence] = useState<PresenceBoard | null>(null);
+  const [holidays, setHolidays] = useState<OfficeHolidaySummary[]>([]);
+  const [holidayDialogOpen, setHolidayDialogOpen] = useState(false);
+  const [editingHoliday, setEditingHoliday] =
+    useState<OfficeHolidaySummary | null>(null);
+  const [deletingHolidayId, setDeletingHolidayId] = useState<string | null>(null);
   const [myLeave, setMyLeave] = useState<LeaveSummary[]>([]);
   const [pendingLeave, setPendingLeave] = useState<LeaveSummary[]>([]);
   const [pendingLeaveTotal, setPendingLeaveTotal] = useState(0);
@@ -82,6 +100,16 @@ export function HrmsPage({ user }: { user: PublicUser }) {
   const [customTo, setCustomTo] = useState("");
 
   const today = istDateKey();
+
+  const officeHolidayToday = useMemo(() => {
+    if (presence?.officeHoliday) return presence.officeHoliday;
+    const hit = holidays.find((h) =>
+      dateIsOfficeHoliday(today, [{ fromDate: h.fromDate, toDate: h.toDate }])
+    );
+    return hit
+      ? { unitId: hit.unitId, title: hit.title, notes: hit.notes }
+      : null;
+  }, [presence?.officeHoliday, holidays, today]);
 
   const onLeaveToday = useMemo(
     () =>
@@ -179,6 +207,21 @@ export function HrmsPage({ user }: { user: PublicUser }) {
         );
       }
 
+      if (canViewHolidays) {
+        tasks.push(
+          (async () => {
+            const from = istAddCalendarDays(today, -90);
+            const to = istAddCalendarDays(today, 365);
+            const res = await apiFetch<HolidayList>(
+              `/api/v1/hrms/holidays?from=${from}&to=${to}&pageSize=50`
+            );
+            if (res.ok) {
+              setHolidays((res.data as unknown as HolidayList).data ?? []);
+            }
+          })()
+        );
+      }
+
       if (canApproveLeave) {
         tasks.push(
           (async () => {
@@ -213,6 +256,7 @@ export function HrmsPage({ user }: { user: PublicUser }) {
     canOwnLeave,
     canManageAttendance,
     canApproveLeave,
+    canViewHolidays,
     today,
   ]);
 
@@ -262,6 +306,38 @@ export function HrmsPage({ user }: { user: PublicUser }) {
 
   function handleLeaveSaved() {
     setSection("leave");
+    void loadCore();
+  }
+
+  function handleHolidaySaved() {
+    setSection("holidays");
+    void loadCore();
+  }
+
+  async function handleDeleteHoliday(holiday: OfficeHolidaySummary) {
+    if (
+      !window.confirm(
+        `Remove office holiday “${holiday.title}”? Staff will no longer see this day as closed.`
+      )
+    ) {
+      return;
+    }
+    setDeletingHolidayId(holiday.unitId);
+    const { ok, data } = await apiFetch(
+      `/api/v1/hrms/holidays/${holiday.unitId}`,
+      { method: "DELETE" }
+    );
+    setDeletingHolidayId(null);
+    if (!ok) {
+      toast.error(
+        getErrorMessage(
+          data as Record<string, unknown>,
+          "Failed to remove holiday"
+        )
+      );
+      return;
+    }
+    toast.success("Holiday removed");
     void loadCore();
   }
 
@@ -372,6 +448,9 @@ export function HrmsPage({ user }: { user: PublicUser }) {
     ...(canOwnLeave || canApproveLeave
       ? [{ id: "leave" as const, label: "Leave" }]
       : []),
+    ...(canViewHolidays
+      ? [{ id: "holidays" as const, label: "Office holidays" }]
+      : []),
   ];
 
   return (
@@ -387,6 +466,7 @@ export function HrmsPage({ user }: { user: PublicUser }) {
                   type="button"
                   size="sm"
                   disabled={
+                    Boolean(officeHolidayToday) ||
                     onLeaveToday ||
                     Boolean(todayRecord?.checkInAt) ||
                     checkBusy
@@ -431,18 +511,24 @@ export function HrmsPage({ user }: { user: PublicUser }) {
         <div className="rounded-xl border border-border/80 bg-card p-4 shadow-sm shadow-black/5 dark:shadow-md dark:shadow-black/40">
           <p className="text-xs font-medium text-muted-foreground">Your status</p>
           <div className="mt-2 flex items-center gap-2">
-            <SelfStatusBadge onLeave={onLeaveToday} record={todayRecord} />
+            {officeHolidayToday ? (
+              <Badge variant="muted">Office closed</Badge>
+            ) : (
+              <SelfStatusBadge onLeave={onLeaveToday} record={todayRecord} />
+            )}
           </div>
           <p className="mt-2 text-xs text-muted-foreground">
-            {onLeaveToday
-              ? "Approved leave covers today"
-              : todayRecord?.checkInAt
-                ? `In ${formatTime(todayRecord.checkInAt)}`
-                : "Not checked in"}
-            {!onLeaveToday && todayRecord?.checkOutAt
+            {officeHolidayToday
+              ? `Closed — ${officeHolidayToday.title}`
+              : onLeaveToday
+                ? "Approved leave covers today"
+                : todayRecord?.checkInAt
+                  ? `In ${formatTime(todayRecord.checkInAt)}`
+                  : "Not checked in"}
+            {!officeHolidayToday && !onLeaveToday && todayRecord?.checkOutAt
               ? ` · Out ${formatTime(todayRecord.checkOutAt)}`
               : ""}
-            {pendingLeaveToday && !onLeaveToday
+            {pendingLeaveToday && !onLeaveToday && !officeHolidayToday
               ? " · Leave pending approval"
               : ""}
           </p>
@@ -452,7 +538,10 @@ export function HrmsPage({ user }: { user: PublicUser }) {
             [
               { label: "Present", value: counts.present },
               { label: "Checked out", value: counts.out },
-              { label: "On leave", value: counts.onLeave },
+              {
+                label: officeHolidayToday ? "Office closed" : "On leave",
+                value: counts.onLeave,
+              },
               { label: "Absent", value: counts.absent },
             ] as const
           ).map((kpi) => (
@@ -501,6 +590,7 @@ export function HrmsPage({ user }: { user: PublicUser }) {
           todayRecord={todayRecord}
           canManageAttendance={canManageAttendance}
           presence={presence}
+          officeHoliday={officeHolidayToday}
         />
       ) : null}
 
@@ -544,10 +634,38 @@ export function HrmsPage({ user }: { user: PublicUser }) {
         />
       ) : null}
 
+      {section === "holidays" ? (
+        <OfficeHolidaysSection
+          loading={loading}
+          canManage={canManageAttendance}
+          holidays={holidays}
+          deletingId={deletingHolidayId}
+          onAdd={() => {
+            setEditingHoliday(null);
+            setHolidayDialogOpen(true);
+          }}
+          onEdit={(h) => {
+            setEditingHoliday(h);
+            setHolidayDialogOpen(true);
+          }}
+          onDelete={handleDeleteHoliday}
+        />
+      ) : null}
+
       <LeaveApplyDialog
         open={applyOpen}
         onOpenChangeAction={setApplyOpen}
         onSavedAction={handleLeaveSaved}
+      />
+
+      <OfficeHolidayDialog
+        open={holidayDialogOpen}
+        editing={editingHoliday}
+        onOpenChangeAction={(open) => {
+          setHolidayDialogOpen(open);
+          if (!open) setEditingHoliday(null);
+        }}
+        onSavedAction={handleHolidaySaved}
       />
 
       <Dialog open={checkInOpen} onOpenChange={setCheckInOpen}>

@@ -7,10 +7,18 @@ import { normalizeMobile } from "@/lib/auth/mobile";
 import { importCasesSchema } from "@/lib/validations/cases.schema";
 import { compliance } from "@/config/company/compliance";
 import type { CaseStatus } from "@prisma/client";
+import {
+  CASE_PIPELINE_STATUSES,
+  normalizeCaseStatus,
+} from "@/config/company/case-pipeline";
 
 type RowResult = { row: number; unitId: string | null; status: "ok" | "error"; message: string };
 
-const VALID_STATUS: CaseStatus[] = ["pending", "listed", "disposed", "withdrawn", "transferred"];
+const VALID_STATUS = new Set<string>([
+  ...CASE_PIPELINE_STATUSES,
+  "pending",
+  "listed",
+]);
 
 export const POST = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "cases", "create");
@@ -59,7 +67,10 @@ export const POST = apiHandler(async (request) => {
         ? await prisma.case.findUnique({ where: { unitId: row.unitId } })
         : null;
 
-      const status = row.status && VALID_STATUS.includes(row.status as CaseStatus) ? (row.status as CaseStatus) : "pending";
+      const status: CaseStatus =
+        row.status && VALID_STATUS.has(row.status)
+          ? (normalizeCaseStatus(row.status) as CaseStatus)
+          : "enquiry";
       const filingDate = row.filingDate ? new Date(row.filingDate) : undefined;
       const nextHearingAt = row.nextHearingAt ? new Date(row.nextHearingAt) : undefined;
       const agreedFee = row.agreedFee ? Number(row.agreedFee) : undefined;

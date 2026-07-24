@@ -34,6 +34,12 @@ export const PERMISSION_CATALOG: {
   { module: "hrms", action: "own_leave" },
   { module: "hrms", action: "manage_attendance" },
   { module: "hrms", action: "approve_leave" },
+  { module: "dak", action: "view" },
+  { module: "dak", action: "create" },
+  { module: "dak", action: "edit" },
+  { module: "tasks", action: "view" },
+  { module: "tasks", action: "create" },
+  { module: "tasks", action: "edit" },
 ];
 
 export const MODULE_LABELS: Record<string, string> = {
@@ -45,6 +51,8 @@ export const MODULE_LABELS: Record<string, string> = {
   cases: "Cases",
   accounts: "Accounts",
   hrms: "HRMS",
+  dak: "Dak / Postal",
+  tasks: "Work allotment",
 };
 
 export const ACTION_LABELS: Record<string, string> = {
@@ -144,6 +152,12 @@ function buildMatrix(): Matrix {
     ["cases", "upload"],
     ["hrms", "manage_attendance"],
     ["hrms", "approve_leave"],
+    ["dak", "view"],
+    ["dak", "create"],
+    ["dak", "edit"],
+    ["tasks", "view"],
+    ["tasks", "create"],
+    ["tasks", "edit"],
   ]);
 
   // advocate
@@ -159,6 +173,11 @@ function buildMatrix(): Matrix {
     ["cases", "create"],
     ["cases", "edit"],
     ["cases", "upload"],
+    ["dak", "view"],
+    ["dak", "create"],
+    ["tasks", "view"],
+    ["tasks", "create"],
+    ["tasks", "edit"],
   ]);
 
   // staff
@@ -174,6 +193,12 @@ function buildMatrix(): Matrix {
     ["cases", "create"],
     ["cases", "edit"],
     ["cases", "upload"],
+    ["dak", "view"],
+    ["dak", "create"],
+    ["dak", "edit"],
+    ["tasks", "view"],
+    ["tasks", "create"],
+    ["tasks", "edit"],
   ]);
 
   // accountant — cash book + read clients/cases + CSV import when granted upload

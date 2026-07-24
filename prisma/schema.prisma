@@ -21,11 +21,21 @@ enum OtpPurpose {
 }
 
 enum CaseStatus {
-  pending
-  listed
+  enquiry
+  engaged
+  pre_filing
+  under_filing
+  filing_defect
+  active
+  reserved
   disposed
   withdrawn
   transferred
+  archived
+  /// @deprecated migrated to pre_filing — kept briefly for Mongo reads
+  pending
+  /// @deprecated migrated to active — kept briefly for Mongo reads
+  listed
 }
 
 enum PaymentType {
@@ -240,11 +250,15 @@ model Case {
   /// Current stage note (e.g. Evidence, Arguments)
   stage                 String?
   caseType              String?
-  status                CaseStatus @default(pending)
+  status                CaseStatus @default(pre_filing)
   filingDate            DateTime?
   nextHearingAt         DateTime?
   agreedFee             Float?
   notes                 String?
+  /// Filing loop checklist (petition, return, batta, etc.)
+  filingChecklist       Json?
+  battaDue              Boolean    @default(false)
+  awaitingService       Boolean    @default(false)
   createdById           String?    @db.ObjectId
   createdAt             DateTime   @default(now())
   updatedAt             DateTime   @updatedAt
@@ -334,6 +348,8 @@ model Appointment {
   unitId         String            @unique
   clientId       String?           @db.ObjectId
   clientUnitId   String?
+  caseId         String?           @db.ObjectId
+  caseUnitId     String?
   /// Advocate on this slot (10-digit or 91… mobile)
   advocateMobile String?
   title          String
@@ -351,6 +367,60 @@ model Appointment {
   @@index([scheduledAt])
   @@index([status])
   @@index([advocateMobile])
+  @@index([caseUnitId])
+}
+
+/// Office dak / postal register (in / out)
+model DakEntry {
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  unitId       String   @unique
+  /// in | out
+  direction    String
+  entryDate    DateTime
+  subject      String
+  fromTo       String?
+  mode         String?
+  trackingNo   String?
+  caseUnitId   String?
+  clientUnitId String?
+  notes        String?
+  createdById  String?  @db.ObjectId
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([entryDate])
+  @@index([direction])
+  @@index([caseUnitId])
+}
+
+/// Morning allotment / office tasks linked optionally to a case
+model OfficeTask {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  unitId       String    @unique
+  title        String
+  /// allotment | finishing | ca_section | bundle_check | numbering | general
+  kind         String    @default("general")
+  /// open | done | cancelled
+  status       String    @default("open")
+  dueDate      DateTime?
+  /// Work date for morning allotment / evening finishing (IST day)
+  workDate     DateTime?
+  assigneeId   String?   @db.ObjectId
+  assigneeUnitId String?
+  caseUnitId   String?
+  notes        String?
+  /// Evening finishing note when marked done
+  finishNote   String?
+  createdById  String?   @db.ObjectId
+  completedAt  DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([workDate])
+  @@index([dueDate])
+  @@index([status])
+  @@index([assigneeId])
+  @@index([caseUnitId])
 }
 
 model Attendance {
@@ -424,5 +494,41 @@ model AdvocateTimeBlock {
 
   @@index([userId, startsAt])
   @@index([userId, endsAt])
+  @@index([userUnitId])
+}
+
+/// Office-wide closed days (festivals, unexpected closure). Not personal leave.
+model OfficeHoliday {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  unitId      String   @unique
+  /// IST YYYY-MM-DD
+  fromDate    String
+  toDate      String
+  title       String
+  notes       String?
+  createdById String?  @db.ObjectId
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([fromDate, toDate])
+}
+
+/// In-app portal notifications (per logged-in user).
+model Notification {
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  unitId     String    @unique
+  userId     String    @db.ObjectId
+  userUnitId String
+  /// leave_request | leave_decided | task_assigned | task_done | appointment | case_status | filing_defect | batta_due | hearing_tomorrow | office_holiday | system
+  type       String
+  title      String
+  body       String?
+  href       String?
+  meta       Json?
+  readAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
   @@index([userUnitId])
 }

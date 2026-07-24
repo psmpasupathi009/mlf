@@ -41,6 +41,12 @@ import type { CaseSummary } from "@/features/cases/server/serialize";
 import { CaseFormDialog } from "@/features/cases/components/case-form-dialog";
 import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
 import { cn } from "@/lib/utils/cn";
+import {
+  CASE_STATUS_LABEL,
+  CASE_STATUS_OPTIONS,
+  CASE_STATUS_VARIANT,
+  normalizeCaseStatus,
+} from "@/config/company/case-pipeline";
 
 type CaseRow = CaseSummary & { clientName: string | null };
 type ListResponse = {
@@ -48,18 +54,13 @@ type ListResponse = {
   meta: { page: number; pageSize: number; total: number };
 };
 
-const STATUS_VARIANT: Record<
-  string,
-  "default" | "success" | "warning" | "destructive" | "muted"
-> = {
-  pending: "warning",
-  listed: "default",
-  disposed: "success",
-  withdrawn: "muted",
-  transferred: "muted",
-};
-
-type QuickFilter = "all" | "today" | "week" | "missingCourt";
+type QuickFilter =
+  | "all"
+  | "today"
+  | "week"
+  | "missingCourt"
+  | "battaDue"
+  | "filingDefect";
 
 export function CasesPage({ user }: { user: PublicUser }) {
   const can = (action: string) => user.permissions.includes(`cases.${action}`);
@@ -74,7 +75,12 @@ export function CasesPage({ user }: { user: PublicUser }) {
         ? "week"
         : searchParams.get("missingCourtNumber") === "1"
           ? "missingCourt"
-          : "all";
+          : searchParams.get("battaDue") === "1" ||
+              searchParams.get("battaDue") === "true"
+            ? "battaDue"
+            : searchParams.get("status") === "filing_defect"
+              ? "filingDefect"
+              : "all";
 
   const [rows, setRows] = useState<CaseRow[]>([]);
   const [total, setTotal] = useState(0);
@@ -82,7 +88,11 @@ export function CasesPage({ user }: { user: PublicUser }) {
   const pageSize = 20;
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 300);
-  const [status, setStatus] = useState<string>("all");
+  const [status, setStatus] = useState<string>(
+    searchParams.get("status") && searchParams.get("status") !== "filing_defect"
+      ? (searchParams.get("status") as string)
+      : "all"
+  );
   const [quick, setQuick] = useState<QuickFilter>(initialQuick);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
@@ -105,11 +115,16 @@ export function CasesPage({ user }: { user: PublicUser }) {
       pageSize: String(pageSize),
     });
     if (debouncedSearch) params.set("q", debouncedSearch);
-    if (status !== "all") params.set("status", status);
+    if (quick === "filingDefect") {
+      params.set("status", "filing_defect");
+    } else if (status !== "all") {
+      params.set("status", status);
+    }
     if (clientUnitId) params.set("clientUnitId", clientUnitId);
     if (quick === "today") params.set("hearing", "today");
     if (quick === "week") params.set("hearing", "week");
     if (quick === "missingCourt") params.set("missingCourtNumber", "1");
+    if (quick === "battaDue") params.set("battaDue", "1");
 
     const { ok, data } = await apiFetch<ListResponse>(
       `/api/v1/cases?${params.toString()}`
@@ -136,6 +151,8 @@ export function CasesPage({ user }: { user: PublicUser }) {
     { id: "today", label: "Hearing today" },
     { id: "week", label: "This week" },
     { id: "missingCourt", label: "No court number" },
+    { id: "battaDue", label: "Batta due" },
+    { id: "filingDefect", label: "Filing defect" },
   ];
 
   return (
@@ -160,6 +177,7 @@ export function CasesPage({ user }: { user: PublicUser }) {
             onClick={() => {
               setPage(1);
               setQuick(c.id);
+              if (c.id === "filingDefect") setStatus("all");
             }}
             className={cn(
               "shrink-0 rounded-full px-3.5 py-2 text-sm font-medium transition-colors",
@@ -198,11 +216,11 @@ export function CasesPage({ user }: { user: PublicUser }) {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All statuses</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="listed">Listed</SelectItem>
-              <SelectItem value="disposed">Disposed</SelectItem>
-              <SelectItem value="withdrawn">Withdrawn</SelectItem>
-              <SelectItem value="transferred">Transferred</SelectItem>
+              {CASE_STATUS_OPTIONS.map((s) => (
+                <SelectItem key={s.value} value={s.value}>
+                  {s.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         }
@@ -273,6 +291,7 @@ export function CasesPage({ user }: { user: PublicUser }) {
                 <TableHead className="hidden md:table-cell">Client</TableHead>
                 <TableHead className="hidden lg:table-cell">Court</TableHead>
                 <TableHead>Status</TableHead>
+                <TableHead className="hidden md:table-cell">Stage</TableHead>
                 <TableHead className="hidden md:table-cell">Next hearing</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -281,12 +300,14 @@ export function CasesPage({ user }: { user: PublicUser }) {
               {loading
                 ? Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={7}>
+                      <TableCell colSpan={8}>
                         <div className="h-8 animate-pulse rounded bg-muted" />
                       </TableCell>
                     </TableRow>
                   ))
-                : rows.map((c) => (
+                : rows.map((c) => {
+                    const st = normalizeCaseStatus(c.status);
+                    return (
                     <TableRow key={c.unitId}>
                       <TableCell className="hidden md:table-cell">
                         <UnitIdBadge value={c.unitId} />
@@ -313,9 +334,12 @@ export function CasesPage({ user }: { user: PublicUser }) {
                         {c.courtName ?? "—"}
                       </TableCell>
                       <TableCell>
-                        <Badge variant={STATUS_VARIANT[c.status] ?? "outline"}>
-                          {c.status}
+                        <Badge variant={CASE_STATUS_VARIANT[st] ?? "outline"}>
+                          {CASE_STATUS_LABEL[st]}
                         </Badge>
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell text-muted-foreground">
+                        {c.stage ?? "—"}
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
                         {c.nextHearingAt
@@ -330,7 +354,8 @@ export function CasesPage({ user }: { user: PublicUser }) {
                         </Button>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
             </TableBody>
           </Table>
 

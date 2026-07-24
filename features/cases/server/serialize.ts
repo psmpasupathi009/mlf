@@ -1,4 +1,8 @@
-import type { Case, Hearing } from "@prisma/client";
+import type { Case, Hearing, Prisma } from "@prisma/client";
+import {
+  normalizeCaseStatus,
+  type FilingChecklistState,
+} from "@/config/company/case-pipeline";
 
 export type CaseSummary = {
   unitId: string;
@@ -25,8 +29,16 @@ export type CaseSummary = {
   nextHearingAt: string | null;
   agreedFee: number | null;
   notes: string | null;
+  filingChecklist: FilingChecklistState;
+  battaDue: boolean;
+  awaitingService: boolean;
   createdAt: string;
 };
+
+function parseChecklist(raw: Prisma.JsonValue | null | undefined): FilingChecklistState {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  return raw as FilingChecklistState;
+}
 
 export function toCaseSummary(item: Case): CaseSummary {
   return {
@@ -49,11 +61,14 @@ export function toCaseSummary(item: Case): CaseSummary {
     firNumber: item.firNumber,
     stage: item.stage,
     caseType: item.caseType,
-    status: item.status,
+    status: normalizeCaseStatus(item.status),
     filingDate: item.filingDate ? item.filingDate.toISOString() : null,
     nextHearingAt: item.nextHearingAt ? item.nextHearingAt.toISOString() : null,
     agreedFee: item.agreedFee,
     notes: item.notes,
+    filingChecklist: parseChecklist(item.filingChecklist),
+    battaDue: item.battaDue ?? false,
+    awaitingService: item.awaitingService ?? false,
     createdAt: item.createdAt.toISOString(),
   };
 }

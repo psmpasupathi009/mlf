@@ -15,6 +15,7 @@ export const appointmentModeEnum = z.enum(["office", "call", "video"]);
 
 export const createAppointmentSchema = z.object({
   clientUnitId: z.string().trim().optional().or(z.literal("")),
+  caseUnitId: z.string().trim().optional().or(z.literal("")),
   advocateMobile: z.string().trim().min(10, "Select advocate").max(15),
   title: z.string().trim().min(1, "Title is required").max(160),
   scheduledAt: dateStringOrDate,
@@ -26,6 +27,7 @@ export const createAppointmentSchema = z.object({
 
 export const updateAppointmentSchema = z.object({
   clientUnitId: z.string().trim().optional().or(z.literal("")),
+  caseUnitId: z.string().trim().optional().or(z.literal("")),
   advocateMobile: z.string().trim().min(10).max(15).optional().or(z.literal("")),
   title: z.string().trim().min(1).max(160).optional(),
   scheduledAt: dateStringOrDate.optional(),

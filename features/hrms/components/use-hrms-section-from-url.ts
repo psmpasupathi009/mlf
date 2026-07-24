@@ -4,9 +4,17 @@ import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import type { DeskSection } from "@/features/hrms/components/hrms-page-helpers";
 
+const SECTION_VALUES = new Set<DeskSection>([
+  "today",
+  "history",
+  "leave",
+  "holidays",
+]);
+
 /**
- * Reads one-shot ?section= / ?leave=1 / ?new=1 URL params into desk section
- * state, then clears them from the address bar.
+ * Reads ?section= / ?leave=1 / ?new=1 URL params into desk section state,
+ * then clears them from the address bar. Re-runs when search params change
+ * (e.g. notification deep-link while already on /hrms).
  */
 export function useHrmsSectionFromUrl(canOwnLeave: boolean) {
   const router = useRouter();
@@ -14,37 +22,42 @@ export function useHrmsSectionFromUrl(canOwnLeave: boolean) {
   const [section, setSection] = useState<DeskSection>("today");
   const [applyOpen, setApplyOpen] = useState(false);
 
-  useEffect(() => {
-    const sectionParam = searchParams.get("section");
-    if (
-      sectionParam === "leave" ||
-      sectionParam === "history" ||
-      sectionParam === "today"
-    ) {
-      queueMicrotask(() => {
-        setSection(sectionParam);
-        const next = new URLSearchParams(searchParams.toString());
-        next.delete("section");
-        const qs = next.toString();
-        router.replace(qs ? `/hrms?${qs}` : "/hrms", { scroll: false });
-      });
-    }
+  const sectionParam = searchParams.get("section");
+  const leaveParam = searchParams.get("leave");
+  const newParam = searchParams.get("new");
 
-    const wantLeave =
-      searchParams.get("leave") === "1" || searchParams.get("new") === "1";
-    if (!wantLeave || !canOwnLeave) return;
+  useEffect(() => {
+    const wantLeave = leaveParam === "1" || newParam === "1";
+    const validSection =
+      sectionParam && SECTION_VALUES.has(sectionParam as DeskSection)
+        ? (sectionParam as DeskSection)
+        : null;
+
+    if (!validSection && !(wantLeave && canOwnLeave)) return;
+
     queueMicrotask(() => {
-      setSection("leave");
-      setApplyOpen(true);
+      if (wantLeave && canOwnLeave) {
+        setSection("leave");
+        setApplyOpen(true);
+      } else if (validSection) {
+        setSection(validSection);
+      }
+
       const next = new URLSearchParams(searchParams.toString());
+      next.delete("section");
       next.delete("leave");
       next.delete("new");
-      next.delete("section");
       const qs = next.toString();
       router.replace(qs ? `/hrms?${qs}` : "/hrms", { scroll: false });
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [
+    sectionParam,
+    leaveParam,
+    newParam,
+    canOwnLeave,
+    router,
+    searchParams,
+  ]);
 
   return { section, setSection, applyOpen, setApplyOpen };
 }

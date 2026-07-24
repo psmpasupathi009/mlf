@@ -6,6 +6,7 @@ import { writeAudit } from "@/lib/audit";
 import { istDateKey } from "@/lib/utils/ist";
 import { checkInOutSchema } from "@/lib/validations/hrms.schema";
 import { toAttendanceSummary } from "@/features/hrms/server/serialize";
+import { findOfficeHolidayForDate } from "@/features/hrms/lib/office-holiday";
 
 export const POST = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "hrms", "own_attendance");
@@ -18,6 +19,15 @@ export const POST = apiHandler(async (request) => {
   }
 
   const today = istDateKey();
+
+  const holiday = await findOfficeHolidayForDate(today);
+  if (holiday) {
+    return jsonFail(
+      "CONFLICT",
+      `Office closed today (${holiday.title}) — check-in is not needed`,
+      409
+    );
+  }
 
   const onLeave = await prisma.leaveRequest.findFirst({
     where: {

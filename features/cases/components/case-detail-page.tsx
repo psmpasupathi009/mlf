@@ -35,9 +35,17 @@ import type { DocumentSummary } from "@/features/documents/server/serialize";
 import { CaseFormDialog } from "@/features/cases/components/case-form-dialog";
 import { AddHearingDialog } from "@/features/cases/components/add-hearing-dialog";
 import { AdjournHearingDialog } from "@/features/cases/components/adjourn-hearing-dialog";
+import { CasePipelineStrip } from "@/features/cases/components/case-pipeline-strip";
+import { CaseFilingChecklist } from "@/features/cases/components/case-filing-checklist";
 import { UploadDocumentDialog } from "@/features/documents/components/upload-document-dialog";
 import { CaseDocumentsPanel } from "@/features/documents/components/case-documents-panel";
 import type { DocumentTypeValue } from "@/lib/validations/documents.schema";
+import {
+  CASE_STATUS_LABEL,
+  CASE_STATUS_VARIANT,
+  normalizeCaseStatus,
+  PRE_NUMBER_STATUSES,
+} from "@/config/company/case-pipeline";
 
 type DetailResponse = {
   case: CaseSummary;
@@ -46,16 +54,7 @@ type DetailResponse = {
   documents: DocumentSummary[];
 };
 
-const STATUS_VARIANT: Record<
-  string,
-  "default" | "success" | "warning" | "destructive" | "muted"
-> = {
-  pending: "warning",
-  listed: "default",
-  disposed: "success",
-  withdrawn: "muted",
-  transferred: "muted",
-};
+const CHECKLIST_STATUSES = new Set<string>(PRE_NUMBER_STATUSES);
 
 export function CaseDetailPage({
   user,
@@ -148,10 +147,17 @@ export function CaseDetailPage({
   }
 
   const { case: item, client, hearings, documents } = detail;
+  const status = normalizeCaseStatus(item.status);
+  const showFilingChecklist =
+    CHECKLIST_STATUSES.has(status) || (status === "active" && item.battaDue);
 
   function openUpload(docType: DocumentTypeValue = "other") {
     setUploadType(docType);
     setUploadOpen(true);
+  }
+
+  function applyCaseUpdate(next: CaseSummary) {
+    setDetail((prev) => (prev ? { ...prev, case: next } : prev));
   }
 
   return (
@@ -176,9 +182,14 @@ export function CaseDetailPage({
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
             <div className="flex flex-wrap items-center gap-2">
               <UnitIdBadge value={item.unitId} />
-              <Badge variant={STATUS_VARIANT[item.status] ?? "outline"}>
-                {item.status}
+              <Badge variant={CASE_STATUS_VARIANT[status] ?? "outline"}>
+                {CASE_STATUS_LABEL[status]}
               </Badge>
+              {item.stage ? (
+                <span className="text-xs text-muted-foreground">
+                  Stage: {item.stage}
+                </span>
+              ) : null}
             </div>
             {can("cases", "edit") ? (
               <Button
@@ -195,6 +206,21 @@ export function CaseDetailPage({
           </div>
         }
       />
+
+      <CasePipelineStrip
+        caseItem={item}
+        canEdit={can("cases", "edit")}
+        feeOutstanding={fee?.outstanding ?? null}
+        onUpdated={applyCaseUpdate}
+      />
+
+      {showFilingChecklist ? (
+        <CaseFilingChecklist
+          caseItem={item}
+          canEdit={can("cases", "edit")}
+          onUpdated={applyCaseUpdate}
+        />
+      ) : null}
 
       <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
         <Card>

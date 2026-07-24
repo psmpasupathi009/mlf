@@ -159,6 +159,11 @@ export function AvailabilitySlotPicker({
   const afternoonSlots =
     avail?.freeSlots.filter((s) => Number(s.slice(0, 2)) >= 13) ?? [];
 
+  const closedBusy = avail?.busy?.find((b) => b.reason === "closed");
+  const officeClosedLabel =
+    closedBusy?.label?.trim() ||
+    (closedBusy ? "Office closed this day" : null);
+
   function pickDate(next: string) {
     setDateKey(next);
     onChange("");
@@ -252,6 +257,10 @@ export function AvailabilitySlotPicker({
             ) : error ? (
               <p className="px-1 py-4 text-center text-xs text-destructive">
                 {error}
+              </p>
+            ) : officeClosedLabel ? (
+              <p className="px-1 py-4 text-center text-xs text-amber-700 dark:text-amber-300">
+                {officeClosedLabel}
               </p>
             ) : avail?.onLeave ? (
               <p className="px-1 py-4 text-center text-xs text-amber-700 dark:text-amber-300">

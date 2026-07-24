@@ -18,11 +18,11 @@ import type { PresenceBoard } from "@/features/hrms/server/presence";
 import { cn } from "@/lib/utils/cn";
 import {
   PresenceCard,
-  PRESENCE_LABEL,
   PRESENCE_VARIANT,
   STATUS_ROW,
   busyChip,
   formatTime,
+  presenceStatusLabel,
 } from "@/features/hrms/components/hrms-page-helpers";
 
 export type PresenceTodaySectionProps = {
@@ -32,6 +32,8 @@ export type PresenceTodaySectionProps = {
   todayRecord: AttendanceSummary | null;
   canManageAttendance: boolean;
   presence: PresenceBoard | null;
+  /** When presence board isn’t loaded (non-managers), still show closed banner. */
+  officeHoliday?: { unitId: string; title: string; notes: string | null } | null;
 };
 
 export function PresenceTodaySection({
@@ -41,9 +43,24 @@ export function PresenceTodaySection({
   todayRecord,
   canManageAttendance,
   presence,
+  officeHoliday: officeHolidayProp,
 }: PresenceTodaySectionProps) {
+  const officeHoliday = officeHolidayProp ?? presence?.officeHoliday ?? null;
+
   return (
     <div className="space-y-4">
+      {officeHoliday ? (
+        <div className="rounded-xl border border-amber-200/80 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-100">
+          <p className="font-semibold">
+            Office closed — {officeHoliday.title}
+          </p>
+          <p className="mt-0.5 text-xs opacity-90">
+            Check-in and appointment booking are blocked today
+            {officeHoliday.notes ? ` · ${officeHoliday.notes}` : ""}.
+          </p>
+        </div>
+      ) : null}
+
       <Card>
         <CardHeader className="pb-3">
           <CardTitle>Your day</CardTitle>
@@ -51,6 +68,12 @@ export function PresenceTodaySection({
         <CardContent className="pt-0 text-sm text-muted-foreground">
           {loading ? (
             <div className="h-12 animate-pulse rounded-lg bg-muted" />
+          ) : officeHoliday ? (
+            <p>
+              Office is closed today for{" "}
+              <span className="font-medium text-navy">{officeHoliday.title}</span>{" "}
+              — no check-in needed.
+            </p>
           ) : onLeaveToday ? (
             <p>
               You are on <span className="font-medium text-navy">approved leave</span> today —
@@ -88,10 +111,9 @@ export function PresenceTodaySection({
             <div>
               <CardTitle>Who’s in today</CardTitle>
               <p className="mt-1 text-xs text-muted-foreground">
-                Color bar: amber absent · green present · grey on leave.
-                Busy chips (court / travel / client meet) mean booking is
-                blocked — status can still be In. Check-in notes are
-                board-only.
+                {officeHoliday
+                  ? `Office closed — ${officeHoliday.title}. Everyone shows as office closed; check-in is blocked.`
+                  : "Color bar: amber absent · green present · grey on leave. Busy chips (court / travel / client meet) mean booking is blocked — status can still be In. Check-in notes are board-only."}
               </p>
             </div>
           </CardHeader>
@@ -112,7 +134,11 @@ export function PresenceTodaySection({
               <>
                 <div className="divide-y divide-border/70 md:hidden">
                   {presence.people.map((row) => (
-                    <PresenceCard key={row.unitId} row={row} />
+                    <PresenceCard
+                      key={row.unitId}
+                      row={row}
+                      officeClosed={Boolean(officeHoliday)}
+                    />
                   ))}
                 </div>
                 <Table containerClassName="hidden rounded-none border-0 border-t shadow-none md:block">
@@ -168,7 +194,10 @@ export function PresenceTodaySection({
                               variant={PRESENCE_VARIANT[row.status]}
                               className="normal-case"
                             >
-                              {PRESENCE_LABEL[row.status]}
+                              {presenceStatusLabel(
+                                row.status,
+                                Boolean(officeHoliday)
+                              )}
                             </Badge>
                             {busyChip(row) ? (
                               <p className="text-[11px] font-medium text-navy/80">

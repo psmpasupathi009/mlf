@@ -34,3 +34,32 @@ export const decideLeaveSchema = z
 export const checkInOutSchema = z.object({
   notes: z.string().trim().max(300).optional().or(z.literal("")),
 });
+
+export const createOfficeHolidaySchema = z
+  .object({
+    fromDate: ymdSchema,
+    toDate: ymdSchema,
+    title: z.string().trim().min(2, "Title is required").max(120),
+    notes: z.string().trim().max(500).optional().or(z.literal("")),
+  })
+  .refine((d) => d.fromDate <= d.toDate, {
+    message: "From date must be on/before to date",
+    path: ["toDate"],
+  });
+
+export const updateOfficeHolidaySchema = z
+  .object({
+    fromDate: ymdSchema.optional(),
+    toDate: ymdSchema.optional(),
+    title: z.string().trim().min(2).max(120).optional(),
+    notes: z.string().trim().max(500).optional().or(z.literal("")),
+  })
+  .superRefine((d, ctx) => {
+    if (d.fromDate && d.toDate && d.fromDate > d.toDate) {
+      ctx.addIssue({
+        code: "custom",
+        message: "From date must be on/before to date",
+        path: ["toDate"],
+      });
+    }
+  });
