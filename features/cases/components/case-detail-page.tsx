@@ -74,6 +74,11 @@ export function CaseDetailPage({
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadType, setUploadType] = useState<DocumentTypeValue>("other");
   const [adjourning, setAdjourning] = useState<string | null>(null);
+  const [fee, setFee] = useState<{
+    agreedFee: number | null;
+    collected: number;
+    outstanding: number | null;
+  } | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,7 +93,29 @@ export function CaseDetailPage({
       return;
     }
     setDetail(data as unknown as DetailResponse);
-  }, [unitId]);
+
+    if (user.permissions.includes("accounts.view")) {
+      const feeRes = await apiFetch<{
+        fee: {
+          agreedFee: number | null;
+          collected: number;
+          outstanding: number | null;
+        } | null;
+      }>(`/api/v1/accounts?caseUnitId=${encodeURIComponent(unitId)}&pageSize=1`);
+      if (feeRes.ok) {
+        const body = feeRes.data as unknown as {
+          fee: {
+            agreedFee: number | null;
+            collected: number;
+            outstanding: number | null;
+          } | null;
+        };
+        setFee(body.fee ?? null);
+      }
+    } else {
+      setFee(null);
+    }
+  }, [unitId, user.permissions]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -309,23 +336,57 @@ export function CaseDetailPage({
 
       {can("accounts", "view") ? (
         <Card>
-          <CardContent className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-start gap-3">
-              <span className="rounded-lg bg-muted p-2.5 text-navy">
-                <Wallet className="size-4" />
-              </span>
-              <div>
-                <p className="font-medium text-navy">Cash linked to this case</p>
-                <p className="text-sm text-muted-foreground">
-                  Advances and fee payments for {item.unitId}
-                </p>
+          <CardContent className="flex flex-col gap-4 p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-start gap-3">
+                <span className="rounded-lg bg-muted p-2.5 text-navy">
+                  <Wallet className="size-4" />
+                </span>
+                <div>
+                  <p className="font-medium text-navy">Cash register</p>
+                  <p className="text-sm text-muted-foreground">
+                    Fee vs collected for {item.unitId} (actuals excluded)
+                  </p>
+                </div>
               </div>
+              <Button asChild type="button" variant="outline" size="sm">
+                <Link href={`/accounts?caseUnitId=${item.unitId}`}>
+                  Open accounts
+                </Link>
+              </Button>
             </div>
-            <Button asChild type="button" variant="outline" size="sm">
-              <Link href={`/accounts?caseUnitId=${item.unitId}`}>
-                Open accounts
-              </Link>
-            </Button>
+            {fee ? (
+              <div className="grid gap-3 sm:grid-cols-3">
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Agreed fee
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-navy">
+                    {fee.agreedFee != null
+                      ? `₹${fee.agreedFee.toLocaleString("en-IN")}`
+                      : "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Collected
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-navy">
+                    ₹{fee.collected.toLocaleString("en-IN")}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Outstanding
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-navy">
+                    {fee.outstanding != null
+                      ? `₹${fee.outstanding.toLocaleString("en-IN")}`
+                      : "—"}
+                  </p>
+                </div>
+              </div>
+            ) : null}
           </CardContent>
         </Card>
       ) : null}

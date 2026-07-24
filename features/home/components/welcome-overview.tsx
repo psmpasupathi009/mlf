@@ -556,21 +556,16 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
 
   return (
     <section className="space-y-6">
-      <div className="overflow-hidden rounded-2xl border border-brand/20 bg-brand text-brand-foreground shadow-sm">
+      <div
+        className="overflow-hidden rounded-2xl border border-brand/30 text-brand-foreground shadow-sm"
+        style={{ backgroundColor: "var(--brand)" }}
+      >
         <div className="relative px-4 py-5 sm:px-6 sm:py-6 md:px-7 md:py-7">
-          <div
-            className="pointer-events-none absolute inset-0 opacity-[0.14]"
-            style={{
-              background:
-                "radial-gradient(ellipse at top right, var(--gold) 0%, transparent 55%)",
-            }}
-            aria-hidden
-          />
-          <div className="relative flex flex-col gap-4 sm:gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div className="min-w-0">
+          <div className="relative flex flex-col gap-4 sm:gap-5 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                <p className="text-sm text-white/65">{formatTodayLabel()}</p>
-                <span className="rounded-md bg-gold/20 px-2 py-0.5 text-[11px] font-medium text-gold">
+                <p className="text-sm text-white/70">{formatTodayLabel()}</p>
+                <span className="rounded-md bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white/90">
                   {isAdmin ? "Admin office board" : "My day"}
                 </span>
               </div>
@@ -578,20 +573,20 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
                 {greetingLabel()}
                 {firstName ? `, ${firstName}` : ""}
               </h1>
-              <p className="mt-2 max-w-xl text-sm leading-relaxed text-white/70">
+              <p className="mt-2 max-w-xl text-sm leading-relaxed text-white/75">
                 {isAdmin
                   ? "Act on blockers, then scan today’s schedule and who’s in."
                   : "Your schedule for today — appointments, hearings, and attendance."}
               </p>
             </div>
 
-            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
+            <div className="flex w-full shrink-0 flex-row flex-wrap items-center gap-2 lg:w-auto lg:justify-end">
               {moduleOn("appointments") && can("appointments.create") ? (
                 <Button
                   asChild
-                  variant="gold"
                   size="sm"
-                  className="w-full shadow-none sm:w-auto"
+                  variant="on-brand-solid"
+                  className="shrink-0"
                 >
                   <Link href="/appointments?new=1">
                     <Plus className="size-4" />
@@ -604,7 +599,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
                   asChild
                   size="sm"
                   variant="on-brand-solid"
-                  className="w-full sm:w-auto"
+                  className="shrink-0"
                 >
                   <Link href="/clients?new=1">
                     <Plus className="size-4" />
@@ -617,7 +612,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
                   asChild
                   size="sm"
                   variant="on-brand-solid"
-                  className="w-full sm:w-auto"
+                  className="shrink-0"
                 >
                   <Link href="/cases?new=1">
                     <Plus className="size-4" />
@@ -630,7 +625,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
                   asChild
                   size="sm"
                   variant="on-brand-solid"
-                  className="w-full sm:w-auto"
+                  className="shrink-0"
                 >
                   <Link href="/accounts?new=1">
                     <Plus className="size-4" />

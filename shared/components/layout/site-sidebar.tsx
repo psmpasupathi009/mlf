@@ -36,6 +36,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 const ICONS: Partial<
@@ -57,10 +58,11 @@ function iconForHref(href: string, module: AppModule) {
   return ICONS[module] ?? Home;
 }
 
-function SidebarBrand() {
+function SidebarBrand({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <Link
       href="/"
+      onClick={() => onNavigate?.()}
       className="flex size-8 items-center justify-center rounded-lg outline-none ring-sidebar-ring hover:bg-sidebar-accent focus-visible:ring-2 group-data-[collapsible=icon]:size-8"
       title={brand.name}
     >
@@ -81,7 +83,12 @@ function SidebarBrand() {
 
 export function SiteSidebar({ user }: { user: PublicUser }) {
   const pathname = usePathname();
+  const { isMobile, setOpenMobile } = useSidebar();
   const perms = new Set(user.permissions);
+
+  const closeMobile = () => {
+    if (isMobile) setOpenMobile(false);
+  };
 
   const items = navItems.filter((item) => {
     if (!isModuleEnabled(item.module)) return false;
@@ -96,8 +103,8 @@ export function SiteSidebar({ user }: { user: PublicUser }) {
 
   return (
     <Sidebar collapsible="icon" variant="sidebar" className="print:hidden">
-      <SidebarHeader className="flex flex-row items-center p-2 group-data-[collapsible=icon]:justify-center">
-        <SidebarBrand />
+      <SidebarHeader className="flex flex-row items-center p-2 pt-[max(0.5rem,env(safe-area-inset-top))] group-data-[collapsible=icon]:justify-center">
+        <SidebarBrand onNavigate={closeMobile} />
       </SidebarHeader>
 
       <SidebarContent>
@@ -124,7 +131,7 @@ export function SiteSidebar({ user }: { user: PublicUser }) {
                           isActive={active}
                           tooltip={item.label}
                         >
-                          <Link href={item.href}>
+                          <Link href={item.href} onClick={closeMobile}>
                             <Icon />
                             <span>{item.label}</span>
                           </Link>
@@ -139,8 +146,8 @@ export function SiteSidebar({ user }: { user: PublicUser }) {
         )}
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border">
-        <UserMenu user={user} variant="sidebar" />
+      <SidebarFooter className="border-t border-sidebar-border pb-[max(0.5rem,env(safe-area-inset-bottom))]">
+        <UserMenu user={user} variant="sidebar" onNavigate={closeMobile} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

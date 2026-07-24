@@ -30,11 +30,15 @@ function SheetContent({
   children,
   side = "left",
   showClose = true,
+  size = "nav",
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   side?: "left" | "right";
   showClose?: boolean;
+  /** nav = slim sidebar; detail = full-width on phones, capped on desktop */
+  size?: "nav" | "detail";
 }) {
+  const isDetail = size === "detail";
   return (
     <SheetPortal>
       <SheetOverlay />
@@ -43,9 +47,17 @@ function SheetContent({
           "fixed z-50 flex h-dvh flex-col gap-0 border-border bg-card shadow-xl outline-none",
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
           side === "left" &&
+            !isDetail &&
             "inset-y-0 left-0 w-[min(17rem,90vw)] border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left",
           side === "right" &&
+            !isDetail &&
             "inset-y-0 right-0 w-[min(17rem,90vw)] border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right",
+          side === "right" &&
+            isDetail &&
+            "inset-y-0 right-0 w-full border-l pb-[env(safe-area-inset-bottom)] data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-md lg:max-w-lg",
+          side === "left" &&
+            isDetail &&
+            "inset-y-0 left-0 w-full border-r pb-[env(safe-area-inset-bottom)] data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-md lg:max-w-lg",
           className
         )}
         {...props}

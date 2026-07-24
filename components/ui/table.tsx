@@ -58,7 +58,7 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
   return (
     <td
       className={cn(
-        "max-w-48 overflow-hidden px-2.5 py-2.5 align-middle text-sm sm:max-w-none sm:px-3 sm:py-3",
+        "px-2.5 py-2.5 align-middle text-sm sm:px-3 sm:py-3",
         className
       )}
       {...props}

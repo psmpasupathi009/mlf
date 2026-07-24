@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import type { Prisma } from "@prisma/client";
 import { apiHandler, jsonFail, jsonOk, parsePagination } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
@@ -7,6 +6,12 @@ import { nextUnitId } from "@/lib/ids";
 import { writeAudit } from "@/lib/audit";
 import { createPaymentSchema } from "@/lib/validations/accounts.schema";
 import { toPaymentSummary } from "@/features/accounts/server/serialize";
+import { resolveActorsByIds } from "@/features/accounts/server/actors";
+import {
+  buildAccountsWhere,
+  parseAccountsFilters,
+} from "@/features/accounts/server/filters";
+import { feeRollupForCase } from "@/features/accounts/server/fee-rollup";
 
 export const GET = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "accounts", "view");
@@ -14,40 +19,73 @@ export const GET = apiHandler(async (request) => {
 
   const { searchParams } = new URL(request.url);
   const { page, pageSize, skip } = parsePagination(searchParams);
-  const clientUnitId = searchParams.get("clientUnitId")?.trim();
-  const caseUnitId = searchParams.get("caseUnitId")?.trim();
-  const status = searchParams.get("status")?.trim();
-  const type = searchParams.get("type")?.trim();
+  const filters = parseAccountsFilters(searchParams);
 
-  const where: Prisma.CashPaymentWhereInput = {
-    ...(clientUnitId ? { clientUnitId } : {}),
-    ...(caseUnitId ? { caseUnitId } : {}),
-    ...(status ? { status: status as never } : {}),
-    ...(type ? { type: type as never } : {}),
-  };
+  let matchingClientUnitIds: string[] | undefined;
+  if (filters.q) {
+    const clients = await prisma.client.findMany({
+      where: { name: { contains: filters.q } },
+      select: { unitId: true },
+      take: 100,
+    });
+    matchingClientUnitIds = clients.map((c) => c.unitId);
+  }
+
+  const where = buildAccountsWhere({ ...filters, matchingClientUnitIds });
 
   const [rows, total, totals] = await Promise.all([
-    prisma.cashPayment.findMany({ where, orderBy: { createdAt: "desc" }, skip, take: pageSize }),
+    prisma.cashPayment.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: pageSize,
+    }),
     prisma.cashPayment.count({ where }),
     prisma.cashPayment.groupBy({ by: ["status"], where, _sum: { amount: true } }),
   ]);
 
   const clientIds = Array.from(new Set(rows.map((r) => r.clientUnitId)));
-  const clients = await prisma.client.findMany({
-    where: { unitId: { in: clientIds } },
-    select: { unitId: true, name: true },
-  });
+  const [clients, actorMap] = await Promise.all([
+    prisma.client.findMany({
+      where: { unitId: { in: clientIds } },
+      select: { unitId: true, name: true },
+    }),
+    resolveActorsByIds(rows.flatMap((r) => [r.createdById, r.voidedById])),
+  ]);
   const clientMap = new Map(clients.map((c) => [c.unitId, c.name]));
 
-  const data = rows.map((r) => ({ ...toPaymentSummary(r), clientName: clientMap.get(r.clientUnitId) ?? null }));
+  const data = rows.map((r) => ({
+    ...toPaymentSummary(r, {
+      createdBy: r.createdById ? actorMap.get(r.createdById) ?? null : null,
+      voidedBy: r.voidedById ? actorMap.get(r.voidedById) ?? null : null,
+    }),
+    clientName: clientMap.get(r.clientUnitId) ?? null,
+  }));
+
+  const paid = totals.find((t) => t.status === "paid")?._sum.amount ?? 0;
+  const pending = totals.find((t) => t.status === "pending")?._sum.amount ?? 0;
+  const voidAmt = totals.find((t) => t.status === "void")?._sum.amount ?? 0;
 
   const summary = {
-    paid: totals.find((t) => t.status === "paid")?._sum.amount ?? 0,
-    pending: totals.find((t) => t.status === "pending")?._sum.amount ?? 0,
-    void: totals.find((t) => t.status === "void")?._sum.amount ?? 0,
+    paid,
+    pending,
+    void: voidAmt,
+    netCollected: paid,
+    entryCount: total,
   };
 
-  return NextResponse.json({ ok: true, data, meta: { page, pageSize, total }, summary });
+  const fee =
+    filters.caseUnitId != null
+      ? await feeRollupForCase(filters.caseUnitId)
+      : null;
+
+  return NextResponse.json({
+    ok: true,
+    data,
+    meta: { page, pageSize, total },
+    summary,
+    fee,
+  });
 });
 
 export const POST = apiHandler(async (request) => {
@@ -57,19 +95,36 @@ export const POST = apiHandler(async (request) => {
   const raw = await request.json();
   const parsed = createPaymentSchema.safeParse(raw);
   if (!parsed.success) {
-    return jsonFail("VALIDATION", parsed.error.issues[0]?.message ?? "Invalid request", 400, parsed.error.issues);
+    return jsonFail(
+      "VALIDATION",
+      parsed.error.issues[0]?.message ?? "Invalid request",
+      400,
+      parsed.error.issues
+    );
   }
   const input = parsed.data;
 
-  const client = await prisma.client.findUnique({ where: { unitId: input.clientUnitId } });
+  const client = await prisma.client.findUnique({
+    where: { unitId: input.clientUnitId },
+  });
   if (!client) return jsonFail("VALIDATION", "Client not found", 400);
 
   let caseId: string | undefined;
+  let caseUnitId: string | undefined;
   if (input.caseUnitId) {
-    const caseItem = await prisma.case.findUnique({ where: { unitId: input.caseUnitId } });
+    const caseItem = await prisma.case.findUnique({
+      where: { unitId: input.caseUnitId },
+    });
     if (!caseItem) return jsonFail("VALIDATION", "Case not found", 400);
+    if (caseItem.clientUnitId !== client.unitId) {
+      return jsonFail("VALIDATION", "Case does not belong to the selected client", 400);
+    }
     caseId = caseItem.id;
+    caseUnitId = caseItem.unitId;
   }
+
+  const status = input.status ?? "pending";
+  const paidOn = status === "paid" ? input.paidOn ?? undefined : null;
 
   const unitId = await nextUnitId("payment");
   const created = await prisma.cashPayment.create({
@@ -78,11 +133,11 @@ export const POST = apiHandler(async (request) => {
       clientId: client.id,
       clientUnitId: client.unitId,
       caseId,
-      caseUnitId: input.caseUnitId || undefined,
+      caseUnitId,
       type: input.type,
       amount: input.amount,
-      status: input.status ?? "pending",
-      paidOn: input.paidOn,
+      status,
+      paidOn,
       notes: input.notes || undefined,
       createdById: user.id,
     },
@@ -93,7 +148,7 @@ export const POST = apiHandler(async (request) => {
     action: "payment.create",
     entity: "CashPayment",
     entityUnitId: created.unitId,
-    meta: { amount: created.amount, type: created.type },
+    meta: { amount: created.amount, type: created.type, status: created.status },
   });
 
   return jsonOk({ payment: toPaymentSummary(created) }, 201);

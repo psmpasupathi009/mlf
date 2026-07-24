@@ -4,7 +4,7 @@
 
 :root {
   /* Brand — restrained, professional */
-  --background: #ffffff;
+  --background: #f6f7f9;
   --foreground: #3a3a3a;
   /* Brand surface (hero, primary buttons) — stays deep in both themes */
   --brand: #1b2a4a;
@@ -14,7 +14,7 @@
   --navy-foreground: #ffffff;
   --gold: #b8953f;
   --gold-foreground: #1b2a4a;
-  --muted: #f3f4f6;
+  --muted: #eef0f3;
   --muted-foreground: #5c5c5c;
   --border: #e2e4e8;
   --input: #d8dbe0;
@@ -42,20 +42,21 @@
 }
 
 .dark {
-  --background: #0f1419;
+  --background: #0b0f14;
   --foreground: #e6e8ec;
   --brand: #1b2a4a;
   --brand-foreground: #ffffff;
   --navy: #9eb0d0;
-  --navy-foreground: #0f1419;
+  --navy-foreground: #0b0f14;
   --gold: #c9a84a;
   --gold-foreground: #1b2a4a;
-  --muted: #161b22;
+  --muted: #141a22;
   --muted-foreground: #9aa3b2;
-  --border: #2a323d;
+  --border: #2f3948;
   --input: #3a4452;
   --ring: #9eb0d0;
-  --card: #0f1419;
+  /* Clearly lighter than page so cards / tables / sheets stand out */
+  --card: #1a222d;
   --card-foreground: #e6e8ec;
   --primary: #1b2a4a;
   --primary-foreground: #ffffff;
@@ -65,11 +66,11 @@
   --accent-foreground: #1b2a4a;
   --destructive: #c45c5c;
   --destructive-foreground: #ffffff;
-  --sidebar: #1a212b;
+  --sidebar: #121820;
   --sidebar-foreground: #e6e8ec;
   --sidebar-primary: #1b2a4a;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #222a35;
+  --sidebar-accent: #1c2430;
   --sidebar-accent-foreground: #e6e8ec;
   --sidebar-border: #2a323d;
   --sidebar-ring: #9eb0d0;

@@ -19,12 +19,13 @@ import { apiFetch, getErrorMessage } from "@/lib/api/client";
 import { ClientPicker } from "@/features/clients/components/client-picker";
 import { DatePicker } from "@/shared/components/forms/date-picker";
 import { SearchableSelect } from "@/shared/components/forms/searchable-select";
-
-const PAYMENT_TYPE_OPTIONS = [
-  { value: "advance", label: "Advance" },
-  { value: "partial", label: "Partial" },
-  { value: "full", label: "Full" },
-];
+import {
+  PAYMENT_PURPOSE_OPTIONS,
+  PAYMENT_PURPOSE_LABELS,
+  type PaymentPurpose,
+} from "@/features/accounts/lib/payment-purposes";
+import type { PaymentSummary } from "@/features/accounts/server/serialize";
+import { istDateKey } from "@/lib/utils/ist";
 
 const PAYMENT_STATUS_OPTIONS = [
   { value: "pending", label: "Pending" },
@@ -36,15 +37,21 @@ export function PaymentFormDialog({
   onOpenChange,
   defaultClientUnitId,
   defaultCaseUnitId,
+  payment,
   onSaved,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   defaultClientUnitId?: string | null;
   defaultCaseUnitId?: string | null;
+  /** When set, dialog edits via PATCH. */
+  payment?: (PaymentSummary & { clientName?: string | null }) | null;
   onSaved: () => void;
 }) {
-  const [client, setClient] = useState<{ unitId: string; name: string } | null>(null);
+  const isEdit = Boolean(payment);
+  const [client, setClient] = useState<{ unitId: string; name: string } | null>(
+    null
+  );
   const [caseUnitId, setCaseUnitId] = useState("");
   const [type, setType] = useState("advance");
   const [amount, setAmount] = useState("");
@@ -58,20 +65,60 @@ export function PaymentFormDialog({
     if (!open) return;
     void (async () => {
       await Promise.resolve();
-      setClient(defaultClientUnitId ? { unitId: defaultClientUnitId, name: defaultClientUnitId } : null);
-      setCaseUnitId(defaultCaseUnitId ?? "");
-      setType("advance");
-      setAmount("");
-      setStatus("pending");
-      setPaidOn("");
-      setNotes("");
+      if (payment) {
+        if (payment.status === "void") {
+          onOpenChange(false);
+          return;
+        }
+        setClient({
+          unitId: payment.clientUnitId,
+          name: payment.clientName ?? payment.clientUnitId,
+        });
+        setCaseUnitId(payment.caseUnitId ?? "");
+        setType(payment.type);
+        setAmount(String(payment.amount));
+        setStatus(payment.status);
+        setPaidOn(
+          payment.status === "paid" && payment.paidOn
+            ? istDateKey(new Date(payment.paidOn))
+            : ""
+        );
+        setNotes(payment.notes ?? "");
+      } else {
+        setClient(
+          defaultClientUnitId
+            ? { unitId: defaultClientUnitId, name: defaultClientUnitId }
+            : null
+        );
+        setCaseUnitId(defaultCaseUnitId ?? "");
+        setType("advance");
+        setAmount("");
+        setStatus("pending");
+        setPaidOn("");
+        setNotes("");
+      }
       setError("");
     })();
-  }, [open, defaultClientUnitId, defaultCaseUnitId]);
+  }, [open, defaultClientUnitId, defaultCaseUnitId, payment, onOpenChange]);
+
+  const purposeOptions = (() => {
+    if (PAYMENT_PURPOSE_OPTIONS.some((o) => o.value === type)) {
+      return PAYMENT_PURPOSE_OPTIONS;
+    }
+    return [
+      ...PAYMENT_PURPOSE_OPTIONS,
+      {
+        value: type,
+        label:
+          PAYMENT_PURPOSE_LABELS[type as PaymentPurpose] ??
+          type.replaceAll("_", " "),
+      },
+    ];
+  })();
 
   async function handleSubmit() {
     setError("");
-    if (!client) {
+    if (!isEdit && !client) {
       setError("Select a client");
       return;
     }
@@ -80,59 +127,114 @@ export function PaymentFormDialog({
       setError("Enter a valid amount");
       return;
     }
-
-    setBusy(true);
-    const { ok, data } = await apiFetch("/api/v1/accounts", {
-      method: "POST",
-      json: {
-        clientUnitId: client.unitId,
-        caseUnitId: caseUnitId || undefined,
-        type,
-        amount: amt,
-        status,
-        paidOn: paidOn || undefined,
-        notes: notes || undefined,
-      },
-    });
-    setBusy(false);
-    if (!ok) {
-      setError(getErrorMessage(data as Record<string, unknown>, "Failed to save entry"));
+    if (type === "other" && !notes.trim()) {
+      setError("Notes are required for Other purpose");
       return;
     }
-    toast.success("Cash entry recorded");
+    if (status === "paid" && !paidOn) {
+      setError("Paid on date is required when status is paid");
+      return;
+    }
+
+    const paidOnPayload = status === "paid" ? paidOn : null;
+    const notesPayload = notes.trim() === "" ? "" : notes;
+
+    setBusy(true);
+    if (isEdit && payment) {
+      const { ok, data } = await apiFetch(`/api/v1/accounts/${payment.unitId}`, {
+        method: "PATCH",
+        json: {
+          type,
+          amount: amt,
+          status,
+          paidOn: paidOnPayload,
+          notes: notesPayload,
+        },
+      });
+      setBusy(false);
+      if (!ok) {
+        setError(
+          getErrorMessage(data as Record<string, unknown>, "Failed to update entry")
+        );
+        return;
+      }
+      toast.success("Cash entry updated");
+    } else {
+      const { ok, data } = await apiFetch("/api/v1/accounts", {
+        method: "POST",
+        json: {
+          clientUnitId: client!.unitId,
+          caseUnitId: caseUnitId || undefined,
+          type,
+          amount: amt,
+          status,
+          paidOn: paidOnPayload,
+          notes: notesPayload || undefined,
+        },
+      });
+      setBusy(false);
+      if (!ok) {
+        setError(
+          getErrorMessage(data as Record<string, unknown>, "Failed to save entry")
+        );
+        return;
+      }
+      toast.success("Cash entry recorded");
+    }
     onSaved();
     onOpenChange(false);
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="sm">
+      <DialogContent size="sm" overlayClassName="z-[60]">
         <DialogHeader>
-          <DialogTitle>Record cash entry</DialogTitle>
-          <DialogDescription>Advance, partial or full payment from a client.</DialogDescription>
+          <DialogTitle>
+            {isEdit ? "Edit cash entry" : "Record cash entry"}
+          </DialogTitle>
+          <DialogDescription>
+            Office cash register — fees, advances, and actuals (court fee, stamp,
+            travel, etc.).
+          </DialogDescription>
         </DialogHeader>
 
         <DialogBody className="grid min-w-0 gap-4">
-          <ClientPicker value={client} onChange={setClient} />
+          {!isEdit ? (
+            <ClientPicker value={client} onChange={setClient} />
+          ) : (
+            <div className="grid min-w-0 gap-1">
+              <Label>Client</Label>
+              <p className="text-sm text-navy">
+                {client?.name ?? payment?.clientUnitId}
+              </p>
+            </div>
+          )}
 
-          <div className="grid min-w-0 gap-2">
-            <Label htmlFor="pay-case">Case ID (optional)</Label>
-            <Input
-              id="pay-case"
-              value={caseUnitId}
-              onChange={(e) => setCaseUnitId(e.target.value)}
-              placeholder="CSE-00001"
-            />
-          </div>
+          {isEdit ? (
+            <div className="grid min-w-0 gap-1">
+              <Label>Case</Label>
+              <p className="text-sm text-navy">{caseUnitId || "—"}</p>
+            </div>
+          ) : (
+            <div className="grid min-w-0 gap-2">
+              <Label htmlFor="pay-case">Case ID (optional)</Label>
+              <Input
+                id="pay-case"
+                value={caseUnitId}
+                onChange={(e) => setCaseUnitId(e.target.value)}
+                placeholder="CSE-00001"
+              />
+            </div>
+          )}
 
           <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="grid min-w-0 gap-2">
-              <Label>Type</Label>
+              <Label>Purpose</Label>
               <SearchableSelect
                 value={type}
                 onChange={setType}
-                options={PAYMENT_TYPE_OPTIONS}
-                placeholder="Type"
+                options={purposeOptions}
+                placeholder="Purpose"
               />
             </div>
             <div className="grid min-w-0 gap-2">
@@ -150,23 +252,32 @@ export function PaymentFormDialog({
             <Label>Status</Label>
             <SearchableSelect
               value={status}
-              onChange={setStatus}
+              onChange={(v) => {
+                setStatus(v);
+                if (v === "pending") setPaidOn("");
+                if (v === "paid" && !paidOn) setPaidOn(istDateKey(new Date()));
+              }}
               options={PAYMENT_STATUS_OPTIONS}
               placeholder="Status"
             />
           </div>
 
-          <div className="grid min-w-0 gap-2">
-            <Label>Paid on</Label>
-            <DatePicker value={paidOn} onChange={setPaidOn} />
-          </div>
+          {status === "paid" ? (
+            <div className="grid min-w-0 gap-2">
+              <Label>Paid on</Label>
+              <DatePicker value={paidOn} onChange={setPaidOn} />
+            </div>
+          ) : null}
 
           <div className="grid min-w-0 gap-2">
-            <Label htmlFor="pay-notes">Notes</Label>
+            <Label htmlFor="pay-notes">
+              Notes{type === "other" ? " (required)" : ""}
+            </Label>
             <Textarea
               id="pay-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
+              placeholder="e.g. consultation adjusted against advance"
             />
           </div>
 
@@ -174,11 +285,15 @@ export function PaymentFormDialog({
         </DialogBody>
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
             Cancel
           </Button>
           <Button type="button" onClick={handleSubmit} disabled={busy}>
-            {busy ? "Saving…" : "Save entry"}
+            {busy ? "Saving…" : isEdit ? "Save changes" : "Save entry"}
           </Button>
         </DialogFooter>
       </DialogContent>

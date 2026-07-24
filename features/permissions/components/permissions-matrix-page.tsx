@@ -317,7 +317,7 @@ export function PermissionsMatrixPage({ user }: { user: PublicUser }) {
               const actions = catalog.filter((c) => c.module === module);
               return (
                 <Card key={module} className="overflow-hidden">
-                  <div className="flex flex-col gap-2 border-b border-border/80 bg-[#fafbfc] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex flex-col gap-2 border-b border-border/80 bg-muted/40 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <h2 className="text-sm font-semibold text-navy">{moduleLabel(module)}</h2>
                       <p className="text-xs text-muted-foreground">{actions.length} actions</p>

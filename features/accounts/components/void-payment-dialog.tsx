@@ -55,7 +55,7 @@ export function VoidPaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="sm">
+      <DialogContent size="sm" overlayClassName="z-[60]">
         <DialogHeader>
           <DialogTitle>Void cash entry</DialogTitle>
           <DialogDescription>

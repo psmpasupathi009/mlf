@@ -32,6 +32,13 @@ enum PaymentType {
   advance
   partial
   full
+  consultation
+  court_fee
+  stamp
+  copying
+  travel
+  clerkage
+  other
 }
 
 enum PaymentStatus {

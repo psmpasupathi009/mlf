@@ -1,5 +1,6 @@
 import { apiHandler, jsonFail, jsonOk, jsonOkList, parsePagination } from "@/lib/api/response";
-import { requirePerm } from "@/lib/api/guard";
+import { requirePerm, requireUser } from "@/lib/api/guard";
+import { hasPermission } from "@/lib/rbac";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
 import { writeAudit } from "@/lib/audit";
@@ -30,7 +31,7 @@ export const GET = apiHandler(async (request) => {
 });
 
 export const POST = apiHandler(async (request) => {
-  const { user, response } = await requirePerm(request, "cases", "upload");
+  const { user, response } = await requireUser(request);
   if (!user) return response;
 
   const form = await request.formData();
@@ -50,6 +51,15 @@ export const POST = apiHandler(async (request) => {
     return jsonFail("VALIDATION", parsed.error.issues[0]?.message ?? "Invalid request", 400, parsed.error.issues);
   }
   const input = parsed.data;
+
+  // Case docs need cases.upload; fee receipts also allowed with accounts.edit.
+  const canCasesUpload = await hasPermission(user.id, "cases", "upload");
+  const canAccountsReceipt =
+    input.docType === "receipt" &&
+    (await hasPermission(user.id, "accounts", "edit"));
+  if (!canCasesUpload && !canAccountsReceipt) {
+    return jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403);
+  }
 
   let caseId: string | undefined;
   if (input.caseUnitId) {

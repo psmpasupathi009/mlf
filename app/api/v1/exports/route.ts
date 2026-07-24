@@ -3,6 +3,11 @@ import { NextResponse } from "next/server";
 import { apiHandler, jsonFail } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
+import {
+  buildAccountsWhere,
+  parseAccountsFilters,
+} from "@/features/accounts/server/filters";
+import { resolveActorsByIds } from "@/features/accounts/server/actors";
 
 export const GET = apiHandler(async (request) => {
   const url = new URL(request.url);
@@ -42,29 +47,72 @@ export const GET = apiHandler(async (request) => {
   } else if (type === "accounts") {
     const { user, response } = await requirePerm(request, "accounts", "view");
     if (!user) return response;
+
+    const filters = parseAccountsFilters(url.searchParams);
+    let matchingClientUnitIds: string[] | undefined;
+    if (filters.q) {
+      const clients = await prisma.client.findMany({
+        where: { name: { contains: filters.q } },
+        select: { unitId: true },
+        take: 100,
+      });
+      matchingClientUnitIds = clients.map((c) => c.unitId);
+    }
+    const where = buildAccountsWhere({ ...filters, matchingClientUnitIds });
+
     const rows = await prisma.cashPayment.findMany({
+      where,
       orderBy: { createdAt: "desc" },
       take: 5000,
     });
+
+    const clientIds = Array.from(new Set(rows.map((r) => r.clientUnitId)));
+    const [clients, actorMap] = await Promise.all([
+      prisma.client.findMany({
+        where: { unitId: { in: clientIds } },
+        select: { unitId: true, name: true },
+      }),
+      resolveActorsByIds(rows.flatMap((r) => [r.createdById, r.voidedById])),
+    ]);
+    const clientMap = new Map(clients.map((c) => [c.unitId, c.name]));
+
     const sheet = workbook.addWorksheet("Payments");
     sheet.columns = [
       { header: "unitId", key: "unitId", width: 14 },
       { header: "clientUnitId", key: "clientUnitId", width: 14 },
+      { header: "clientName", key: "clientName", width: 24 },
       { header: "caseUnitId", key: "caseUnitId", width: 14 },
-      { header: "type", key: "type", width: 12 },
+      { header: "purpose", key: "purpose", width: 14 },
       { header: "amount", key: "amount", width: 12 },
       { header: "status", key: "status", width: 12 },
       { header: "paidOn", key: "paidOn", width: 20 },
+      { header: "notes", key: "notes", width: 32 },
+      { header: "voidedAt", key: "voidedAt", width: 20 },
+      { header: "voidReason", key: "voidReason", width: 28 },
+      { header: "createdAt", key: "createdAt", width: 20 },
+      { header: "createdByUnitId", key: "createdByUnitId", width: 14 },
+      { header: "voidedByUnitId", key: "voidedByUnitId", width: 14 },
     ];
     for (const r of rows) {
       sheet.addRow({
         unitId: r.unitId,
         clientUnitId: r.clientUnitId,
+        clientName: clientMap.get(r.clientUnitId) ?? "",
         caseUnitId: r.caseUnitId ?? "",
-        type: r.type,
+        purpose: r.type,
         amount: r.amount,
         status: r.status,
         paidOn: r.paidOn?.toISOString() ?? "",
+        notes: r.notes ?? "",
+        voidedAt: r.voidedAt?.toISOString() ?? "",
+        voidReason: r.voidReason ?? "",
+        createdAt: r.createdAt.toISOString(),
+        createdByUnitId: r.createdById
+          ? actorMap.get(r.createdById)?.unitId ?? ""
+          : "",
+        voidedByUnitId: r.voidedById
+          ? actorMap.get(r.voidedById)?.unitId ?? ""
+          : "",
       });
     }
   } else {

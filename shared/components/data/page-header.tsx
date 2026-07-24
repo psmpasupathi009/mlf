@@ -12,13 +12,13 @@ export function PageHeader({ title, description, actions }: PageHeaderProps) {
           {title}
         </h1>
         {description ? (
-          <p className="max-w-2xl text-sm leading-relaxed text-muted-foreground">
+          <p className="line-clamp-3 max-w-2xl text-sm leading-relaxed text-muted-foreground sm:line-clamp-none">
             {description}
           </p>
         ) : null}
       </div>
       {actions ? (
-        <div className="flex w-full shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center md:w-auto md:justify-end [&_a]:w-full sm:[&_a]:w-auto [&_button:not([data-unit-id-badge])]:w-full sm:[&_button:not([data-unit-id-badge])]:w-auto">
+        <div className="flex w-full shrink-0 flex-wrap items-center gap-2 md:w-auto md:justify-end">
           {actions}
         </div>
       ) : null}

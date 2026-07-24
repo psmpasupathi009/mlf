@@ -23,6 +23,7 @@ export function Toaster(props: ToasterProps) {
       position="top-center"
       richColors
       closeButton
+      offset="calc(env(safe-area-inset-top) + 0.75rem)"
       {...props}
     />
   );

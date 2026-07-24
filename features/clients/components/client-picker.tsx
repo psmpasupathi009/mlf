@@ -33,7 +33,7 @@ export function ClientPicker({
 
   return (
     <div className="grid min-w-0 gap-2">
-      <Label>{label}</Label>
+      {label ? <Label>{label}</Label> : null}
       <AsyncSearchSelect<ClientSummary>
         value={value?.unitId ?? null}
         selectedLabel={value ? `${value.name} (${value.unitId})` : null}
@@ -55,11 +55,12 @@ export function ClientPicker({
             </span>
           </span>
         )}
-        placeholder="Search client by name or mobile…"
+        placeholder="Filter by client…"
         searchPlaceholder="Search client by name or mobile…"
         clearable={Boolean(value)}
         clearLabel="Clear client"
         footer={
+          label ? (
           <button
             type="button"
             className="block w-full px-3 py-2 text-left text-sm font-medium text-navy hover:bg-muted"
@@ -67,6 +68,7 @@ export function ClientPicker({
           >
             + Add new client
           </button>
+          ) : undefined
         }
       />
 

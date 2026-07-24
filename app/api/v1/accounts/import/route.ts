@@ -6,12 +6,17 @@ import { writeAudit } from "@/lib/audit";
 import { normalizeMobile } from "@/lib/auth/mobile";
 import { importPaymentsSchema } from "@/lib/validations/accounts.schema";
 import { compliance } from "@/config/company/compliance";
+import { isPaymentPurpose } from "@/features/accounts/lib/payment-purposes";
 import type { PaymentStatus, PaymentType } from "@prisma/client";
 
-type RowResult = { row: number; unitId: string | null; status: "ok" | "error"; message: string };
+type RowResult = {
+  row: number;
+  unitId: string | null;
+  status: "ok" | "error";
+  message: string;
+};
 
-const VALID_TYPE: PaymentType[] = ["advance", "partial", "full"];
-const VALID_STATUS: PaymentStatus[] = ["pending", "paid"];
+const VALID_STATUS = new Set<PaymentStatus>(["pending", "paid"]);
 
 /** Bulk import for opening balances — void is never allowed via CSV. Uses accounts.upload. */
 export const POST = apiHandler(async (request) => {
@@ -21,28 +26,57 @@ export const POST = apiHandler(async (request) => {
   const raw = await request.json();
   const parsed = importPaymentsSchema.safeParse(raw);
   if (!parsed.success) {
-    return jsonFail("VALIDATION", parsed.error.issues[0]?.message ?? "Invalid request", 400, parsed.error.issues);
+    return jsonFail(
+      "VALIDATION",
+      parsed.error.issues[0]?.message ?? "Invalid request",
+      400,
+      parsed.error.issues
+    );
   }
   const { dryRun, rows } = parsed.data;
 
   if (rows.length > compliance.csv.maxRows) {
-    return jsonFail("VALIDATION", `Max ${compliance.csv.maxRows} rows per import`, 400);
+    return jsonFail(
+      "VALIDATION",
+      `Max ${compliance.csv.maxRows} rows per import`,
+      400
+    );
   }
 
   const results: RowResult[] = [];
+  const createdUnitIds: string[] = [];
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const rowNum = i + 2;
 
-    const type = row.type as PaymentType;
-    if (!VALID_TYPE.includes(type)) {
-      results.push({ row: rowNum, unitId: row.unitId || null, status: "error", message: "Invalid payment type" });
+    if (!isPaymentPurpose(row.type)) {
+      results.push({
+        row: rowNum,
+        unitId: row.unitId || null,
+        status: "error",
+        message: "Invalid payment type",
+      });
       continue;
     }
+    const type = row.type as PaymentType;
     const amount = Number(row.amount);
     if (!Number.isFinite(amount) || amount <= 0) {
-      results.push({ row: rowNum, unitId: row.unitId || null, status: "error", message: "Invalid amount" });
+      results.push({
+        row: rowNum,
+        unitId: row.unitId || null,
+        status: "error",
+        message: "Invalid amount",
+      });
+      continue;
+    }
+    if (type === "other" && !row.notes?.trim()) {
+      results.push({
+        row: rowNum,
+        unitId: row.unitId || null,
+        status: "error",
+        message: "Notes required for Other purpose",
+      });
       continue;
     }
 
@@ -50,11 +84,21 @@ export const POST = apiHandler(async (request) => {
       const client = row.clientUnitId
         ? await prisma.client.findUnique({ where: { unitId: row.clientUnitId } })
         : row.clientMobile
-          ? await prisma.client.findFirst({ where: { mobile: normalizeMobile(row.clientMobile) ?? row.clientMobile } })
+          ? await prisma.client.findFirst({
+              where: {
+                mobile:
+                  normalizeMobile(row.clientMobile) ?? row.clientMobile,
+              },
+            })
           : null;
 
       if (!client) {
-        results.push({ row: rowNum, unitId: row.unitId || null, status: "error", message: "Client not found" });
+        results.push({
+          row: rowNum,
+          unitId: row.unitId || null,
+          status: "error",
+          message: "Client not found",
+        });
         continue;
       }
 
@@ -63,18 +107,79 @@ export const POST = apiHandler(async (request) => {
       if (row.caseUnitId || row.caseNumber) {
         const caseItem = row.caseUnitId
           ? await prisma.case.findUnique({ where: { unitId: row.caseUnitId } })
-          : await prisma.case.findFirst({ where: { caseNumber: row.caseNumber } });
-        if (caseItem) {
-          caseId = caseItem.id;
-          caseUnitId = caseItem.unitId;
+          : await prisma.case.findFirst({
+              where: { caseNumber: row.caseNumber },
+            });
+        if (!caseItem) {
+          results.push({
+            row: rowNum,
+            unitId: row.unitId || null,
+            status: "error",
+            message: "Case not found",
+          });
+          continue;
         }
+        if (caseItem.clientUnitId !== client.unitId) {
+          results.push({
+            row: rowNum,
+            unitId: row.unitId || null,
+            status: "error",
+            message: "Case does not belong to client",
+          });
+          continue;
+        }
+        caseId = caseItem.id;
+        caseUnitId = caseItem.unitId;
       }
 
-      const status = row.status && VALID_STATUS.includes(row.status as PaymentStatus) ? (row.status as PaymentStatus) : "pending";
-      const paidOn = row.paidOn ? new Date(row.paidOn) : undefined;
+      let status: PaymentStatus = "pending";
+      if (row.status?.trim()) {
+        const rawStatus = row.status.trim().toLowerCase() as PaymentStatus;
+        if (rawStatus === "void") {
+          results.push({
+            row: rowNum,
+            unitId: row.unitId || null,
+            status: "error",
+            message: "Void status not allowed via import",
+          });
+          continue;
+        }
+        if (!VALID_STATUS.has(rawStatus)) {
+          results.push({
+            row: rowNum,
+            unitId: row.unitId || null,
+            status: "error",
+            message: "Invalid status (use pending or paid)",
+          });
+          continue;
+        }
+        status = rawStatus;
+      }
+
+      const paidOnRaw = row.paidOn ? new Date(row.paidOn) : null;
+      const paidOn =
+        status === "paid"
+          ? paidOnRaw && !Number.isNaN(paidOnRaw.getTime())
+            ? paidOnRaw
+            : null
+          : null;
+      if (status === "paid" && !paidOn) {
+        results.push({
+          row: rowNum,
+          unitId: row.unitId || null,
+          status: "error",
+          message: "paidOn required when status is paid",
+        });
+        continue;
+      }
 
       if (dryRun) {
-        results.push({ row: rowNum, unitId: row.unitId || null, status: "ok", message: "Will create" });
+        results.push({
+          row: rowNum,
+          unitId: row.unitId || null,
+          status: "ok",
+          message: "Will create",
+        });
         continue;
       }
 
@@ -94,9 +199,34 @@ export const POST = apiHandler(async (request) => {
           createdById: user.id,
         },
       });
-      results.push({ row: rowNum, unitId: created.unitId, status: "ok", message: "Created" });
+
+      await writeAudit({
+        actorUnitId: user.unitId,
+        action: "payment.create",
+        entity: "CashPayment",
+        entityUnitId: created.unitId,
+        meta: {
+          amount: created.amount,
+          type: created.type,
+          status: created.status,
+          source: "import",
+        },
+      });
+
+      createdUnitIds.push(created.unitId);
+      results.push({
+        row: rowNum,
+        unitId: created.unitId,
+        status: "ok",
+        message: "Created",
+      });
     } catch {
-      results.push({ row: rowNum, unitId: row.unitId || null, status: "error", message: "Failed to save row" });
+      results.push({
+        row: rowNum,
+        unitId: row.unitId || null,
+        status: "error",
+        message: "Failed to save row",
+      });
     }
   }
 
@@ -109,6 +239,7 @@ export const POST = apiHandler(async (request) => {
         total: rows.length,
         succeeded: results.filter((r) => r.status === "ok").length,
         failed: results.filter((r) => r.status === "error").length,
+        unitIds: createdUnitIds.slice(0, 100),
       },
     });
   }
