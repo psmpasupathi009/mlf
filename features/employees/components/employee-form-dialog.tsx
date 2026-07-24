@@ -15,15 +15,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { apiFetch, getErrorMessage } from "@/lib/api/client";
 import {
   DESIGNATION_GROUPS,
@@ -31,6 +22,11 @@ import {
   normalizeDesignation,
   type Designation,
 } from "@/config/company/designations";
+import { SearchableSelect } from "@/shared/components/forms/searchable-select";
+
+const DESIGNATION_OPTIONS = DESIGNATION_GROUPS.flatMap((g) =>
+  g.items.map((d) => ({ value: d, label: d, group: g.label }))
+);
 import {
   ACTION_LABELS,
   MODULE_LABELS,
@@ -364,29 +360,26 @@ export function EmployeeFormDialog({
                   <Label>
                     Designation <span className="text-destructive">*</span>
                   </Label>
-                  <Select value={designation || undefined} onValueChange={applyDesignationDefaults}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select designation" />
-                    </SelectTrigger>
-                    <SelectContent className="z-200">
-                      {designation &&
-                      !(DESIGNATION_GROUPS.flatMap((g) => g.items) as readonly string[]).includes(
-                        designation
-                      ) ? (
-                        <SelectItem value={designation}>{designation}</SelectItem>
-                      ) : null}
-                      {DESIGNATION_GROUPS.map((group) => (
-                        <SelectGroup key={group.label}>
-                          <SelectLabel>{group.label}</SelectLabel>
-                          {group.items.map((d) => (
-                            <SelectItem key={d} value={d}>
-                              {d}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={designation}
+                    onChange={applyDesignationDefaults}
+                    options={
+                      designation &&
+                      !DESIGNATION_OPTIONS.some((o) => o.value === designation)
+                        ? [
+                            {
+                              value: designation,
+                              label: designation,
+                              group: "Current",
+                            },
+                            ...DESIGNATION_OPTIONS,
+                          ]
+                        : DESIGNATION_OPTIONS
+                    }
+                    grouped
+                    placeholder="Select designation"
+                    searchPlaceholder="Search designation…"
+                  />
                   <p className="text-xs text-muted-foreground">
                     On create, this prefills roles on the right. Changing it later does not overwrite
                     roles.

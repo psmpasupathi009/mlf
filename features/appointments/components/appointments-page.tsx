@@ -49,13 +49,12 @@ import { canBookForAnyAdvocate } from "@/lib/appointments/booking-rules";
 import { displayMobile } from "@/lib/auth/mobile";
 import { PersonChip } from "@/shared/components/user/person-chip";
 import { APPOINTMENT_MODE_OPTIONS } from "@/lib/validations/appointments.schema";
+import { AdvocatePicker } from "@/features/employees/components/advocate-picker";
 
 type ListResponse = {
   data: AppointmentSummary[];
   meta: { page: number; pageSize: number; total: number };
 };
-
-type AdvocateOption = { unitId: string; name: string; mobile: string };
 
 const STATUS_VARIANT: Record<
   string,
@@ -118,32 +117,14 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
   const [status, setStatus] = useState("scheduled");
   const [range, setRange] = useState<Range>("today");
   const [advocateFilter, setAdvocateFilter] = useState("all");
-  const [advocates, setAdvocates] = useState<AdvocateOption[]>([]);
+  const [advocateFilterLabel, setAdvocateFilterLabel] = useState<string | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<AppointmentSummary | null>(null);
   const [formMode, setFormMode] = useState<AppointmentFormMode>("create");
   const [actionBusy, setActionBusy] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (!bookAny) return;
-    let cancelled = false;
-    (async () => {
-      const { ok, data } = await apiFetch<{ data: AdvocateOption[] }>(
-        "/api/v1/advocates?pageSize=100"
-      );
-      if (!cancelled && ok && data && typeof data === "object") {
-        const list =
-          "data" in data && Array.isArray((data as { data: unknown }).data)
-            ? (data as { data: AdvocateOption[] }).data
-            : [];
-        setAdvocates(list);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [bookAny]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -332,25 +313,27 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
               />
             </div>
             {bookAny ? (
-              <Select
-                value={advocateFilter}
-                onValueChange={(v) => {
+              <AdvocatePicker
+                className="h-11 w-full sm:w-48"
+                value={advocateFilter === "all" ? null : advocateFilter}
+                selectedLabel={
+                  advocateFilter === "all" ? null : advocateFilterLabel
+                }
+                onChange={(a) => {
                   setPage(1);
-                  setAdvocateFilter(v);
+                  if (!a) {
+                    setAdvocateFilter("all");
+                    setAdvocateFilterLabel(null);
+                    return;
+                  }
+                  setAdvocateFilter(displayMobile(a.mobile));
+                  setAdvocateFilterLabel(a.displayName || a.name || a.mobile);
                 }}
-              >
-                <SelectTrigger className="h-11 w-full sm:w-48">
-                  <SelectValue placeholder="Advocate" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All advocates</SelectItem>
-                  {advocates.map((a) => (
-                    <SelectItem key={a.unitId} value={displayMobile(a.mobile)}>
-                      {a.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                valueBy="mobile"
+                placeholder="All advocates"
+                clearable
+                clearLabel="All advocates"
+              />
             ) : null}
             <Select
               value={status}

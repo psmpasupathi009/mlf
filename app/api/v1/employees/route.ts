@@ -8,6 +8,7 @@ import { createEmployeeSchema } from "@/lib/validations/employees.schema";
 import { requireAdminToAssignAdmin } from "@/lib/rbac/employee-guards";
 import { toEmployeeSummary } from "@/features/employees/server/serialize";
 import { Prisma } from "@prisma/client";
+import { containsInsensitive } from "@/lib/db/search";
 
 export const GET = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "employees", "view");
@@ -24,10 +25,10 @@ export const GET = apiHandler(async (request) => {
     ...(q
       ? {
           OR: [
-            { name: { contains: q } },
+            { name: containsInsensitive(q) },
             ...(digits ? [{ mobile: { contains: digits } }] : []),
-            { unitId: { contains: q } },
-            { designation: { contains: q } },
+            { unitId: containsInsensitive(q) },
+            { designation: containsInsensitive(q) },
           ],
         }
       : {}),

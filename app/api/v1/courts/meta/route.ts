@@ -1,4 +1,4 @@
-import { apiHandler, jsonOk, jsonFail } from "@/lib/api/response";
+import { apiHandler, jsonOk, jsonFail, parsePagination } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/guard";
 import {
   listIndiaComplexes,
@@ -6,11 +6,12 @@ import {
   listIndiaDistricts,
   listIndiaStates,
 } from "@/lib/courts/local-catalog";
+import { paginateNamedOptions } from "@/lib/utils/paginate-options";
 
 /**
  * Offline court hierarchy for Register Case (all-India office seed + used cases).
  *
- * GET ?level=states|districts|complexes|courts
+ * GET ?level=states|districts|complexes|courts&q&page&pageSize
  */
 export const GET = apiHandler(async (request) => {
   const { user, response } = await requireUser(request);
@@ -18,22 +19,41 @@ export const GET = apiHandler(async (request) => {
 
   const { searchParams } = new URL(request.url);
   const level = (searchParams.get("level") ?? "states").trim();
+  const q = searchParams.get("q")?.trim() ?? "";
+  const { page, pageSize } = parsePagination(searchParams);
   const attribution = {
     provider: "office-seed",
     note: "All-India court list (seed + courts used on existing cases). Type “Other” for any court not listed. Verify filings on official eCourts if needed.",
     liveApiConfigured: false,
   };
 
+  function pageResult(
+    options: { code: string; name: string }[],
+    extra: Record<string, unknown> = {}
+  ) {
+    const paged = paginateNamedOptions(options, { q, page, pageSize });
+    return jsonOk({
+      level,
+      source: extra.source,
+      attribution,
+      ...extra,
+      options: paged.options,
+      total: paged.total,
+      page: paged.page,
+      pageSize: paged.pageSize,
+    });
+  }
+
   if (level === "states") {
     const { options, source } = listIndiaStates();
-    return jsonOk({ level, source, attribution, options });
+    return pageResult(options, { source });
   }
 
   if (level === "districts") {
     const state = searchParams.get("state")?.trim();
     if (!state) return jsonFail("VALIDATION", "state is required", 400);
     const { options, source } = await listIndiaDistricts(state);
-    return jsonOk({ level, state, source, attribution, options });
+    return pageResult(options, { state, source });
   }
 
   if (level === "complexes") {
@@ -43,7 +63,7 @@ export const GET = apiHandler(async (request) => {
       return jsonFail("VALIDATION", "state and district are required", 400);
     }
     const { options, source } = await listIndiaComplexes(state, district);
-    return jsonOk({ level, state, district, source, attribution, options });
+    return pageResult(options, { state, district, source });
   }
 
   if (level === "courts") {
@@ -62,15 +82,7 @@ export const GET = apiHandler(async (request) => {
       district,
       complex
     );
-    return jsonOk({
-      level,
-      state,
-      district,
-      complex,
-      source,
-      attribution,
-      options,
-    });
+    return pageResult(options, { state, district, complex, source });
   }
 
   return jsonFail(

@@ -11,6 +11,7 @@ import {
 import { assertSlotBookable } from "@/lib/appointments/availability";
 import { createAppointmentSchema } from "@/lib/validations/appointments.schema";
 import { enrichAppointments, enrichAppointment } from "@/features/appointments/server/enrich";
+import { containsInsensitive } from "@/lib/db/search";
 
 export const GET = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "appointments", "view");
@@ -32,7 +33,7 @@ export const GET = apiHandler(async (request) => {
 
   const where: Prisma.AppointmentWhereInput = {
     ...(status ? { status: status as never } : {}),
-    ...(q ? { title: { contains: q } } : {}),
+    ...(q ? { title: containsInsensitive(q) } : {}),
     ...(scopedMobile
       ? {
           OR: [

@@ -2,6 +2,7 @@ import { apiHandler, jsonOk, jsonFail } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/guard";
 import { hasPermission } from "@/lib/rbac";
 import { prisma } from "@/lib/db/prisma";
+import { containsInsensitive } from "@/lib/db/search";
 
 export const GET = apiHandler(async (request) => {
   const { user, response } = await requireUser(request);
@@ -24,7 +25,6 @@ export const GET = apiHandler(async (request) => {
   }
 
   const digits = q.replace(/\D/g, "");
-  const qUpper = q.toUpperCase();
 
   const [employees, clients, cases] = await Promise.all([
     canEmployees
@@ -32,8 +32,8 @@ export const GET = apiHandler(async (request) => {
           where: {
             isActive: true,
             OR: [
-              { unitId: { contains: qUpper } },
-              { name: { contains: q } },
+              { unitId: containsInsensitive(q) },
+              { name: containsInsensitive(q) },
               ...(digits.length >= 4 ? [{ mobile: { contains: digits } }] : []),
             ],
           },
@@ -50,8 +50,8 @@ export const GET = apiHandler(async (request) => {
       ? prisma.client.findMany({
           where: {
             OR: [
-              { unitId: { contains: qUpper } },
-              { name: { contains: q } },
+              { unitId: containsInsensitive(q) },
+              { name: containsInsensitive(q) },
               ...(digits.length >= 4 ? [{ mobile: { contains: digits } }] : []),
             ],
           },
@@ -63,9 +63,9 @@ export const GET = apiHandler(async (request) => {
       ? prisma.case.findMany({
           where: {
             OR: [
-              { unitId: { contains: qUpper } },
-              { caseNumber: { contains: q } },
-              { opposingParty: { contains: q } },
+              { unitId: containsInsensitive(q) },
+              { caseNumber: containsInsensitive(q) },
+              { opposingParty: containsInsensitive(q) },
             ],
           },
           take: 8,

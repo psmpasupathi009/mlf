@@ -8,9 +8,7 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -39,14 +37,15 @@ import {
 } from "@/config/company/form-options";
 import { OUR_SIDE_OPTIONS } from "@/lib/validations/cases.schema";
 import { SelectOrOther } from "@/shared/components/forms/select-or-other";
+import { SearchableSelect } from "@/shared/components/forms/searchable-select";
 import { DatePicker } from "@/shared/components/forms/date-picker";
+import { AdvocatePicker } from "@/features/employees/components/advocate-picker";
+import { displayMobile } from "@/lib/auth/mobile";
 import { cn } from "@/lib/utils/cn";
 
-type AdvocateOption = {
-  unitId: string;
-  name: string;
-  mobile: string;
-};
+const CASE_TYPE_OPTIONS = CASE_TYPE_GROUPS.flatMap((g) =>
+  g.types.map((t) => ({ value: t.value, label: t.label, group: g.group }))
+);
 
 type Props = {
   open: boolean;
@@ -107,7 +106,9 @@ export function CaseFormDialog({
   const [city, setCity] = useState("");
   const [courtName, setCourtName] = useState("");
   const [primaryAdvocateMobile, setPrimaryAdvocateMobile] = useState("");
-  const [advocates, setAdvocates] = useState<AdvocateOption[]>([]);
+  const [primaryAdvocateLabel, setPrimaryAdvocateLabel] = useState<string | null>(
+    null
+  );
   const [opposingParty, setOpposingParty] = useState("");
   const [ourSide, setOurSide] = useState("");
   const [underActs, setUnderActs] = useState("");
@@ -122,28 +123,6 @@ export function CaseFormDialog({
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    (async () => {
-      const { ok, data } = await apiFetch<{
-        data: AdvocateOption[];
-      }>("/api/v1/advocates?pageSize=50");
-      if (!cancelled && ok && data && typeof data === "object") {
-        const list =
-          "data" in data && Array.isArray((data as { data: unknown }).data)
-            ? (data as { data: AdvocateOption[] }).data
-            : Array.isArray(data)
-              ? (data as AdvocateOption[])
-              : [];
-        setAdvocates(list);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -164,6 +143,11 @@ export function CaseFormDialog({
         setCity(caseItem.city ?? "");
         setCourtName(caseItem.courtName ?? "");
         setPrimaryAdvocateMobile(caseItem.primaryAdvocateMobile ?? "");
+        setPrimaryAdvocateLabel(
+          caseItem.primaryAdvocateMobile
+            ? `Advocate · ${caseItem.primaryAdvocateMobile}`
+            : null
+        );
         setOpposingParty(caseItem.opposingParty ?? "");
         setOurSide(caseItem.ourSide ?? "");
         setUnderActs(caseItem.underActs ?? "");
@@ -191,6 +175,7 @@ export function CaseFormDialog({
         setCity("");
         setCourtName("");
         setPrimaryAdvocateMobile("");
+        setPrimaryAdvocateLabel(null);
         setOpposingParty("");
         setOurSide("");
         setUnderActs("");
@@ -360,26 +345,14 @@ export function CaseFormDialog({
                   <Label>
                     Case type <span className="text-destructive">*</span>
                   </Label>
-                  <Select
-                    value={caseType || undefined}
-                    onValueChange={setCaseType}
-                  >
-                    <SelectTrigger className="h-11">
-                      <SelectValue placeholder="Select type" />
-                    </SelectTrigger>
-                    <SelectContent className="z-200">
-                      {CASE_TYPE_GROUPS.map((g) => (
-                        <SelectGroup key={g.group}>
-                          <SelectLabel>{g.group}</SelectLabel>
-                          {g.types.map((t) => (
-                            <SelectItem key={t.value} value={t.value}>
-                              {t.label}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={caseType}
+                    onChange={setCaseType}
+                    options={CASE_TYPE_OPTIONS}
+                    grouped
+                    placeholder="Select type"
+                    searchPlaceholder="Search case type…"
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label>Status</Label>
@@ -526,42 +499,32 @@ export function CaseFormDialog({
                     Primary advocate{" "}
                     <span className="text-destructive">*</span>
                   </Label>
-                  {advocates.length > 0 ? (
-                    <Select
-                      value={
-                        advocates.some((a) => {
-                          const m = a.mobile.startsWith("91")
-                            ? a.mobile.slice(2)
-                            : a.mobile;
-                          return m === primaryAdvocateMobile;
-                        })
-                          ? primaryAdvocateMobile
-                          : undefined
+                  <AdvocatePicker
+                    value={primaryAdvocateMobile || null}
+                    selectedLabel={primaryAdvocateLabel}
+                    onChange={(a) => {
+                      if (!a) {
+                        setPrimaryAdvocateMobile("");
+                        setPrimaryAdvocateLabel(null);
+                        return;
                       }
-                      onValueChange={setPrimaryAdvocateMobile}
-                    >
-                      <SelectTrigger className="h-11">
-                        <SelectValue placeholder="Select advocate" />
-                      </SelectTrigger>
-                      <SelectContent className="z-200">
-                        {advocates.map((a) => {
-                          const m = a.mobile.startsWith("91")
-                            ? a.mobile.slice(2)
-                            : a.mobile;
-                          return (
-                            <SelectItem key={a.unitId} value={m}>
-                              {a.name} · {m}
-                            </SelectItem>
-                          );
-                        })}
-                      </SelectContent>
-                    </Select>
-                  ) : null}
+                      const m = displayMobile(a.mobile);
+                      setPrimaryAdvocateMobile(m);
+                      setPrimaryAdvocateLabel(
+                        `${a.displayName || a.name || "Advocate"} · ${m}`
+                      );
+                    }}
+                    valueBy="mobile"
+                    placeholder="Select advocate"
+                  />
                   <Input
                     className="h-11"
                     value={primaryAdvocateMobile}
-                    onChange={(e) => setPrimaryAdvocateMobile(e.target.value)}
-                    placeholder="10-digit mobile"
+                    onChange={(e) => {
+                      setPrimaryAdvocateMobile(e.target.value);
+                      setPrimaryAdvocateLabel(null);
+                    }}
+                    placeholder="Or type 10-digit mobile"
                     inputMode="numeric"
                   />
                 </div>

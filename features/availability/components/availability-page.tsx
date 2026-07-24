@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { PageHeader } from "@/shared/components/data/page-header";
@@ -47,9 +47,8 @@ import {
 import { DatePicker } from "@/shared/components/forms/date-picker";
 import { formatIstTime, istDateKey, istDisplayDate } from "@/lib/utils/ist";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
+import { AdvocatePicker } from "@/features/employees/components/advocate-picker";
 import { cn } from "@/lib/utils/cn";
-
-type AdvocateOption = { unitId: string; name: string | null; displayName?: string; mobile: string };
 
 type HoursDay = {
   weekday: number;
@@ -141,8 +140,15 @@ export function AvailabilityPage({ user }: { user: PublicUser }) {
   const canEdit = user.permissions.includes("appointments.edit");
   const bookAny = canBookForAnyAdvocate(user.roles);
 
-  const [advocates, setAdvocates] = useState<AdvocateOption[]>([]);
   const [targetUnitId, setTargetUnitId] = useState(user.unitId);
+  const [targetLabel, setTargetLabel] = useState(
+    personDisplayName({
+      name: user.name,
+      mobile: user.mobile,
+      unitId: user.unitId,
+      fallback: "Your schedule",
+    })
+  );
   const [usingDefaults, setUsingDefaults] = useState(true);
   const [loading, setLoading] = useState(true);
   const [savingHours, setSavingHours] = useState(false);
@@ -161,22 +167,6 @@ export function AvailabilityPage({ user }: { user: PublicUser }) {
   const [editingBlock, setEditingBlock] = useState<TimeBlock | null>(null);
   const [blockForm, setBlockForm] = useState(emptyBlockForm);
   const [blockBusy, setBlockBusy] = useState(false);
-
-  const targetLabel = useMemo(() => {
-    if (targetUnitId === user.unitId) {
-      return personDisplayName({
-        name: user.name,
-        mobile: user.mobile,
-        unitId: user.unitId,
-        fallback: "Your schedule",
-      });
-    }
-    const a = advocates.find((x) => x.unitId === targetUnitId);
-    return a
-      ? a.displayName ||
-          personDisplayName({ name: a.name, mobile: a.mobile, unitId: a.unitId })
-      : targetUnitId;
-  }, [advocates, targetUnitId, user.mobile, user.name, user.unitId]);
 
   const loadHours = useCallback(async (unitId: string) => {
     const q = unitId !== user.unitId ? `?userUnitId=${encodeURIComponent(unitId)}` : "";
@@ -219,24 +209,6 @@ export function AvailabilityPage({ user }: { user: PublicUser }) {
     await Promise.all([loadHours(targetUnitId), loadBlocks(targetUnitId)]);
     setLoading(false);
   }, [loadBlocks, loadHours, targetUnitId]);
-
-  useEffect(() => {
-    if (!bookAny) return;
-    let cancelled = false;
-    (async () => {
-      const { ok, data } = await apiFetch<{ data: AdvocateOption[] }>(
-        "/api/v1/advocates?pageSize=100"
-      );
-      if (cancelled || !ok || !data || typeof data !== "object") return;
-      const list = Array.isArray((data as { data: AdvocateOption[] }).data)
-        ? (data as { data: AdvocateOption[] }).data
-        : [];
-      setAdvocates(list);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [bookAny]);
 
   useEffect(() => {
     void (async () => {
@@ -414,34 +386,42 @@ export function AvailabilityPage({ user }: { user: PublicUser }) {
       {bookAny ? (
         <div className="max-w-sm space-y-2">
           <Label>Advocate</Label>
-          <Select value={targetUnitId} onValueChange={setTargetUnitId}>
-            <SelectTrigger className="h-10">
-              <SelectValue placeholder="Select advocate" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={user.unitId}>
-                Yourself (
-                {personDisplayName({
-                  name: user.name,
-                  mobile: user.mobile,
-                  unitId: user.unitId,
-                })}
-                )
-              </SelectItem>
-              {advocates
-                .filter((a) => a.unitId !== user.unitId)
-                .map((a) => (
-                  <SelectItem key={a.unitId} value={a.unitId}>
-                    {a.displayName ||
-                      personDisplayName({
-                        name: a.name,
-                        mobile: a.mobile,
-                        unitId: a.unitId,
-                      })}
-                  </SelectItem>
-                ))}
-            </SelectContent>
-          </Select>
+          <AdvocatePicker
+            className="h-10"
+            value={targetUnitId}
+            selectedLabel={targetLabel}
+            valueBy="unitId"
+            onChange={(a) => {
+              if (!a) {
+                setTargetUnitId(user.unitId);
+                setTargetLabel(
+                  personDisplayName({
+                    name: user.name,
+                    mobile: user.mobile,
+                    unitId: user.unitId,
+                    fallback: "Your schedule",
+                  })
+                );
+                return;
+              }
+              setTargetUnitId(a.unitId);
+              setTargetLabel(
+                a.displayName ||
+                  personDisplayName({
+                    name: a.name,
+                    mobile: a.mobile,
+                    unitId: a.unitId,
+                  })
+              );
+            }}
+            placeholder="Select advocate"
+            clearable
+            clearLabel={`Yourself (${personDisplayName({
+              name: user.name,
+              mobile: user.mobile,
+              unitId: user.unitId,
+            })})`}
+          />
         </div>
       ) : null}
 

@@ -7,6 +7,7 @@ import { writeAudit } from "@/lib/audit";
 import { normalizeMobile } from "@/lib/auth/mobile";
 import { createClientSchema } from "@/lib/validations/clients.schema";
 import { toClientSummary } from "@/features/clients/server/serialize";
+import { containsInsensitive } from "@/lib/db/search";
 
 export const GET = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "clients", "view");
@@ -20,9 +21,9 @@ export const GET = apiHandler(async (request) => {
   const where: Prisma.ClientWhereInput = q
     ? {
         OR: [
-          { name: { contains: q } },
+          { name: containsInsensitive(q) },
           ...(digits ? [{ mobile: { contains: digits } }] : []),
-          { unitId: { contains: q } },
+          { unitId: containsInsensitive(q) },
         ],
       }
     : {};

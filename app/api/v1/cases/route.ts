@@ -7,6 +7,7 @@ import { writeAudit } from "@/lib/audit";
 import { createCaseSchema } from "@/lib/validations/cases.schema";
 import { toCaseSummary } from "@/features/cases/server/serialize";
 import { istDateKey, istDayBounds } from "@/lib/utils/ist";
+import { containsInsensitive } from "@/lib/db/search";
 
 export const GET = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "cases", "view");
@@ -26,11 +27,11 @@ export const GET = apiHandler(async (request) => {
     ...(q
       ? {
           OR: [
-            { caseNumber: { contains: q } },
-            { unitId: { contains: q } },
-            { clientUnitId: { contains: q } },
-            { courtName: { contains: q } },
-            { opposingParty: { contains: q } },
+            { caseNumber: containsInsensitive(q) },
+            { unitId: containsInsensitive(q) },
+            { clientUnitId: containsInsensitive(q) },
+            { courtName: containsInsensitive(q) },
+            { opposingParty: containsInsensitive(q) },
           ],
         }
       : {}),

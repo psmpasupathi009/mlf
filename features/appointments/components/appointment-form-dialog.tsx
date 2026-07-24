@@ -27,6 +27,10 @@ import {
   getErrorMessage,
 } from "@/lib/api/client";
 import { ClientPicker } from "@/features/clients/components/client-picker";
+import {
+  AdvocatePicker,
+  type AdvocateSummary,
+} from "@/features/employees/components/advocate-picker";
 import type { AppointmentSummary } from "@/features/appointments/server/serialize";
 import { APPOINTMENT_MODE_OPTIONS } from "@/lib/validations/appointments.schema";
 import {
@@ -41,15 +45,6 @@ import { displayMobile } from "@/lib/auth/mobile";
 import { PersonChip } from "@/shared/components/user/person-chip";
 import { personDisplayName } from "@/shared/lib/person";
 import { cn } from "@/lib/utils/cn";
-
-type AdvocateOption = {
-  unitId: string;
-  name: string | null;
-  displayName?: string;
-  mobile: string;
-  designation?: string | null;
-  photoUrl?: string | null;
-};
 
 export type AppointmentFormMode = "create" | "edit" | "reschedule";
 
@@ -178,7 +173,8 @@ export function AppointmentFormDialog({
   const [client, setClient] = useState<{ unitId: string; name: string } | null>(
     null
   );
-  const [advocates, setAdvocates] = useState<AdvocateOption[]>([]);
+  const [selectedAdvocate, setSelectedAdvocate] =
+    useState<AdvocateSummary | null>(null);
   const [advocateMobile, setAdvocateMobile] = useState("");
   const [title, setTitle] = useState("");
   const [scheduledAt, setScheduledAt] = useState("");
@@ -194,28 +190,6 @@ export function AppointmentFormDialog({
 
   useEffect(() => {
     if (!open) return;
-    let cancelled = false;
-    (async () => {
-      const { ok, data } = await apiFetch<{ data: AdvocateOption[] }>(
-        "/api/v1/advocates?pageSize=100"
-      );
-      if (!cancelled && ok && data && typeof data === "object") {
-        const list =
-          "data" in data && Array.isArray((data as { data: unknown }).data)
-            ? (data as { data: AdvocateOption[] }).data
-            : Array.isArray(data)
-              ? (data as AdvocateOption[])
-              : [];
-        setAdvocates(list);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [open]);
-
-  useEffect(() => {
-    if (!open) return;
     queueMicrotask(() => {
       setClient(
         appointment?.clientUnitId
@@ -226,13 +200,24 @@ export function AppointmentFormDialog({
           : null
       );
       if (bookAny) {
-        setAdvocateMobile(
-          appointment?.advocateMobile
-            ? tenDigit(appointment.advocateMobile)
-            : ""
+        const mobile = appointment?.advocateMobile
+          ? tenDigit(appointment.advocateMobile)
+          : "";
+        setAdvocateMobile(mobile);
+        setSelectedAdvocate(
+          mobile
+            ? {
+                unitId: appointment?.advocateUnitId ?? "",
+                name: appointment?.advocateName ?? null,
+                displayName: appointment?.advocateName ?? undefined,
+                mobile: appointment?.advocateMobile ?? mobile,
+                photoUrl: appointment?.advocatePhotoUrl,
+              }
+            : null
         );
       } else {
         setAdvocateMobile(selfMobile10);
+        setSelectedAdvocate(null);
       }
       setTitle(appointment?.title ?? "");
       setScheduledAt("");
@@ -243,25 +228,16 @@ export function AppointmentFormDialog({
     });
   }, [open, appointment, bookAny, selfMobile10]);
 
-  const selectedAdvocate = useMemo(
-    () =>
-      advocates.find((a) => tenDigit(a.mobile) === tenDigit(advocateMobile)),
-    [advocates, advocateMobile]
-  );
-
   const originalAdvocate = useMemo(() => {
     if (!appointment?.advocateMobile) return null;
-    const m = tenDigit(appointment.advocateMobile);
-    return (
-      advocates.find((a) => tenDigit(a.mobile) === m) ?? {
-        unitId: appointment.advocateUnitId ?? "",
-        name: appointment.advocateName,
-        displayName: appointment.advocateName,
-        mobile: appointment.advocateMobile,
-        photoUrl: appointment.advocatePhotoUrl,
-      }
-    );
-  }, [advocates, appointment]);
+    return {
+      unitId: appointment.advocateUnitId ?? "",
+      name: appointment.advocateName,
+      displayName: appointment.advocateName,
+      mobile: appointment.advocateMobile,
+      photoUrl: appointment.advocatePhotoUrl,
+    };
+  }, [appointment]);
 
   const effectiveAdvocateMobile = bookAny ? advocateMobile : selfMobile10;
 
@@ -373,51 +349,32 @@ export function AppointmentFormDialog({
   const dialogSize = isEditOnly ? "md" : "lg";
 
   function renderAdvocateSelect(label: string) {
+    const advocateLabel = selectedAdvocate
+      ? selectedAdvocate.displayName ||
+        personDisplayName({
+          name: selectedAdvocate.name,
+          mobile: selectedAdvocate.mobile,
+          unitId: selectedAdvocate.unitId,
+        })
+      : null;
+
     return (
       <div className="grid gap-2">
         <Label>
           {label} <span className="text-destructive">*</span>
         </Label>
         {bookAny ? (
-          <Select
-            value={advocateMobile || undefined}
-            onValueChange={(v) => {
-              setAdvocateMobile(v);
+          <AdvocatePicker
+            value={advocateMobile || null}
+            selectedLabel={advocateLabel}
+            onChange={(a) => {
+              setSelectedAdvocate(a);
+              setAdvocateMobile(a ? tenDigit(a.mobile) : "");
               setScheduledAt("");
             }}
-          >
-            <SelectTrigger className="h-11">
-              <SelectValue placeholder="Select advocate by name" />
-            </SelectTrigger>
-            <SelectContent className="z-200 max-h-72">
-              {advocates.map((a) => {
-                const m = tenDigit(a.mobile);
-                const name =
-                  a.displayName ||
-                  personDisplayName({
-                    name: a.name,
-                    mobile: a.mobile,
-                    unitId: a.unitId,
-                  });
-                return (
-                  <SelectItem key={a.unitId} value={m}>
-                    <span className="flex items-center gap-2">
-                      <PersonChip
-                        name={name}
-                        photoUrl={a.photoUrl}
-                        avatarOnly
-                        className="gap-0"
-                      />
-                      <span>
-                        {name}
-                        {a.designation ? ` · ${a.designation}` : ""}
-                      </span>
-                    </span>
-                  </SelectItem>
-                );
-              })}
-            </SelectContent>
-          </Select>
+            valueBy="mobile"
+            placeholder="Select advocate by name"
+          />
         ) : (
           <>
             <div className="rounded-md border border-input bg-muted/30 px-3 py-2.5">

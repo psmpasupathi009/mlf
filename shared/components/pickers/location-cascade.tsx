@@ -1,19 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useState } from "react";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { apiFetch } from "@/lib/api/client";
 import { ADDRESS_STATES } from "@/lib/locations/catalog";
+import { SearchableSelect } from "@/shared/components/forms/searchable-select";
+import { AsyncSearchSelect } from "@/shared/components/forms/async-search-select";
 
 type LocationOption = { code: string; name: string };
+
+type MetaPage = {
+  options: LocationOption[];
+  total: number;
+};
 
 type Props = {
   state: string;
@@ -22,156 +22,126 @@ type Props = {
   onChange: (next: { state: string; district: string; city: string }) => void;
 };
 
-const OTHER = "__other__";
-
-async function loadDistricts(stateName: string): Promise<LocationOption[]> {
-  const q = new URLSearchParams({ level: "districts", state: stateName });
-  const { ok, data } = await apiFetch<{ options: LocationOption[] }>(
-    `/api/v1/locations/meta?${q.toString()}`
-  );
-  if (!ok || !data || typeof data !== "object") return [];
-  const options = (data as { options?: LocationOption[] }).options;
-  return Array.isArray(options) ? options : [];
-}
+const STATE_OPTIONS = ADDRESS_STATES.map((s) => ({
+  value: s.name,
+  label: s.name,
+}));
 
 /**
  * Client residence: State + District from locations-seed; city is free text.
  */
 export function LocationCascade({ state, district, city, onChange }: Props) {
-  const [districts, setDistricts] = useState<LocationOption[]>([]);
-  const [loadingDistricts, setLoadingDistricts] = useState(false);
   const [customDistrict, setCustomDistrict] = useState(false);
-  const hydratedDistrictsFor = useRef("");
-  const districtsRef = useRef<LocationOption[]>([]);
 
-  const syncCustomDistrict = useCallback(
-    (options: LocationOption[], districtName: string) => {
-      if (!options.length) {
-        setCustomDistrict(true);
-        return;
+  const fetchDistricts = useCallback(
+    async ({
+      query,
+      page,
+      pageSize,
+    }: {
+      query: string;
+      page: number;
+      pageSize: number;
+    }) => {
+      if (!state) return { items: [], total: 0 };
+      const q = new URLSearchParams({
+        level: "districts",
+        state,
+        page: String(page),
+        pageSize: String(pageSize),
+      });
+      if (query.trim()) q.set("q", query.trim());
+      const { ok, data } = await apiFetch<MetaPage>(
+        `/api/v1/locations/meta?${q.toString()}`
+      );
+      if (!ok || !data || typeof data !== "object") {
+        throw new Error("Failed to load districts");
       }
-      if (!districtName) return;
-      setCustomDistrict(!options.some((d) => d.name === districtName));
+      const options = Array.isArray(data.options) ? data.options : [];
+      const total = typeof data.total === "number" ? data.total : options.length;
+      return { items: options, total };
     },
-    []
+    [state]
   );
-
-  const pickState = useCallback(
-    async (name: string) => {
-      hydratedDistrictsFor.current = "";
-      districtsRef.current = [];
-      setDistricts([]);
-      setCustomDistrict(false);
-      onChange({ state: name, district: "", city: "" });
-      setLoadingDistricts(true);
-      const next = await loadDistricts(name);
-      setDistricts(next);
-      districtsRef.current = next;
-      setLoadingDistricts(false);
-      hydratedDistrictsFor.current = name;
-      if (!next.length) setCustomDistrict(true);
-    },
-    [onChange]
-  );
-
-  const pickDistrict = useCallback(
-    (name: string, stateName: string) => {
-      onChange({ state: stateName, district: name, city: "" });
-    },
-    [onChange]
-  );
-
-  useEffect(() => {
-    if (!state) return;
-    let cancelled = false;
-    (async () => {
-      if (hydratedDistrictsFor.current !== state) {
-        setLoadingDistricts(true);
-        const next = await loadDistricts(state);
-        if (cancelled) return;
-        setDistricts(next);
-        districtsRef.current = next;
-        setLoadingDistricts(false);
-        hydratedDistrictsFor.current = state;
-        syncCustomDistrict(next, district);
-        return;
-      }
-      syncCustomDistrict(districtsRef.current, district);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [state, district, syncCustomDistrict]);
-
-  const districtSelectValue = customDistrict ? OTHER : district || undefined;
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-3">
-      <div className="grid gap-2">
+    <div className="grid min-w-0 gap-3 sm:grid-cols-2 md:grid-cols-3">
+      <div className="grid min-w-0 gap-2">
         <Label>State</Label>
-        <Select
-          value={state || undefined}
-          onValueChange={(v) => void pickState(v)}
-        >
-          <SelectTrigger className="h-10">
-            <SelectValue placeholder="Select state" />
-          </SelectTrigger>
-          <SelectContent className="z-200 max-h-72">
-            {ADDRESS_STATES.map((s) => (
-              <SelectItem key={s.code} value={s.name}>
-                {s.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <SearchableSelect
+          value={state}
+          onChange={(name) => {
+            setCustomDistrict(false);
+            onChange({ state: name, district: "", city: "" });
+          }}
+          options={STATE_OPTIONS}
+          placeholder="Select state"
+          searchPlaceholder="Search state…"
+          className="h-11"
+        />
       </div>
 
-      <div className="grid gap-2">
+      <div className="grid min-w-0 gap-2">
         <Label>District</Label>
-        <Select
-          value={districtSelectValue}
-          disabled={!state || loadingDistricts}
-          onValueChange={(v) => {
-            if (v === OTHER) {
-              setCustomDistrict(true);
-              onChange({ state, district: "", city: "" });
-              return;
-            }
-            setCustomDistrict(false);
-            pickDistrict(v, state);
-          }}
-        >
-          <SelectTrigger className="h-10">
-            <SelectValue
-              placeholder={loadingDistricts ? "Loading…" : "Select district"}
-            />
-          </SelectTrigger>
-          <SelectContent className="z-200 max-h-72">
-            {districts.map((d) => (
-              <SelectItem key={d.code} value={d.name}>
-                {d.name}
-              </SelectItem>
-            ))}
-            <SelectItem value={OTHER}>Other — type district</SelectItem>
-          </SelectContent>
-        </Select>
         {customDistrict ? (
-          <Input
-            className="h-10"
-            value={district}
-            placeholder="Type district"
-            onChange={(e) =>
-              onChange({ state, district: e.target.value, city })
+          <>
+            <Input
+              className="h-11"
+              value={district}
+              placeholder="Type district"
+              onChange={(e) =>
+                onChange({ state, district: e.target.value, city })
+              }
+            />
+            <button
+              type="button"
+              className="text-left text-xs text-navy hover:underline"
+              onClick={() => {
+                setCustomDistrict(false);
+                onChange({ state, district: "", city });
+              }}
+            >
+              Back to list
+            </button>
+          </>
+        ) : (
+          <AsyncSearchSelect<LocationOption>
+            key={`loc-district-${state}`}
+            value={district || null}
+            selectedLabel={district || null}
+            disabled={!state}
+            className="h-11"
+            placeholder={state ? "Select district" : "Pick state first"}
+            searchPlaceholder="Search district…"
+            fetchPage={fetchDistricts}
+            getOptionValue={(o) => o.name}
+            getOptionLabel={(o) => o.name}
+            onChange={(opt) => {
+              if (!opt) return;
+              setCustomDistrict(false);
+              onChange({ state, district: opt.name, city: "" });
+            }}
+            footer={
+              <button
+                type="button"
+                className="block w-full px-3 py-2 text-left text-sm font-medium text-navy hover:bg-muted"
+                onClick={() => {
+                  setCustomDistrict(true);
+                  onChange({ state, district: "", city: "" });
+                }}
+              >
+                Other — type district
+              </button>
             }
           />
-        ) : null}
+        )}
       </div>
 
-      <div className="grid gap-2">
+      <div className="grid min-w-0 gap-2 sm:col-span-2 md:col-span-1">
         <Label htmlFor="loc-city">Town / city (residence)</Label>
         <Input
           id="loc-city"
-          className="h-10"
+          className="h-11"
           value={city}
           placeholder="Type town / city / village"
           onChange={(e) =>

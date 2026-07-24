@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db/prisma";
 import { displayMobile } from "@/lib/auth/mobile";
 import { userPhotoUrl } from "@/lib/auth/user-photo";
 import { personDisplayName } from "@/shared/lib/person";
+import { containsInsensitive } from "@/lib/db/search";
 
 /**
  * Advocates list for case assignment and appointment booking.
@@ -32,9 +33,9 @@ export const GET = apiHandler(async (request) => {
     ...(q
       ? {
           OR: [
-            { name: { contains: q } },
+            { name: containsInsensitive(q) },
             ...(digits ? [{ mobile: { contains: digits } }] : []),
-            { unitId: { contains: q } },
+            { unitId: containsInsensitive(q) },
           ],
         }
       : {}),
