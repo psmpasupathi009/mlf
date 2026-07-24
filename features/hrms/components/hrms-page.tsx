@@ -73,6 +73,7 @@ export function HrmsPage({ user }: { user: PublicUser }) {
   const [rejectTarget, setRejectTarget] = useState<LeaveSummary | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [deciding, setDeciding] = useState(false);
+  const [cancelBusyId, setCancelBusyId] = useState<string | null>(null);
 
   const today = istDateKey();
   const todayRecord = myAttendance.find((a) => a.date === today) ?? null;
@@ -217,6 +218,29 @@ export function HrmsPage({ user }: { user: PublicUser }) {
     void load();
   }
 
+  async function handleCancelLeave(unitId: string) {
+    if (
+      !window.confirm(
+        "Cancel this leave request? You can apply again later if needed."
+      )
+    ) {
+      return;
+    }
+    setCancelBusyId(unitId);
+    const { ok, data } = await apiFetch(`/api/v1/hrms/leave/${unitId}/cancel`, {
+      method: "POST",
+    });
+    setCancelBusyId(null);
+    if (!ok) {
+      toast.error(
+        getErrorMessage(data as Record<string, unknown>, "Failed to cancel leave")
+      );
+      return;
+    }
+    toast.success("Leave request cancelled");
+    void load();
+  }
+
   async function handleApprove(unitId: string) {
     setDeciding(true);
     const { ok, data } = await apiFetch(`/api/v1/hrms/leave/${unitId}/decide`, {
@@ -304,6 +328,7 @@ export function HrmsPage({ user }: { user: PublicUser }) {
                   <TableHead className="hidden sm:table-cell">To</TableHead>
                   <TableHead className="hidden md:table-cell">Reason</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -323,6 +348,19 @@ export function HrmsPage({ user }: { user: PublicUser }) {
                     </TableCell>
                     <TableCell>
                       <Badge variant={LEAVE_VARIANT[l.status] ?? "outline"}>{l.status}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {l.status === "pending" ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={cancelBusyId === l.unitId}
+                          onClick={() => handleCancelLeave(l.unitId)}
+                        >
+                          {cancelBusyId === l.unitId ? "Cancelling…" : "Cancel"}
+                        </Button>
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 ))}

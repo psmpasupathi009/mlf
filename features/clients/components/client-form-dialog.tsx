@@ -190,11 +190,11 @@ export function ClientFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      {/* z-[70]: nested from ClientPicker inside other dialogs */}
+      {/* z-70: nested from ClientPicker inside other dialogs */}
       <DialogContent
         size="lg"
-        className="z-[70] p-0"
-        overlayClassName="z-[70]"
+        className="z-70 p-0"
+        overlayClassName="z-70"
       >
         <DialogHeader>
           <DialogTitle>
