@@ -292,7 +292,7 @@ export function DiaryPage({ user }: { user: PublicUser }) {
       </div>
 
       {truncated ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 print:hidden">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200 print:hidden">
           Showing the first 100 hearings for this day. Narrow by advocate or
           open Cases for the full register.
         </div>

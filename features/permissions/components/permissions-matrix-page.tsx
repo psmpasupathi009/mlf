@@ -224,7 +224,7 @@ export function PermissionsMatrixPage({ user }: { user: PublicUser }) {
       />
 
       {justSeeded ? (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-200">
           Default permissions were written automatically so the office is not locked out. Review and
           save if you need changes.
         </div>
@@ -399,7 +399,7 @@ export function PermissionsMatrixPage({ user }: { user: PublicUser }) {
                                   key={role}
                                   className={cn(
                                     "px-3 py-3 text-center",
-                                    allowed ? "bg-emerald-50/70" : ""
+                                    allowed ? "bg-emerald-50/70 dark:bg-emerald-950/30" : ""
                                   )}
                                 >
                                   <div className="flex justify-center">

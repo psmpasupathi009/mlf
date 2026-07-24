@@ -204,7 +204,7 @@ export function UploadDocumentDialog({
               className={cn(
                 "flex w-full flex-col items-center justify-center gap-2 rounded-xl border border-dashed px-4 py-8 text-center transition-colors",
                 dragging
-                  ? "border-navy bg-[#eef1f6]"
+                  ? "border-navy bg-secondary"
                   : "border-border bg-muted/30 hover:border-navy/40 hover:bg-muted/50"
               )}
             >

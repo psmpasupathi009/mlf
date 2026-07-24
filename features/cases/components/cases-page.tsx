@@ -294,7 +294,7 @@ export function CasesPage({ user }: { user: PublicUser }) {
                       <TableCell className="font-medium text-navy">
                         <div className="space-y-0.5">
                           {c.caseNumber ?? (
-                            <span className="font-normal text-amber-700">
+                            <span className="font-normal text-amber-700 dark:text-amber-400">
                               Pending
                             </span>
                           )}

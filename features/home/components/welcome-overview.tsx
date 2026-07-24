@@ -336,7 +336,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
                 unitId={a.advocateUnitId}
               />
             ) : (
-              <span className="text-amber-700">Unassigned</span>
+              <span className="text-amber-700 dark:text-amber-400">Unassigned</span>
             ),
           advocateLabel:
             a.advocateName?.trim() ||
@@ -557,7 +557,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
   return (
     <section className="space-y-6">
       <div className="overflow-hidden rounded-2xl border border-brand/20 bg-brand text-brand-foreground shadow-sm">
-        <div className="relative px-5 py-6 sm:px-7 sm:py-7">
+        <div className="relative px-4 py-5 sm:px-6 sm:py-6 md:px-7 md:py-7">
           <div
             className="pointer-events-none absolute inset-0 opacity-[0.14]"
             style={{
@@ -566,15 +566,15 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
             }}
             aria-hidden
           />
-          <div className="relative flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-            <div>
+          <div className="relative flex flex-col gap-4 sm:gap-5 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
                 <p className="text-sm text-white/65">{formatTodayLabel()}</p>
-                <span className="rounded-full bg-gold/20 px-2.5 py-0.5 text-[11px] font-medium text-gold">
+                <span className="rounded-md bg-gold/20 px-2 py-0.5 text-[11px] font-medium text-gold">
                   {isAdmin ? "Admin office board" : "My day"}
                 </span>
               </div>
-              <h1 className="mt-1 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+              <h1 className="mt-1 text-xl font-semibold tracking-tight text-white sm:text-2xl md:text-3xl">
                 {greetingLabel()}
                 {firstName ? `, ${firstName}` : ""}
               </h1>
@@ -673,7 +673,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
                         </p>
                       ) : null}
                     </div>
-                    <span className="rounded-lg bg-[#eef1f6] p-2.5 text-navy transition-colors group-hover:bg-brand group-hover:text-brand-foreground dark:bg-secondary dark:text-navy">
+                    <span className="rounded-lg bg-secondary p-2.5 text-navy transition-colors group-hover:bg-brand group-hover:text-brand-foreground">
                       <Icon className="size-4" />
                     </span>
                   </CardContent>
@@ -725,7 +725,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
                             item.tone === "warning" &&
                               "bg-amber-50 text-amber-800 dark:bg-amber-950 dark:text-amber-300",
                             item.tone === "info" &&
-                              "bg-[#eef1f6] text-navy dark:bg-secondary dark:text-navy"
+                              "bg-secondary text-navy"
                           )}
                         >
                           <AlertTriangle className="size-3.5" />
@@ -926,11 +926,11 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
-              <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900">
+              <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900 dark:bg-amber-950/50 dark:text-amber-300">
                 <UserX className="size-3.5" />
                 {presenceStats.absent} absent
               </span>
-              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800">
+              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
                 <UserCheck className="size-3.5" />
                 {presenceStats.present} present
               </span>

@@ -185,7 +185,7 @@ export function CaseDocumentsPanel({
                   className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="flex min-w-0 items-start gap-3">
-                    <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-[#eef1f6] text-navy">
+                    <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-secondary text-navy">
                       <Icon className="size-4" />
                     </span>
                     <div className="min-w-0">

@@ -439,7 +439,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                                 className="mt-0.5"
                               />
                             ) : (
-                              <span className="text-amber-700">Unassigned</span>
+                              <span className="text-amber-700 dark:text-amber-400">Unassigned</span>
                             )}
                           </div>
                           <div className="min-w-0">

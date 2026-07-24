@@ -6,7 +6,7 @@ export function SiteFooter() {
 
   return (
     <footer className="border-t border-border/80 bg-muted pb-[env(safe-area-inset-bottom)] print:bg-white">
-      <div className="flex min-h-11 w-full flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:px-4 lg:px-6">
+      <div className="flex min-h-11 w-full flex-wrap items-center justify-between gap-2 px-3 py-2.5 sm:px-5 md:px-6 lg:px-8">
         <p className="text-xs text-muted-foreground">
           © {year} {brand.name}
         </p>

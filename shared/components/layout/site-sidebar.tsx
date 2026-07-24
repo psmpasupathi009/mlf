@@ -96,7 +96,7 @@ export function SiteSidebar({ user }: { user: PublicUser }) {
 
   return (
     <Sidebar collapsible="icon" variant="sidebar" className="print:hidden">
-      <SidebarHeader className="items-center p-2">
+      <SidebarHeader className="flex flex-row items-center p-2 group-data-[collapsible=icon]:justify-center">
         <SidebarBrand />
       </SidebarHeader>
 

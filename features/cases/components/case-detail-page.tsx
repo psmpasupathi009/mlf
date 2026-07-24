@@ -211,7 +211,7 @@ export function CaseDetailPage({
             </p>
             <p className="mt-2 text-sm font-medium text-navy">
               {item.caseNumber ?? (
-                <span className="text-amber-700">Not allotted yet</span>
+                <span className="text-amber-700 dark:text-amber-400">Not allotted yet</span>
               )}
             </p>
           </CardContent>

@@ -420,10 +420,10 @@ export function HrmsPage({ user }: { user: PublicUser }) {
             </div>
             {!loading && presenceRows.length > 0 ? (
               <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                <span className="rounded-md bg-amber-50 px-2 py-0.5 font-semibold text-amber-900">
+                <span className="rounded-md bg-amber-50 px-2 py-0.5 font-semibold text-amber-900 dark:bg-amber-950/50 dark:text-amber-300">
                   {presenceStats.absent} absent
                 </span>
-                <span className="rounded-md bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-800">
+                <span className="rounded-md bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
                   {presenceStats.present} present
                 </span>
                 <span className="rounded-md bg-muted px-2 py-0.5 font-medium text-muted-foreground">
@@ -455,7 +455,9 @@ export function HrmsPage({ user }: { user: PublicUser }) {
                     <TableRow
                       key={row.key}
                       className={
-                        row.status === "absent" ? "bg-amber-50/40" : undefined
+                        row.status === "absent"
+                          ? "bg-amber-50/40 dark:bg-amber-950/25"
+                          : undefined
                       }
                     >
                       <TableCell>
