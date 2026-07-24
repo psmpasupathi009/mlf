@@ -146,23 +146,26 @@ export function CaseDetailPage({
             : "Case file and case documents"
         }
         actions={
-          <>
-            <UnitIdBadge value={item.unitId} />
-            <Badge variant={STATUS_VARIANT[item.status] ?? "outline"}>
-              {item.status}
-            </Badge>
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="flex flex-wrap items-center gap-2">
+              <UnitIdBadge value={item.unitId} />
+              <Badge variant={STATUS_VARIANT[item.status] ?? "outline"}>
+                {item.status}
+              </Badge>
+            </div>
             {can("cases", "edit") ? (
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
+                className="w-full sm:w-auto"
                 onClick={() => setEditOpen(true)}
               >
                 <Pencil className="size-4" />
                 Edit
               </Button>
             ) : null}
-          </>
+          </div>
         }
       />
 

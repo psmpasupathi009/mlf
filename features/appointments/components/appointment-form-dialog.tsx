@@ -425,7 +425,7 @@ export function AppointmentFormDialog({
               title="Current booking"
               description="What you are moving — old slot frees after save"
             >
-              <div className="grid gap-3 rounded-xl border border-border/60 bg-muted/30 p-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-3 rounded-xl border border-border/60 bg-muted/30 p-3 text-sm md:grid-cols-2 lg:grid-cols-4">
                 <div>
                   <p className="text-xs text-muted-foreground">Client</p>
                   <p className="font-medium text-navy">

@@ -242,9 +242,9 @@ export function EmployeesPage({ user }: { user: PublicUser }) {
                 <TableHead className="hidden lg:table-cell">ID</TableHead>
                 <TableHead className="hidden md:table-cell">Mobile</TableHead>
                 <TableHead className="hidden lg:table-cell">Designation</TableHead>
-                <TableHead>Roles</TableHead>
-                <TableHead className="hidden sm:table-cell">Access</TableHead>
-                <TableHead className="hidden md:table-cell">Last login</TableHead>
+                <TableHead className="hidden sm:table-cell">Roles</TableHead>
+                <TableHead className="hidden md:table-cell">Access</TableHead>
+                <TableHead className="hidden lg:table-cell">Last login</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -260,13 +260,30 @@ export function EmployeesPage({ user }: { user: PublicUser }) {
                 : rows.map((emp) => (
                     <TableRow key={emp.unitId} className={cn(!emp.isActive && "opacity-70")}>
                       <TableCell>
-                        <PersonChip
-                          name={emp.displayName || emp.name}
-                          photoUrl={emp.photoUrl}
-                          mobile={emp.mobile}
-                          unitId={emp.unitId}
-                          subtitle={emp.email || emp.designation || undefined}
-                        />
+                        <div className="min-w-0 space-y-1">
+                          <PersonChip
+                            name={emp.displayName || emp.name}
+                            photoUrl={emp.photoUrl}
+                            mobile={emp.mobile}
+                            unitId={emp.unitId}
+                            subtitle={emp.email || emp.designation || undefined}
+                          />
+                          <div className="flex flex-wrap gap-1 sm:hidden">
+                            {emp.roles.slice(0, 1).map((r) => (
+                              <Badge key={r} variant="outline" className="normal-case">
+                                {roleLabel(r)}
+                              </Badge>
+                            ))}
+                            {emp.roles.length > 1 ? (
+                              <Badge variant="muted" className="normal-case">
+                                +{emp.roles.length - 1}
+                              </Badge>
+                            ) : null}
+                            <Badge variant={emp.isActive ? "success" : "muted"}>
+                              {emp.isActive ? "Active" : "Inactive"}
+                            </Badge>
+                          </div>
+                        </div>
                       </TableCell>
                       <TableCell className="hidden lg:table-cell">
                         <UnitIdBadge value={emp.unitId} />
@@ -283,7 +300,7 @@ export function EmployeesPage({ user }: { user: PublicUser }) {
                           "—"
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="hidden sm:table-cell">
                         <div className="flex flex-wrap gap-1">
                           {emp.roles.map((r) => (
                             <Badge key={r} variant="outline" className="normal-case">
@@ -292,7 +309,7 @@ export function EmployeesPage({ user }: { user: PublicUser }) {
                           ))}
                         </div>
                       </TableCell>
-                      <TableCell className="hidden sm:table-cell">
+                      <TableCell className="hidden md:table-cell">
                         <div className="flex flex-wrap gap-1">
                           <Badge variant={emp.isActive ? "success" : "muted"}>
                             {emp.isActive ? "Active" : "Inactive"}
@@ -302,7 +319,7 @@ export function EmployeesPage({ user }: { user: PublicUser }) {
                           </Badge>
                         </div>
                       </TableCell>
-                      <TableCell className="hidden whitespace-nowrap text-muted-foreground md:table-cell">
+                      <TableCell className="hidden whitespace-nowrap text-muted-foreground lg:table-cell">
                         {formatLastLogin(emp.lastLoginAt)}
                       </TableCell>
                       <TableCell className="text-right">

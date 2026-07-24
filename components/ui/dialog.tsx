@@ -26,7 +26,8 @@ const DIALOG_SIZE_CLASSES: Record<DialogContentSize, string> = {
   /** Large multi-section registers (client, employee, case) */
   lg: [
     "w-[calc(100dvw-1rem)] max-w-[min(1440px,calc(100dvw-1rem))]",
-    "h-[min(92dvh,calc(100dvh-1rem))] max-h-[min(92dvh,calc(100dvh-1rem))]",
+    "h-auto max-h-[min(92dvh,calc(100dvh-1rem))]",
+    "md:h-[min(92dvh,calc(100dvh-1rem))]",
   ].join(" "),
 };
 

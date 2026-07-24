@@ -268,7 +268,7 @@ export function CasesPage({ user }: { user: PublicUser }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>ID</TableHead>
+                <TableHead className="hidden md:table-cell">ID</TableHead>
                 <TableHead>Court no.</TableHead>
                 <TableHead className="hidden md:table-cell">Client</TableHead>
                 <TableHead className="hidden lg:table-cell">Court</TableHead>
@@ -288,7 +288,7 @@ export function CasesPage({ user }: { user: PublicUser }) {
                   ))
                 : rows.map((c) => (
                     <TableRow key={c.unitId}>
-                      <TableCell>
+                      <TableCell className="hidden md:table-cell">
                         <UnitIdBadge value={c.unitId} />
                       </TableCell>
                       <TableCell className="font-medium text-navy">
@@ -301,6 +301,9 @@ export function CasesPage({ user }: { user: PublicUser }) {
                           <p className="text-xs font-normal text-muted-foreground md:hidden">
                             {c.clientName ?? c.clientUnitId}
                           </p>
+                          <div className="md:hidden">
+                            <UnitIdBadge value={c.unitId} className="mt-1" />
+                          </div>
                         </div>
                       </TableCell>
                       <TableCell className="hidden md:table-cell">

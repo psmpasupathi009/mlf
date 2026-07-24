@@ -149,11 +149,11 @@ export function ClientsPage({ user }: { user: PublicUser }) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>ID</TableHead>
+                <TableHead className="hidden md:table-cell">ID</TableHead>
                 <TableHead>Name</TableHead>
-                <TableHead>Mobile</TableHead>
+                <TableHead className="hidden sm:table-cell">Mobile</TableHead>
                 <TableHead className="hidden md:table-cell">Email</TableHead>
-                <TableHead className="hidden md:table-cell">Address</TableHead>
+                <TableHead className="hidden lg:table-cell">Address</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -170,22 +170,28 @@ export function ClientsPage({ user }: { user: PublicUser }) {
                     const secondary = locationLine(c);
                     return (
                       <TableRow key={c.unitId}>
-                        <TableCell>
+                        <TableCell className="hidden md:table-cell">
                           <UnitIdBadge value={c.unitId} />
                         </TableCell>
                         <TableCell>
                           <div className="min-w-0">
                             <p className="font-medium text-navy">{c.name}</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground sm:hidden">
+                              +91 {c.mobile}
+                              {secondary ? ` · ${secondary}` : ""}
+                            </p>
                             {secondary ? (
-                              <p className="mt-0.5 truncate text-xs text-muted-foreground md:hidden">
+                              <p className="mt-0.5 hidden truncate text-xs text-muted-foreground sm:block md:hidden">
                                 {secondary}
                               </p>
                             ) : null}
                           </div>
                         </TableCell>
-                        <TableCell className="whitespace-nowrap">+91 {c.mobile}</TableCell>
+                        <TableCell className="hidden whitespace-nowrap sm:table-cell">
+                          +91 {c.mobile}
+                        </TableCell>
                         <TableCell className="hidden md:table-cell">{c.email ?? "—"}</TableCell>
-                        <TableCell className="hidden max-w-xs truncate md:table-cell">
+                        <TableCell className="hidden max-w-xs truncate lg:table-cell">
                           {c.address ?? "—"}
                         </TableCell>
                         <TableCell className="text-right">

@@ -195,7 +195,7 @@ export function AccountsPage({ user }: { user: PublicUser }) {
                 <TableHead className="hidden md:table-cell">Case</TableHead>
                 <TableHead className="hidden sm:table-cell">Type</TableHead>
                 <TableHead>Amount</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead className="hidden sm:table-cell">Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -212,6 +212,11 @@ export function AccountsPage({ user }: { user: PublicUser }) {
                         {p.caseUnitId ?? "No case"} ·{" "}
                         <span className="capitalize">{p.type}</span>
                       </p>
+                      <div className="sm:hidden">
+                        <Badge variant={STATUS_VARIANT[p.status] ?? "outline"}>
+                          {p.status}
+                        </Badge>
+                      </div>
                     </div>
                   </TableCell>
                   <TableCell className="hidden md:table-cell">
@@ -221,12 +226,18 @@ export function AccountsPage({ user }: { user: PublicUser }) {
                     {p.type}
                   </TableCell>
                   <TableCell className="font-medium text-navy">{rupee(p.amount)}</TableCell>
-                  <TableCell>
+                  <TableCell className="hidden sm:table-cell">
                     <Badge variant={STATUS_VARIANT[p.status] ?? "outline"}>{p.status}</Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     {can("edit") && p.status !== "void" ? (
-                      <Button type="button" variant="destructive" size="sm" onClick={() => setVoiding(p.unitId)}>
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="px-2 sm:px-3"
+                        onClick={() => setVoiding(p.unitId)}
+                      >
                         Void
                       </Button>
                     ) : null}

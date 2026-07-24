@@ -138,6 +138,7 @@ type TimelineRow = {
   href: string;
   client: string;
   advocate: ReactNode;
+  advocateLabel: string;
   detail: string;
   refId: string;
   advocateMobile: string | null;
@@ -337,6 +338,9 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
             ) : (
               <span className="text-amber-700">Unassigned</span>
             ),
+          advocateLabel:
+            a.advocateName?.trim() ||
+            (a.advocateMobile ? `+91 ${a.advocateMobile}` : "Unassigned"),
           detail: [
             a.mode,
             `${a.durationMin} min`,
@@ -363,6 +367,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
           href: `/cases/${h.caseUnitId}`,
           client: h.clientName,
           advocate: h.advocateName ?? h.advocateMobile ?? "—",
+          advocateLabel: h.advocateName ?? h.advocateMobile ?? "—",
           detail:
             [h.courtName, h.district, h.caseType].filter(Boolean).join(" · ") ||
             "Court not set",
@@ -580,9 +585,14 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
               </p>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap">
               {moduleOn("appointments") && can("appointments.create") ? (
-                <Button asChild variant="gold" size="sm" className="shadow-none">
+                <Button
+                  asChild
+                  variant="gold"
+                  size="sm"
+                  className="w-full shadow-none sm:w-auto"
+                >
                   <Link href="/appointments?new=1">
                     <Plus className="size-4" />
                     Book appointment
@@ -590,7 +600,12 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
                 </Button>
               ) : null}
               {moduleOn("clients") && can("clients.create") ? (
-                <Button asChild size="sm" variant="on-brand-solid">
+                <Button
+                  asChild
+                  size="sm"
+                  variant="on-brand-solid"
+                  className="w-full sm:w-auto"
+                >
                   <Link href="/clients?new=1">
                     <Plus className="size-4" />
                     New client
@@ -598,7 +613,12 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
                 </Button>
               ) : null}
               {moduleOn("cases") && can("cases.create") ? (
-                <Button asChild size="sm" variant="on-brand-solid">
+                <Button
+                  asChild
+                  size="sm"
+                  variant="on-brand-solid"
+                  className="w-full sm:w-auto"
+                >
                   <Link href="/cases?new=1">
                     <Plus className="size-4" />
                     Register case
@@ -606,7 +626,12 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
                 </Button>
               ) : null}
               {moduleOn("accounts") && can("accounts.create") ? (
-                <Button asChild size="sm" variant="on-brand-solid">
+                <Button
+                  asChild
+                  size="sm"
+                  variant="on-brand-solid"
+                  className="w-full sm:w-auto"
+                >
                   <Link href="/accounts?new=1">
                     <Plus className="size-4" />
                     Add payment
@@ -683,7 +708,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
               <TableHeader>
                 <TableRow>
                   <TableHead>Issue</TableHead>
-                  <TableHead>Detail</TableHead>
+                  <TableHead className="hidden sm:table-cell">Detail</TableHead>
                   <TableHead className="text-right">Action</TableHead>
                 </TableRow>
               </TableHeader>
@@ -691,7 +716,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
                 {attention.map((item) => (
                   <TableRow key={item.label}>
                     <TableCell>
-                      <div className="flex items-center gap-2.5">
+                      <div className="flex items-start gap-2.5">
                         <span
                           className={cn(
                             "flex size-8 shrink-0 items-center justify-center rounded-lg",
@@ -705,16 +730,26 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
                         >
                           <AlertTriangle className="size-3.5" />
                         </span>
-                        <span className="font-medium text-navy">
-                          {item.label}
-                        </span>
+                        <div className="min-w-0">
+                          <span className="font-medium text-navy">
+                            {item.label}
+                          </span>
+                          <p className="mt-0.5 text-xs text-muted-foreground sm:hidden">
+                            {item.value}
+                          </p>
+                        </div>
                       </div>
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell className="hidden text-muted-foreground sm:table-cell">
                       {item.value}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button asChild size="sm" variant="outline">
+                      <Button
+                        asChild
+                        size="sm"
+                        variant="outline"
+                        className="w-full sm:w-auto"
+                      >
                         <Link href={item.href}>
                           {item.cta}
                           <ArrowRight className="size-3.5" />
@@ -857,7 +892,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
                       ) : null}
                       <p className="mt-0.5 text-xs capitalize text-muted-foreground sm:hidden">
                         {row.kind === "hearing" ? "Hearing" : "Appt"}
-                        {row.advocate ? ` · ${row.advocate}` : ""}
+                        {row.advocateLabel ? ` · ${row.advocateLabel}` : ""}
                       </p>
                     </TableCell>
                     <TableCell className="hidden md:table-cell">{row.advocate}</TableCell>
