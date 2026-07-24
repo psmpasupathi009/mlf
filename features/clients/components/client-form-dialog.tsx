@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
+  DialogBody,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -189,12 +190,13 @@ export function ClientFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
+      {/* z-[70]: nested from ClientPicker inside other dialogs */}
       <DialogContent
         size="lg"
         className="z-[70] p-0"
         overlayClassName="z-[70]"
       >
-        <DialogHeader className="shrink-0 border-b border-border/80 px-3 py-3 pr-11 sm:px-5 sm:py-4 md:px-6">
+        <DialogHeader>
           <DialogTitle>
             {isEdit ? "Edit client intake" : "Client intake"}
           </DialogTitle>
@@ -205,188 +207,193 @@ export function ClientFormDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-3 sm:px-5 sm:py-4 md:px-6 md:py-5">
-          <div className="grid min-w-0 gap-4 md:grid-cols-2">
-            <Section
-              title="1. Identity"
-              description="As on petition / vakalat — name and parent or spouse"
-            >
-              <div className="grid min-w-0 gap-3 sm:grid-cols-2 sm:gap-4">
-                <div className="grid min-w-0 gap-2 sm:col-span-2">
-                  <Label htmlFor="cl-name">
-                    Full name <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="cl-name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="As in petition / ID"
-                  />
+        <DialogBody>
+          <div className="flex min-w-0 flex-col gap-4 lg:grid lg:grid-cols-2 lg:items-start">
+            <div className="space-y-4">
+              <Section
+                title="1. Identity"
+                description="As on petition / vakalat — name and parent or spouse"
+              >
+                <div className="grid min-w-0 gap-3 md:grid-cols-2 md:gap-4">
+                  <div className="grid min-w-0 gap-2 md:col-span-2">
+                    <Label htmlFor="cl-name">
+                      Full name <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="cl-name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="As in petition / ID"
+                    />
+                  </div>
+                  <div className="grid min-w-0 gap-2">
+                    <Label>Relation</Label>
+                    <SearchableSelect
+                      value={relationPrefix}
+                      onChange={setRelationPrefix}
+                      options={RELATION_PREFIX_OPTIONS}
+                      placeholder="S/o · W/o…"
+                      searchPlaceholder="Search relation…"
+                    />
+                  </div>
+                  <div className="grid min-w-0 gap-2">
+                    <Label htmlFor="cl-father">
+                      Father / spouse / guardian name
+                    </Label>
+                    <Input
+                      id="cl-father"
+                      value={relationName}
+                      onChange={(e) => setRelationName(e.target.value)}
+                      placeholder="Name"
+                    />
+                  </div>
+                  <div className="grid min-w-0 gap-2">
+                    <Label>Gender</Label>
+                    <SearchableSelect
+                      value={gender}
+                      onChange={setGender}
+                      options={[...CLIENT_GENDER_OPTIONS]}
+                      placeholder="Optional"
+                      searchPlaceholder="Search…"
+                    />
+                  </div>
+                  <div className="grid min-w-0 gap-2">
+                    <Label>Occupation</Label>
+                    <SelectOrOther
+                      value={occupation}
+                      onChange={setOccupation}
+                      options={OCCUPATION_OPTIONS}
+                      placeholder="Select occupation"
+                    />
+                  </div>
                 </div>
-                <div className="grid min-w-0 gap-2">
-                  <Label>Relation</Label>
-                  <SearchableSelect
-                    value={relationPrefix}
-                    onChange={setRelationPrefix}
-                    options={RELATION_PREFIX_OPTIONS}
-                    placeholder="S/o · W/o…"
-                    searchPlaceholder="Search relation…"
-                  />
-                </div>
-                <div className="grid min-w-0 gap-2">
-                  <Label htmlFor="cl-father">
-                    Father / spouse / guardian name
-                  </Label>
-                  <Input
-                    id="cl-father"
-                    value={relationName}
-                    onChange={(e) => setRelationName(e.target.value)}
-                    placeholder="Name"
-                  />
-                </div>
-                <div className="grid min-w-0 gap-2">
-                  <Label>Gender</Label>
-                  <SearchableSelect
-                    value={gender}
-                    onChange={setGender}
-                    options={[...CLIENT_GENDER_OPTIONS]}
-                    placeholder="Optional"
-                    searchPlaceholder="Search…"
-                  />
-                </div>
-                <div className="grid min-w-0 gap-2">
-                  <Label>Occupation</Label>
-                  <SelectOrOther
-                    value={occupation}
-                    onChange={setOccupation}
-                    options={OCCUPATION_OPTIONS}
-                    placeholder="Select occupation"
-                  />
-                </div>
-              </div>
-            </Section>
+              </Section>
 
-            <Section
-              title="2. Contact"
-              description="Primary mobile is used for hearing SMS"
-            >
-              <div className="grid min-w-0 gap-3 sm:grid-cols-2 sm:gap-4">
-                <div className="grid min-w-0 gap-2">
-                  <Label htmlFor="cl-mobile">
-                    Mobile <span className="text-destructive">*</span>
-                  </Label>
-                  <Input
-                    id="cl-mobile"
-                    value={mobile}
-                    onChange={(e) => setMobile(e.target.value)}
-                    placeholder="10-digit mobile"
-                    inputMode="numeric"
-                  />
+              <Section
+                title="2. Contact"
+                description="Primary mobile is used for hearing SMS"
+              >
+                <div className="grid min-w-0 gap-3 md:grid-cols-2 md:gap-4">
+                  <div className="grid min-w-0 gap-2">
+                    <Label htmlFor="cl-mobile">
+                      Mobile <span className="text-destructive">*</span>
+                    </Label>
+                    <Input
+                      id="cl-mobile"
+                      value={mobile}
+                      onChange={(e) => setMobile(e.target.value)}
+                      placeholder="10-digit mobile"
+                      inputMode="numeric"
+                    />
+                  </div>
+                  <div className="grid min-w-0 gap-2">
+                    <Label htmlFor="cl-alt-mobile">Alt mobile</Label>
+                    <Input
+                      id="cl-alt-mobile"
+                      value={altMobile}
+                      onChange={(e) => setAltMobile(e.target.value)}
+                    />
+                  </div>
+                  <div className="grid min-w-0 gap-2 md:col-span-2">
+                    <Label htmlFor="cl-email">Email</Label>
+                    <Input
+                      id="cl-email"
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                    />
+                  </div>
+                  <label className="flex items-start gap-2 text-sm md:col-span-2">
+                    <input
+                      type="checkbox"
+                      className="mt-1"
+                      checked={smsConsent}
+                      onChange={(e) => setSmsConsent(e.target.checked)}
+                    />
+                    <span>
+                      Client consents to hearing / office SMS on the primary
+                      mobile (see Privacy policy).
+                    </span>
+                  </label>
                 </div>
-                <div className="grid min-w-0 gap-2">
-                  <Label htmlFor="cl-alt-mobile">Alt mobile</Label>
-                  <Input
-                    id="cl-alt-mobile"
-                    value={altMobile}
-                    onChange={(e) => setAltMobile(e.target.value)}
-                  />
-                </div>
-                <div className="grid min-w-0 gap-2 sm:col-span-2">
-                  <Label htmlFor="cl-email">Email</Label>
-                  <Input
-                    id="cl-email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                  />
-                </div>
-                <label className="flex items-start gap-2 text-sm sm:col-span-2">
-                  <input
-                    type="checkbox"
-                    className="mt-1"
-                    checked={smsConsent}
-                    onChange={(e) => setSmsConsent(e.target.checked)}
-                  />
-                  <span>
-                    Client consents to hearing / office SMS on the primary
-                    mobile (see Privacy policy).
-                  </span>
-                </label>
-              </div>
-            </Section>
+              </Section>
+            </div>
 
-            <Section
-              className="md:col-span-2"
-              title="3. Address"
-              description="For notices and vakalat — select state and district; type town / city"
-            >
-              <div className="grid min-w-0 gap-4">
-                <div className="grid min-w-0 gap-2">
-                  <Label htmlFor="cl-address">Door / street / area</Label>
-                  <Textarea
-                    id="cl-address"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    rows={2}
-                    placeholder="Door no., street, village / locality"
+            <div className="space-y-4">
+              <Section
+                title="3. Address"
+                description="For notices and vakalat — select state and district; type town / city"
+              >
+                <div className="grid min-w-0 gap-4">
+                  <div className="grid min-w-0 gap-2">
+                    <Label htmlFor="cl-address">Door / street / area</Label>
+                    <Textarea
+                      id="cl-address"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      rows={2}
+                      placeholder="Door no., street, village / locality"
+                    />
+                  </div>
+                  <LocationCascade
+                    key={`${open}-${client?.unitId ?? "new"}`}
+                    state={state}
+                    district={district}
+                    city={city}
+                    onChange={onLocationChange}
                   />
                 </div>
-                <LocationCascade
-                  key={`${open}-${client?.unitId ?? "new"}`}
-                  state={state}
-                  district={district}
-                  city={city}
-                  onChange={onLocationChange}
-                />
-              </div>
-            </Section>
+              </Section>
 
-            <Section
-              className="md:col-span-2"
-              title="4. Matter at intake"
-              description="Short facts before case register — opposite party goes on the case form"
-            >
-              <div className="grid min-w-0 gap-4 sm:grid-cols-2">
-                <div className="grid min-w-0 gap-2 sm:col-span-2">
-                  <Label htmlFor="cl-matter">Matter brief</Label>
-                  <Textarea
-                    id="cl-matter"
-                    value={matterBrief}
-                    onChange={(e) => setMatterBrief(e.target.value)}
-                    rows={3}
-                    placeholder="What happened, relief sought, urgency, papers brought…"
-                  />
+              <Section
+                title="4. Matter at intake"
+                description="Short facts before case register — opposite party goes on the case form"
+              >
+                <div className="grid min-w-0 gap-4 md:grid-cols-2">
+                  <div className="grid min-w-0 gap-2 md:col-span-2">
+                    <Label htmlFor="cl-matter">Matter brief</Label>
+                    <Textarea
+                      id="cl-matter"
+                      value={matterBrief}
+                      onChange={(e) => setMatterBrief(e.target.value)}
+                      rows={3}
+                      placeholder="What happened, relief sought, urgency, papers brought…"
+                    />
+                  </div>
+                  <div className="grid min-w-0 gap-2">
+                    <Label>Referred by</Label>
+                    <SelectOrOther
+                      value={referredBy}
+                      onChange={setReferredBy}
+                      options={REFERRED_BY_OPTIONS}
+                      placeholder="How they found us"
+                      otherPlaceholder="Name / source"
+                    />
+                  </div>
+                  <div className="grid min-w-0 gap-2">
+                    <Label htmlFor="cl-notes">Internal notes</Label>
+                    <Textarea
+                      id="cl-notes"
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      rows={2}
+                      placeholder="Clerk notes — not for SMS"
+                    />
+                  </div>
                 </div>
-                <div className="grid min-w-0 gap-2">
-                  <Label>Referred by</Label>
-                  <SelectOrOther
-                    value={referredBy}
-                    onChange={setReferredBy}
-                    options={REFERRED_BY_OPTIONS}
-                    placeholder="How they found us"
-                    otherPlaceholder="Name / source"
-                  />
-                </div>
-                <div className="grid min-w-0 gap-2">
-                  <Label htmlFor="cl-notes">Internal notes</Label>
-                  <Textarea
-                    id="cl-notes"
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    rows={2}
-                    placeholder="Clerk notes — not for SMS"
-                  />
-                </div>
-              </div>
-            </Section>
+              </Section>
+            </div>
 
             {error ? (
-              <p className="text-sm text-destructive md:col-span-2">{error}</p>
+              <p className="text-sm text-destructive lg:col-span-2">{error}</p>
             ) : null}
           </div>
-        </div>
+        </DialogBody>
 
-        <DialogFooter className="shrink-0 border-t border-border/80 bg-muted/30 px-3 py-3 sm:px-5 sm:py-4 md:px-6">
+        <DialogFooter className="bg-muted/30 sm:justify-between">
+          <p className="hidden text-xs text-muted-foreground sm:block">
+            Required: name and mobile
+          </p>
           <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
             <Button
               type="button"
