@@ -14,7 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { getErrorMessage } from "@/lib/api/client";
+import { apiFetch, getErrorMessage } from "@/lib/api/client";
 import type { PublicUser } from "@/lib/auth/session";
 
 async function cropToBlob(
@@ -114,18 +114,16 @@ export function ProfilePhotoCropDialog({
       const blob = await cropToBlob(src, croppedArea);
       const form = new FormData();
       form.set("file", blob, "avatar.jpg");
-      const res = await fetch("/api/v1/profile/photo", {
-        method: "POST",
-        body: form,
-        credentials: "include",
-      });
-      const body = await res.json().catch(() => ({}));
-      if (!res.ok || body?.ok === false) {
-        setError(getErrorMessage(body, "Upload failed"));
+      const { ok, data } = await apiFetch<{ user: PublicUser }>(
+        "/api/v1/profile/photo",
+        { method: "POST", body: form }
+      );
+      if (!ok) {
+        setError(getErrorMessage(data, "Upload failed"));
         setBusy(false);
         return;
       }
-      const user = (body.data?.user ?? body.user) as PublicUser;
+      const user = data.user;
       toast.success("Profile photo updated");
       reset();
       onUploaded(user);

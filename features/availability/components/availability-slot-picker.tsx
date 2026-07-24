@@ -254,7 +254,7 @@ export function AvailabilitySlotPicker({
                 {error}
               </p>
             ) : avail?.onLeave ? (
-              <p className="px-1 py-4 text-center text-xs text-amber-800">
+              <p className="px-1 py-4 text-center text-xs text-amber-700 dark:text-amber-300">
                 Advocate on approved leave this day
               </p>
             ) : !avail?.freeSlots.length ? (

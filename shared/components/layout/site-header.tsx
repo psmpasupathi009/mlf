@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ThemeToggle } from "@/shared/components/theme/theme-toggle";
+import { GlobalSearch } from "@/shared/components/layout/global-search";
 import { cn } from "@/lib/utils/cn";
 
 type SiteHeaderProps = {
@@ -31,7 +32,8 @@ export function SiteHeader({ brandName, className }: SiteHeaderProps) {
           {brandName}
         </Link>
 
-        <div className="flex w-10 shrink-0 items-center justify-end">
+        <div className="flex shrink-0 items-center justify-end gap-0.5">
+          <GlobalSearch />
           <ThemeToggle />
         </div>
       </div>

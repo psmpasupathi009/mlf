@@ -6,11 +6,10 @@ import { useTheme } from "next-themes";
 import { Button } from "@/components/ui/button";
 
 /**
- * Single-icon toggle (no absolute overlays) so the control stays in the header
- * and never “escapes” into page content on refresh/hydrate.
+ * Cycles system → light → dark so first-time visitors can override OS preference.
  */
 export function ThemeToggle() {
-  const { resolvedTheme, setTheme } = useTheme();
+  const { theme, resolvedTheme, setTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -34,6 +33,20 @@ export function ThemeToggle() {
   }
 
   const isDark = resolvedTheme === "dark";
+  const next =
+    theme === "system" ? "light" : theme === "light" ? "dark" : "system";
+  const label =
+    next === "light"
+      ? "Switch to light mode"
+      : next === "dark"
+        ? "Switch to dark mode"
+        : "Use system theme";
+  const title =
+    theme === "system"
+      ? "Theme: system"
+      : theme === "light"
+        ? "Theme: light"
+        : "Theme: dark";
 
   return (
     <Button
@@ -41,9 +54,9 @@ export function ThemeToggle() {
       variant="ghost"
       size="icon"
       className="shrink-0 text-navy hover:bg-muted hover:text-navy"
-      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      title={isDark ? "Light mode" : "Dark mode"}
-      onClick={() => setTheme(isDark ? "light" : "dark")}
+      aria-label={label}
+      title={title}
+      onClick={() => setTheme(next)}
     >
       {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
     </Button>

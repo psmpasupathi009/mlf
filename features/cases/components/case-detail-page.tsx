@@ -285,9 +285,7 @@ export function CaseDetailPage({
         </div>
         <CardContent className="p-0 pt-0">
           {hearings.length === 0 ? (
-            <p className="px-5 py-10 text-sm text-muted-foreground">
-              No hearings recorded yet.
-            </p>
+            <EmptyState compact title="No hearings recorded yet" />
           ) : (
             <Table>
               <TableHeader>

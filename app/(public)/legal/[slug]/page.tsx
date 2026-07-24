@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { brand } from "@/config/company/brand";
 import { getLegalPage, legalPages } from "@/config/company/legal";
+import { ThemeToggle } from "@/shared/components/theme/theme-toggle";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -25,27 +26,30 @@ export default async function LegalPageRoute({ params }: Props) {
   if (!page) notFound();
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-slate-100 via-white to-amber-50/40">
-      <header className="border-b border-border/80 bg-background/90">
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border/80 bg-background/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-3xl items-center justify-between gap-4 px-4 py-4">
           <Link href="/login" className="text-sm font-semibold text-navy">
             {brand.name}
           </Link>
-          <nav className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-            {legalPages.map((p) => (
-              <Link
-                key={p.slug}
-                href={`/legal/${p.slug}`}
-                className={
-                  p.slug === page.slug
-                    ? "font-medium text-navy"
-                    : "hover:text-navy"
-                }
-              >
-                {p.title}
-              </Link>
-            ))}
-          </nav>
+          <div className="flex items-center gap-3">
+            <nav className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+              {legalPages.map((p) => (
+                <Link
+                  key={p.slug}
+                  href={`/legal/${p.slug}`}
+                  className={
+                    p.slug === page.slug
+                      ? "font-medium text-navy"
+                      : "hover:text-navy"
+                  }
+                >
+                  {p.title}
+                </Link>
+              ))}
+            </nav>
+            <ThemeToggle />
+          </div>
         </div>
       </header>
 

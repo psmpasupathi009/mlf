@@ -5,6 +5,7 @@ import { writeAudit } from "@/lib/audit";
 import { updateCaseSchema } from "@/lib/validations/cases.schema";
 import { toCaseSummary, toHearingSummary } from "@/features/cases/server/serialize";
 import { toClientSummary } from "@/features/clients/server/serialize";
+import { toDocumentSummary } from "@/features/documents/server/serialize";
 
 export const GET = apiHandler(async (request, context) => {
   const { user, response } = await requirePerm(request, "cases", "view");
@@ -20,7 +21,6 @@ export const GET = apiHandler(async (request, context) => {
     prisma.document.findMany({
       where: { caseId: item.id },
       orderBy: { createdAt: "desc" },
-      select: { unitId: true, title: true, mimeType: true, size: true, createdAt: true },
     }),
   ]);
 
@@ -28,7 +28,7 @@ export const GET = apiHandler(async (request, context) => {
     case: toCaseSummary(item),
     client: client ? toClientSummary(client) : null,
     hearings: hearings.map(toHearingSummary),
-    documents,
+    documents: documents.map(toDocumentSummary),
   });
 });
 

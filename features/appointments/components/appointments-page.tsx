@@ -285,6 +285,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                     ? "bg-brand text-brand-foreground shadow-sm"
                     : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-navy"
                 )}
+                aria-pressed={range === c.id}
               >
                 <span className="block text-sm font-semibold">{c.label}</span>
                 <span

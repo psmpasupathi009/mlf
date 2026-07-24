@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { PageHeader } from "@/shared/components/data/page-header";
 import { DataToolbar } from "@/shared/components/data/data-toolbar";
@@ -62,12 +63,13 @@ const ROLE_FILTER_OPTIONS = (Object.keys(ROLE_LABELS) as UserRole[]).map((value)
 
 export function EmployeesPage({ user }: { user: PublicUser }) {
   const can = (action: string) => user.permissions.includes(`employees.${action}`);
+  const searchParams = useSearchParams();
 
   const [rows, setRows] = useState<EmployeeSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const pageSize = 20;
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(() => searchParams.get("q") ?? "");
   const debouncedSearch = useDebouncedValue(search, 300);
   const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive">("all");
   const [roleFilter, setRoleFilter] = useState<string>("all");

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import { LoginForm } from "@/features/auth/components/login-form";
+import { ThemeToggle } from "@/shared/components/theme/theme-toggle";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -33,7 +34,10 @@ export default function LoginPage() {
         </div>
       </aside>
 
-      <section className="flex flex-1 items-start justify-center px-4 py-6 sm:items-center sm:px-6 sm:py-8 md:min-h-dvh md:px-8 lg:px-16 xl:px-20">
+      <section className="relative flex flex-1 items-start justify-center px-4 py-6 sm:items-center sm:px-6 sm:py-8 md:min-h-dvh md:px-8 lg:px-16 xl:px-20">
+        <div className="absolute top-3 right-3 sm:top-4 sm:right-4">
+          <ThemeToggle />
+        </div>
         <div className="w-full max-w-86">
           <LoginForm />
           <p className="mt-8 flex flex-wrap items-center justify-center gap-x-3 gap-y-2 text-center text-[11px] text-muted-foreground">

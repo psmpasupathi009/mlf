@@ -696,7 +696,7 @@ export function AppointmentFormDialog({
           ) : null}
 
           {error ? (
-            <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-destructive">
+            <p className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-sm text-destructive dark:border-destructive/40 dark:bg-destructive/15">
               {error}
             </p>
           ) : null}

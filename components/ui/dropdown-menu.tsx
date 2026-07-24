@@ -49,7 +49,7 @@ function DropdownMenuItem({
         "focus:bg-muted data-disabled:pointer-events-none data-disabled:opacity-50",
         "[&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
         variant === "destructive" &&
-          "text-destructive focus:bg-red-50 focus:text-destructive",
+          "text-destructive focus:bg-red-50 focus:text-destructive dark:focus:bg-red-950/50",
         inset && "pl-8",
         className
       )}

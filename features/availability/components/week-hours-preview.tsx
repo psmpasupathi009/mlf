@@ -179,7 +179,7 @@ export function WeekHoursPreview({
                 <div
                   className={cn(
                     "relative h-40 w-full overflow-hidden rounded-xl",
-                    open ? "bg-navy/[0.06]" : "bg-muted/50"
+                    open ? "bg-navy/6" : "bg-muted/50"
                   )}
                 >
                   {HOUR_MARKS.slice(1, -1).map((hour) => (
@@ -200,7 +200,7 @@ export function WeekHoursPreview({
                         return (
                           <span
                             key={`${r.startTime}-${r.endTime}`}
-                            className="absolute inset-x-1 z-[1] rounded-md bg-brand shadow-sm transition-colors group-hover:brightness-110"
+                            className="absolute inset-x-1 z-10 rounded-md bg-brand shadow-sm transition-colors group-hover:brightness-110"
                             style={{ top: `${top}%`, height: `${height}%` }}
                           />
                         );
@@ -295,7 +295,7 @@ export function WeekHoursPreview({
                         return (
                           <span
                             key={`${r.startTime}-${r.endTime}`}
-                            className="absolute inset-y-0 z-[1] rounded-full bg-brand"
+                            className="absolute inset-y-0 z-10 rounded-full bg-brand"
                             style={{ left: `${left}%`, width: `${width}%` }}
                           />
                         );

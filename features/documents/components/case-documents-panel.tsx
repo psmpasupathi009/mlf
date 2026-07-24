@@ -9,6 +9,7 @@ import {
   ScrollText,
   Upload,
 } from "lucide-react";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,6 +19,7 @@ import {
   DOCUMENT_TYPES,
   type DocumentTypeValue,
 } from "@/lib/validations/documents.schema";
+import { apiDownload } from "@/lib/api/client";
 import { cn } from "@/lib/utils/cn";
 
 const TYPE_ICON: Record<
@@ -209,11 +211,26 @@ export function CaseDocumentsPanel({
                       ) : null}
                     </div>
                   </div>
-                  <Button asChild type="button" variant="outline" size="sm">
-                    <a href={`/api/v1/documents/${d.unitId}/download`}>
-                      <Download className="size-4" />
-                      Download
-                    </a>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      const filename =
+                        d.originalName?.trim() ||
+                        d.title?.trim() ||
+                        `${d.unitId}.bin`;
+                      const result = await apiDownload(
+                        `/api/v1/documents/${d.unitId}/download`,
+                        filename
+                      );
+                      if (!result.ok) {
+                        toast.error(result.error ?? "Download failed");
+                      }
+                    }}
+                  >
+                    <Download className="size-4" />
+                    Download
                   </Button>
                 </li>
               );

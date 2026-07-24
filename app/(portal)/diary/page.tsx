@@ -5,10 +5,12 @@ import { isModuleEnabled } from "@/config/company/modules";
 
 export default async function DiaryRoutePage() {
   const user = await getSessionUser();
-  if (!user) return null;
-  const can =
-    isModuleEnabled("cases") &&
-    (user.permissions ?? []).includes("cases.view");
-  if (!can) return <ForbiddenState />;
+  if (
+    !user ||
+    !isModuleEnabled("cases") ||
+    !(user.permissions ?? []).includes("cases.view")
+  ) {
+    return <ForbiddenState />;
+  }
   return <DiaryPage user={user} />;
 }

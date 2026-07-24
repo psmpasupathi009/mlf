@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -9,24 +8,12 @@ import {
   FileSpreadsheet,
   MoreHorizontal,
   Plus,
-  Search,
   Upload,
-  Wallet,
   X,
 } from "lucide-react";
 import { PageHeader } from "@/shared/components/data/page-header";
-import { DataToolbar } from "@/shared/components/data/data-toolbar";
-import { PaginationBar } from "@/shared/components/data/pagination-bar";
-import { EmptyState } from "@/shared/components/feedback/empty-state";
-import { UnitIdBadge } from "@/shared/components/data/unit-id-badge";
 import { ImportDialog } from "@/shared/components/data/import-dialog";
-import { DatePicker } from "@/shared/components/forms/date-picker";
-import { ClientPicker } from "@/features/clients/components/client-picker";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,28 +21,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { apiFetch, apiDownload, getErrorMessage } from "@/lib/api/client";
 import type { PublicUser } from "@/lib/auth/session";
-import type { PaymentSummary } from "@/features/accounts/server/serialize";
 import { PaymentFormDialog } from "@/features/accounts/components/payment-form-dialog";
 import { VoidPaymentDialog } from "@/features/accounts/components/void-payment-dialog";
 import { PaymentDetailDrawer } from "@/features/accounts/components/payment-detail-drawer";
-import { PAYMENT_PURPOSE_OPTIONS } from "@/features/accounts/lib/payment-purposes";
+import { AccountsFiltersSection } from "@/features/accounts/components/accounts-filters-section";
+import { AccountsSummaryCards } from "@/features/accounts/components/accounts-summary-cards";
+import { AccountsToolbarSection } from "@/features/accounts/components/accounts-toolbar-section";
+import { PaymentsListSection } from "@/features/accounts/components/payments-list-section";
+import {
+  type FeeSummary,
+  type ListResponse,
+  type PaymentRow,
+} from "@/features/accounts/components/accounts-page-helpers";
 import {
   dayKeyToFromIso,
   dayKeyToToIso,
@@ -63,60 +42,7 @@ import {
   thisMonthBounds,
   type PeriodPreset,
 } from "@/features/accounts/lib/period";
-import { istDisplayDate } from "@/lib/utils/ist";
 import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
-import { cn } from "@/lib/utils/cn";
-
-type PaymentRow = PaymentSummary & { clientName: string | null };
-type FeeSummary = {
-  agreedFee: number | null;
-  collected: number;
-  outstanding: number | null;
-};
-type ListResponse = {
-  data: PaymentRow[];
-  meta: { page: number; pageSize: number; total: number };
-  summary: {
-    paid: number;
-    pending: number;
-    void: number;
-    netCollected: number;
-    entryCount: number;
-  };
-  fee: FeeSummary | null;
-};
-
-const STATUS_VARIANT: Record<
-  string,
-  "default" | "success" | "warning" | "destructive" | "muted"
-> = {
-  pending: "warning",
-  paid: "success",
-  void: "muted",
-};
-
-const PERIOD_CHIPS: { id: PeriodPreset; label: string }[] = [
-  { id: "all", label: "All dates" },
-  { id: "month", label: "This month" },
-  { id: "fy", label: "This FY" },
-  { id: "custom", label: "Custom range" },
-];
-
-const STATUS_CHIPS: { id: string; label: string }[] = [
-  { id: "all", label: "All" },
-  { id: "paid", label: "Paid" },
-  { id: "pending", label: "Pending" },
-  { id: "void", label: "Void" },
-];
-
-function rupee(n: number) {
-  return `₹${n.toLocaleString("en-IN")}`;
-}
-
-function truncate(s: string | null, n = 40) {
-  if (!s) return "—";
-  return s.length > n ? `${s.slice(0, n)}…` : s;
-}
 
 export function AccountsPage({ user }: { user: PublicUser }) {
   const can = (action: string) =>
@@ -330,6 +256,11 @@ export function AccountsPage({ user }: { user: PublicUser }) {
     else toast.success("Audit pack downloaded");
   }
 
+  function openCreate() {
+    setEditing(null);
+    setFormOpen(true);
+  }
+
   return (
     <section className="space-y-4">
       <PageHeader
@@ -380,14 +311,7 @@ export function AccountsPage({ user }: { user: PublicUser }) {
               </DropdownMenuContent>
             </DropdownMenu>
             {can("create") ? (
-              <Button
-                type="button"
-                className="gap-2"
-                onClick={() => {
-                  setEditing(null);
-                  setFormOpen(true);
-                }}
-              >
+              <Button type="button" className="gap-2" onClick={openCreate}>
                 <Plus className="size-4" />
                 <span className="sm:hidden">Record</span>
                 <span className="hidden sm:inline">Record entry</span>
@@ -397,565 +321,92 @@ export function AccountsPage({ user }: { user: PublicUser }) {
         }
       />
 
-      {/* Period + status quick filters */}
-      <div className="space-y-2">
-        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5 [-webkit-overflow-scrolling:touch]">
-          {PERIOD_CHIPS.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => {
-                setPage(1);
-                setPeriod(c.id);
-              }}
-              className={cn(
-                "shrink-0 rounded-full px-3.5 py-2 text-sm font-medium transition-colors",
-                period === c.id
-                  ? "bg-brand text-brand-foreground"
-                  : "bg-muted text-muted-foreground hover:text-navy"
-              )}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
-        <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5 [-webkit-overflow-scrolling:touch]">
-          {STATUS_CHIPS.map((c) => (
-            <button
-              key={c.id}
-              type="button"
-              onClick={() => {
-                setPage(1);
-                setStatus(c.id);
-              }}
-              className={cn(
-                "shrink-0 rounded-full px-3.5 py-1.5 text-xs font-medium transition-colors",
-                status === c.id
-                  ? "bg-brand text-brand-foreground"
-                  : "bg-muted/80 text-muted-foreground hover:text-navy"
-              )}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Custom date range with proper DatePickers */}
-      {period === "custom" ? (
-        <Card>
-          <CardContent className="grid gap-4 p-4 sm:grid-cols-2">
-            <div className="grid min-w-0 gap-2">
-              <Label>From</Label>
-              <DatePicker
-                value={customFrom}
-                onChange={(v) => {
-                  setPage(1);
-                  setCustomFrom(v);
-                }}
-              />
-            </div>
-            <div className="grid min-w-0 gap-2">
-              <Label>To</Label>
-              <DatePicker
-                value={customTo}
-                onChange={(v) => {
-                  setPage(1);
-                  setCustomTo(v);
-                }}
-              />
-            </div>
-            {!customRangeReady ? (
-              <p className="text-sm text-muted-foreground sm:col-span-2">
-                Pick both From and To dates to filter the register.
-              </p>
-            ) : null}
-            {customRangeInvalid ? (
-              <p className="text-sm text-destructive sm:col-span-2">
-                From date must be on or before To date.
-              </p>
-            ) : null}
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {/* Context + fee completeness */}
-      {(caseUnitId || activeClientId || fee) && (
-        <Card>
-          <CardContent className="flex flex-col gap-4 p-4 sm:p-5">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-              <div className="flex items-start gap-3">
-                <span className="rounded-lg bg-muted p-2.5 text-navy">
-                  <Wallet className="size-4" />
-                </span>
-                <div className="min-w-0 space-y-1.5">
-                  <p className="font-medium text-navy">
-                    {caseUnitId
-                      ? "Case cash register"
-                      : activeClientId
-                        ? "Client ledger"
-                        : "Filtered register"}
-                  </p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    {caseUnitId ? (
-                      <Badge variant="outline" className="gap-1.5 pr-1">
-                        <Link
-                          href={`/cases/${caseUnitId}`}
-                          className="hover:underline"
-                        >
-                          {caseUnitId}
-                        </Link>
-                        <button
-                          type="button"
-                          className="rounded p-0.5 hover:bg-muted"
-                          aria-label="Clear case filter"
-                          onClick={() =>
-                            setContextQuery({ caseUnitId: null })
-                          }
-                        >
-                          <X className="size-3.5" />
-                        </button>
-                      </Badge>
-                    ) : null}
-                    {activeClientId ? (
-                      <Badge variant="outline" className="gap-1.5 pr-1">
-                        {clientNames[activeClientId] ?? activeClientId}
-                        <button
-                          type="button"
-                          className="rounded p-0.5 hover:bg-muted"
-                          aria-label="Clear client filter"
-                          onClick={() => {
-                            setContextQuery({ clientUnitId: null });
-                          }}
-                        >
-                          <X className="size-3.5" />
-                        </button>
-                      </Badge>
-                    ) : null}
-                  </div>
-                </div>
-              </div>
-              {hasActiveFilters ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearAllFilters}
-                >
-                  Clear filters
-                </Button>
-              ) : null}
-            </div>
-
-            {fee && caseUnitId ? (
-              <div className="grid gap-3 border-t border-border/70 pt-4 sm:grid-cols-3">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Agreed fee
-                  </p>
-                  <p className="mt-1 text-lg font-semibold text-navy">
-                    {fee.agreedFee != null ? rupee(fee.agreedFee) : "—"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Fee collected
-                  </p>
-                  <p className="mt-1 text-lg font-semibold text-navy">
-                    {rupee(fee.collected)}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    <span className="sm:hidden">All-time (excl. actuals)</span>
-                    <span className="hidden sm:inline">
-                      All-time fees (excl. actuals) — not limited by period filter
-                    </span>
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Outstanding
-                  </p>
-                  <p className="mt-1 text-lg font-semibold text-navy">
-                    {fee.outstanding != null ? rupee(fee.outstanding) : "—"}
-                  </p>
-                </div>
-              </div>
-            ) : null}
-          </CardContent>
-        </Card>
-      )}
-
-      {/* KPI cards — click to filter status */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
-        {(
-          [
-            {
-              key: "paid",
-              label: "Paid",
-              value: summary.paid,
-              hint: "Collected in filter",
-            },
-            {
-              key: "pending",
-              label: "Pending",
-              value: summary.pending,
-              hint: "Awaiting receipt",
-            },
-            {
-              key: "void",
-              label: "Void",
-              value: summary.void,
-              hint: "Kept for audit",
-            },
-            {
-              key: "all",
-              label: "Net collected",
-              value: summary.netCollected,
-              hint: `${summary.entryCount} entries`,
-            },
-          ] as const
-        ).map((kpi) => {
-          const active =
-            kpi.key === "all" ? status === "all" : status === kpi.key;
-          return (
-            <button
-              key={kpi.key}
-              type="button"
-              onClick={() => {
-                setPage(1);
-                setStatus(kpi.key);
-              }}
-              className={cn(
-                "rounded-xl border bg-card p-3 text-left transition-colors sm:p-5",
-                active
-                  ? "border-navy/40 ring-1 ring-navy/20"
-                  : "border-border/80 hover:border-navy/25"
-              )}
-            >
-              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                {kpi.label}
-              </p>
-              <p className="mt-1.5 text-base font-semibold text-navy sm:mt-2 sm:text-xl">
-                {rupee(kpi.value)}
-              </p>
-              <p className="mt-1 hidden text-xs text-muted-foreground sm:block">
-                {kpi.hint}
-              </p>
-            </button>
-          );
-        })}
-      </div>
-
-      <DataToolbar
-        search={
-          <div className="relative">
-            <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(e) => {
-                setPage(1);
-                setSearch(e.target.value);
-              }}
-              placeholder="Search PAY / client / case…"
-              className="w-full pl-9"
-            />
-          </div>
-        }
-        filters={
-          <>
-            <div className="w-full min-w-0 sm:w-56">
-              <ClientPicker
-                label=""
-                value={clientPickerValue}
-                onChange={(c) => {
-                  if (c) {
-                    setClientNames((prev) => ({ ...prev, [c.unitId]: c.name }));
-                  }
-                  setContextQuery({
-                    clientUnitId: c?.unitId ?? null,
-                  });
-                }}
-              />
-            </div>
-            <Select
-              value={purpose}
-              onValueChange={(v) => {
-                setPage(1);
-                setPurpose(v);
-              }}
-            >
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="Purpose" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All purposes</SelectItem>
-                {PAYMENT_PURPOSE_OPTIONS.map((o) => (
-                  <SelectItem key={o.value} value={o.value}>
-                    {o.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </>
-        }
-        actions={
-          can("view") ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="gap-2"
-              disabled={exporting}
-              onClick={() => void exportAuditPack()}
-            >
-              <Download className="size-4" />
-              {exporting ? "Exporting…" : "Export"}
-            </Button>
-          ) : undefined
-        }
+      <AccountsFiltersSection
+        period={period}
+        status={status}
+        customFrom={customFrom}
+        customTo={customTo}
+        customRangeReady={customRangeReady}
+        customRangeInvalid={customRangeInvalid}
+        caseUnitId={caseUnitId}
+        activeClientId={activeClientId}
+        clientNames={clientNames}
+        fee={fee}
+        hasActiveFilters={hasActiveFilters}
+        onPeriodChange={(p) => {
+          setPage(1);
+          setPeriod(p);
+        }}
+        onStatusChange={(s) => {
+          setPage(1);
+          setStatus(s);
+        }}
+        onCustomFromChange={(v) => {
+          setPage(1);
+          setCustomFrom(v);
+        }}
+        onCustomToChange={(v) => {
+          setPage(1);
+          setCustomTo(v);
+        }}
+        onClearCase={() => setContextQuery({ caseUnitId: null })}
+        onClearClient={() => setContextQuery({ clientUnitId: null })}
+        onClearAllFilters={clearAllFilters}
       />
 
-      {loading && rows.length === 0 ? (
-        <div className="space-y-2">
-          <div className="h-12 animate-pulse rounded-lg bg-muted" />
-          <div className="h-12 animate-pulse rounded-lg bg-muted" />
-          <div className="h-12 animate-pulse rounded-lg bg-muted" />
-        </div>
-      ) : !loading && rows.length === 0 ? (
-        <EmptyState
-          title={hasActiveFilters ? "No matching entries" : "No cash entries yet"}
-          description={
-            hasActiveFilters
-              ? "Try another period, status, or clear filters."
-              : "Record an advance, stage payment, or actuals against a client."
-          }
-          action={
-            hasActiveFilters ? (
-              <Button type="button" variant="outline" onClick={clearAllFilters}>
-                Clear filters
-              </Button>
-            ) : can("create") ? (
-              <Button
-                type="button"
-                onClick={() => {
-                  setEditing(null);
-                  setFormOpen(true);
-                }}
-              >
-                Record first entry
-              </Button>
-            ) : undefined
-          }
-        />
-      ) : (
-        <>
-          {/* Mobile card list */}
-          <div className="space-y-2 md:hidden">
-            {rows.map((p) => (
-              <div
-                key={p.unitId}
-                role="button"
-                tabIndex={0}
-                onClick={() => setDetailId(p.unitId)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setDetailId(p.unitId);
-                  }
-                }}
-                className="flex w-full flex-col gap-2 rounded-xl border border-border/80 bg-card p-3.5 text-left transition-colors active:bg-muted/40"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 space-y-0.5">
-                    <p className="truncate font-medium text-navy">
-                      {p.clientName ?? p.clientUnitId}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {p.unitId}
-                      {p.caseUnitId ? ` · ${p.caseUnitId}` : ""}
-                    </p>
-                  </div>
-                  <div className="shrink-0 text-right">
-                    <p className="font-semibold text-navy">{rupee(p.amount)}</p>
-                    <Badge
-                      variant={STATUS_VARIANT[p.status] ?? "outline"}
-                      className="mt-1"
-                    >
-                      {p.status}
-                    </Badge>
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                  <span>{p.typeLabel}</span>
-                  {p.paidOn ? (
-                    <>
-                      <span aria-hidden>·</span>
-                      <span>{istDisplayDate(new Date(p.paidOn))}</span>
-                    </>
-                  ) : null}
-                </div>
-                {p.status === "void" && p.voidReason ? (
-                  <p className="line-clamp-2 text-xs text-muted-foreground">
-                    Void: {p.voidReason}
-                  </p>
-                ) : p.notes ? (
-                  <p className="line-clamp-2 text-xs text-muted-foreground">
-                    {p.notes}
-                  </p>
-                ) : null}
-                <div
-                  className="flex justify-end gap-1 pt-0.5"
-                  onClick={(e) => e.stopPropagation()}
-                  onKeyDown={(e) => e.stopPropagation()}
-                >
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8"
-                    onClick={() => setDetailId(p.unitId)}
-                  >
-                    View
-                  </Button>
-                  {can("edit") && p.status !== "void" ? (
-                    <Button
-                      type="button"
-                      variant="destructive"
-                      size="sm"
-                      className="h-8"
-                      onClick={() => setVoiding(p.unitId)}
-                    >
-                      Void
-                    </Button>
-                  ) : null}
-                </div>
-              </div>
-            ))}
-          </div>
+      <AccountsSummaryCards
+        summary={summary}
+        status={status}
+        onStatusChange={(s) => {
+          setPage(1);
+          setStatus(s);
+        }}
+      />
 
-          {/* Desktop table */}
-          <div className="hidden overflow-x-auto rounded-xl border border-border/80 bg-card md:block">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="hidden lg:table-cell">ID</TableHead>
-                  <TableHead>Client</TableHead>
-                  <TableHead>Case</TableHead>
-                  <TableHead>Purpose</TableHead>
-                  <TableHead className="text-right">Amount</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="hidden lg:table-cell">Paid on</TableHead>
-                  <TableHead className="hidden xl:table-cell">Notes</TableHead>
-                  <TableHead className="w-12 text-right"> </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((p) => (
-                  <TableRow
-                    key={p.unitId}
-                    className="cursor-pointer"
-                    onClick={() => setDetailId(p.unitId)}
-                  >
-                    <TableCell className="hidden lg:table-cell">
-                      <UnitIdBadge value={p.unitId} />
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-0.5">
-                        <span className="font-medium text-navy">
-                          {p.clientName ?? p.clientUnitId}
-                        </span>
-                        {p.status === "void" && p.voidReason ? (
-                          <p className="text-xs text-muted-foreground">
-                            Void: {truncate(p.voidReason, 48)}
-                          </p>
-                        ) : null}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {p.caseUnitId ? (
-                        <Link
-                          href={`/cases/${p.caseUnitId}`}
-                          className="text-navy underline-offset-2 hover:underline"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {p.caseUnitId}
-                        </Link>
-                      ) : (
-                        "—"
-                      )}
-                    </TableCell>
-                    <TableCell>{p.typeLabel}</TableCell>
-                    <TableCell className="text-right font-medium text-navy">
-                      {rupee(p.amount)}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={STATUS_VARIANT[p.status] ?? "outline"}>
-                        {p.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="hidden lg:table-cell">
-                      {p.paidOn ? istDisplayDate(new Date(p.paidOn)) : "—"}
-                    </TableCell>
-                    <TableCell className="hidden max-w-48 truncate xl:table-cell">
-                      {truncate(p.notes)}
-                    </TableCell>
-                    <TableCell
-                      className="text-right"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            className="size-8 p-0"
-                            aria-label="Row actions"
-                          >
-                            <MoreHorizontal className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-44">
-                          <DropdownMenuItem
-                            onSelect={() => setDetailId(p.unitId)}
-                          >
-                            View detail
-                          </DropdownMenuItem>
-                          {can("edit") && p.status !== "void" ? (
-                            <>
-                              <DropdownMenuItem
-                                onSelect={() => {
-                                  setEditing(p);
-                                  setFormOpen(true);
-                                }}
-                              >
-                                Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-destructive focus:text-destructive"
-                                onSelect={() => setVoiding(p.unitId)}
-                              >
-                                Void
-                              </DropdownMenuItem>
-                            </>
-                          ) : null}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+      <AccountsToolbarSection
+        purpose={purpose}
+        search={search}
+        clientPickerValue={clientPickerValue}
+        canExport={can("view")}
+        exporting={exporting}
+        onPurposeChange={(v) => {
+          setPage(1);
+          setPurpose(v);
+        }}
+        onSearchChange={(v) => {
+          setPage(1);
+          setSearch(v);
+        }}
+        onClientChange={(c) => {
+          if (c) {
+            setClientNames((prev) => ({ ...prev, [c.unitId]: c.name }));
+          }
+          setContextQuery({
+            clientUnitId: c?.unitId ?? null,
+          });
+        }}
+        onExport={() => void exportAuditPack()}
+      />
 
-          <PaginationBar
-            page={page}
-            pageSize={pageSize}
-            total={total}
-            onPageChange={setPage}
-          />
-        </>
-      )}
+      <PaymentsListSection
+        loading={loading}
+        rows={rows}
+        page={page}
+        pageSize={pageSize}
+        total={total}
+        hasActiveFilters={hasActiveFilters}
+        canCreate={can("create")}
+        canEdit={can("edit")}
+        onPageChange={setPage}
+        onClearFilters={clearAllFilters}
+        onCreate={openCreate}
+        onOpenDetail={setDetailId}
+        onEdit={(p) => {
+          setEditing(p);
+          setFormOpen(true);
+        }}
+        onVoid={setVoiding}
+      />
 
       <PaymentFormDialog
         open={formOpen}

@@ -255,7 +255,7 @@ export function WeeklyHoursCard({
       )}
 
       {canEdit && dirty ? (
-        <div className="sticky bottom-0 z-10 border-t border-border/70 bg-card/95 px-4 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80 sm:hidden">
+        <div className="sticky bottom-0 z-10 border-t border-border/70 bg-card/95 px-4 py-3 backdrop-blur supports-backdrop-filter:bg-card/80 sm:hidden">
           <Button
             type="button"
             className="h-11 w-full gap-2 shadow-md ring-2 ring-gold/40"

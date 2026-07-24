@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -17,6 +17,7 @@ import { apiFetch, getErrorMessage } from "@/lib/api/client";
 import { LEAVE_REASON_OPTIONS } from "@/config/company/form-options";
 import { SelectOrOther } from "@/shared/components/forms/select-or-other";
 import { DatePicker } from "@/shared/components/forms/date-picker";
+import { FormError } from "@/shared/components/feedback/form-error";
 
 type LeaveApplyDialogProps = {
   open: boolean;
@@ -37,10 +38,10 @@ export function LeaveApplyDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (!open) return;
-    setError("");
-  }, [open]);
+  function handleOpenChange(next: boolean) {
+    if (!next) setError("");
+    onOpenChangeAction(next);
+  }
 
   function handleFromChange(next: string) {
     setFromDate(next);
@@ -77,11 +78,11 @@ export function LeaveApplyDialog({
     setToDate("");
     setReason("");
     onSavedAction();
-    onOpenChangeAction(false);
+    handleOpenChange(false);
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChangeAction}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>Apply for leave</DialogTitle>
@@ -111,13 +112,13 @@ export function LeaveApplyDialog({
               className="h-10"
             />
           </div>
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          <FormError>{error}</FormError>
         </DialogBody>
         <DialogFooter>
           <Button
             type="button"
             variant="outline"
-            onClick={() => onOpenChangeAction(false)}
+            onClick={() => handleOpenChange(false)}
           >
             Cancel
           </Button>
