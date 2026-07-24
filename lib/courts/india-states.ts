@@ -55,3 +55,10 @@ export function stateCodeFromName(name: string): string | undefined {
 export function stateNameFromCode(code: string): string | undefined {
   return INDIA_STATES.find((s) => s.code === code.toUpperCase())?.name;
 }
+
+/** Accept eCourts letter code (e.g. TN) or full state name (e.g. Goa). */
+export function resolveIndiaStateName(stateCodeOrName: string): string {
+  const trimmed = stateCodeOrName.trim();
+  if (!trimmed) return trimmed;
+  return stateNameFromCode(trimmed) ?? trimmed;
+}

@@ -347,6 +347,7 @@ export function ClientFormDialog({
                   />
                 </div>
                 <LocationCascade
+                  key={`${open}-${client?.unitId ?? "new"}`}
                   state={state}
                   district={district}
                   city={city}

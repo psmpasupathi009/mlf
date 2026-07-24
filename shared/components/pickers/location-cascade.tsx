@@ -42,16 +42,31 @@ export function LocationCascade({ state, district, city, onChange }: Props) {
   const [loadingDistricts, setLoadingDistricts] = useState(false);
   const [customDistrict, setCustomDistrict] = useState(false);
   const hydratedDistrictsFor = useRef("");
+  const districtsRef = useRef<LocationOption[]>([]);
+
+  const syncCustomDistrict = useCallback(
+    (options: LocationOption[], districtName: string) => {
+      if (!options.length) {
+        setCustomDistrict(true);
+        return;
+      }
+      if (!districtName) return;
+      setCustomDistrict(!options.some((d) => d.name === districtName));
+    },
+    []
+  );
 
   const pickState = useCallback(
     async (name: string) => {
       hydratedDistrictsFor.current = "";
+      districtsRef.current = [];
       setDistricts([]);
       setCustomDistrict(false);
       onChange({ state: name, district: "", city: "" });
       setLoadingDistricts(true);
       const next = await loadDistricts(name);
       setDistricts(next);
+      districtsRef.current = next;
       setLoadingDistricts(false);
       hydratedDistrictsFor.current = name;
       if (!next.length) setCustomDistrict(true);
@@ -70,21 +85,23 @@ export function LocationCascade({ state, district, city, onChange }: Props) {
     if (!state) return;
     let cancelled = false;
     (async () => {
-      if (hydratedDistrictsFor.current === state) return;
-      setLoadingDistricts(true);
-      const next = await loadDistricts(state);
-      if (cancelled) return;
-      setDistricts(next);
-      setLoadingDistricts(false);
-      hydratedDistrictsFor.current = state;
-      const listed = next.some((d) => d.name === district);
-      setCustomDistrict(Boolean(district) && !listed);
-      if (!next.length) setCustomDistrict(true);
+      if (hydratedDistrictsFor.current !== state) {
+        setLoadingDistricts(true);
+        const next = await loadDistricts(state);
+        if (cancelled) return;
+        setDistricts(next);
+        districtsRef.current = next;
+        setLoadingDistricts(false);
+        hydratedDistrictsFor.current = state;
+        syncCustomDistrict(next, district);
+        return;
+      }
+      syncCustomDistrict(districtsRef.current, district);
     })();
     return () => {
       cancelled = true;
     };
-  }, [state, district]);
+  }, [state, district, syncCustomDistrict]);
 
   const districtSelectValue = customDistrict ? OTHER : district || undefined;
 
@@ -144,7 +161,7 @@ export function LocationCascade({ state, district, city, onChange }: Props) {
             value={district}
             placeholder="Type district"
             onChange={(e) =>
-              onChange({ state, district: e.target.value, city: "" })
+              onChange({ state, district: e.target.value, city })
             }
           />
         ) : null}

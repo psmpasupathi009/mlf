@@ -70,6 +70,8 @@ export function CourtCascade({
   const hydratedDistrictsFor = useRef("");
   const hydratedComplexesFor = useRef("");
   const hydratedCourtsFor = useRef("");
+  const districtsRef = useRef<CourtOption[]>([]);
+  const complexesRef = useRef<CourtOption[]>([]);
 
   const resolveStateCode = useCallback(
     (name: string) =>
@@ -88,6 +90,8 @@ export function CourtCascade({
       setDistricts([]);
       setComplexes([]);
       setCourts([]);
+      districtsRef.current = [];
+      complexesRef.current = [];
       setCustomDistrict(false);
       setCustomCity(false);
       setCustomCourt(false);
@@ -104,6 +108,7 @@ export function CourtCascade({
       setLoadingDistricts(true);
       const next = await loadOptions("districts", { state: code });
       setDistricts(next);
+      districtsRef.current = next;
       setLoadingDistricts(false);
       hydratedDistrictsFor.current = code;
       // No seed districts (other states) → type district
@@ -123,6 +128,7 @@ export function CourtCascade({
         setCustomCity(true);
         setCustomCourt(true);
         setComplexes([]);
+        complexesRef.current = [];
         setCourts([]);
         onChange({ state, district: "", city: "", courtName: "" });
         return;
@@ -134,6 +140,7 @@ export function CourtCascade({
       setDistrictCode(code);
       setComplexCode("");
       setComplexes([]);
+      complexesRef.current = [];
       setCourts([]);
       setCustomCity(false);
       setCustomCourt(false);
@@ -155,6 +162,7 @@ export function CourtCascade({
         district: code,
       });
       setComplexes(next);
+      complexesRef.current = next;
       setLoadingComplexes(false);
       hydratedComplexesFor.current = `${sc}:${code}`;
 
@@ -241,26 +249,43 @@ export function CourtCascade({
   useEffect(() => {
     if (!state) return;
     const sc = resolveStateCode(state);
-    if (!sc || hydratedDistrictsFor.current === sc) return;
+    if (!sc) return;
     let cancelled = false;
     (async () => {
-      setLoadingDistricts(true);
-      const next = await loadOptions("districts", { state: sc });
-      if (cancelled) return;
-      setStateCode(sc);
-      setDistricts(next);
-      setLoadingDistricts(false);
-      hydratedDistrictsFor.current = sc;
+      let next = districtsRef.current;
+      if (hydratedDistrictsFor.current !== sc) {
+        setLoadingDistricts(true);
+        next = await loadOptions("districts", { state: sc });
+        if (cancelled) return;
+        setStateCode(sc);
+        setDistricts(next);
+        districtsRef.current = next;
+        setLoadingDistricts(false);
+        hydratedDistrictsFor.current = sc;
+      }
       if (!next.length) {
         setCustomDistrict(true);
         setCustomCity(true);
         setCustomCourt(true);
+      } else if (
+        district &&
+        !next.some((d) => d.name === district || d.code === district)
+      ) {
+        // Edit / import arrived after districts loaded, or free-text district
+        setCustomDistrict(true);
+        setCustomCity(true);
+        setCustomCourt(true);
+      } else if (
+        district &&
+        next.some((d) => d.name === district || d.code === district)
+      ) {
+        setCustomDistrict(false);
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [state, resolveStateCode]);
+  }, [state, district, resolveStateCode]);
 
   useEffect(() => {
     if (!state || !district || customDistrict) return;
@@ -271,23 +296,37 @@ export function CourtCascade({
       districts.find((d) => d.name === district)?.code ||
       district;
     const key = `${sc}:${dc}`;
-    if (hydratedComplexesFor.current === key) return;
     if (!districts.length && !districtCode) return;
     let cancelled = false;
     (async () => {
-      setLoadingComplexes(true);
-      const next = await loadOptions("complexes", {
-        state: sc,
-        district: dc,
-      });
-      if (cancelled) return;
-      setDistrictCode(dc);
-      setComplexes(next);
-      setLoadingComplexes(false);
-      hydratedComplexesFor.current = key;
+      let next = complexesRef.current;
+      if (hydratedComplexesFor.current !== key) {
+        setLoadingComplexes(true);
+        next = await loadOptions("complexes", {
+          state: sc,
+          district: dc,
+        });
+        if (cancelled) return;
+        setDistrictCode(dc);
+        setComplexes(next);
+        complexesRef.current = next;
+        setLoadingComplexes(false);
+        hydratedComplexesFor.current = key;
+      }
       if (!next.length) {
         setCustomCity(true);
         setCustomCourt(true);
+      } else if (
+        city &&
+        !next.some((c) => c.name === city || c.code === city)
+      ) {
+        setCustomCity(true);
+        setCustomCourt(true);
+      } else if (
+        city &&
+        next.some((c) => c.name === city || c.code === city)
+      ) {
+        setCustomCity(false);
       }
     })();
     return () => {
@@ -296,6 +335,7 @@ export function CourtCascade({
   }, [
     state,
     district,
+    city,
     stateCode,
     districtCode,
     districts,
@@ -410,6 +450,31 @@ export function CourtCascade({
           <Label>
             District <span className="text-destructive">*</span>
           </Label>
+          <Select
+            value={districtSelectValue}
+            onValueChange={(v) => void pickDistrict(v)}
+            disabled={!state || loadingDistricts}
+          >
+            <SelectTrigger className="h-11">
+              <SelectValue
+                placeholder={
+                  loadingDistricts
+                    ? "Loading…"
+                    : state
+                      ? "Select district"
+                      : "Pick state first"
+                }
+              />
+            </SelectTrigger>
+            <SelectContent position="popper" className="z-200 max-h-72">
+              {districts.map((d) => (
+                <SelectItem key={d.code} value={d.name}>
+                  {d.name}
+                </SelectItem>
+              ))}
+              <SelectItem value={OTHER}>Other — type district</SelectItem>
+            </SelectContent>
+          </Select>
           {customDistrict ? (
             <Input
               className="h-11"
@@ -418,46 +483,20 @@ export function CourtCascade({
                 onChange({
                   state,
                   district: e.target.value,
-                  city: "",
-                  courtName: "",
+                  city,
+                  courtName,
                 })
               }
               placeholder="Type district name"
             />
-          ) : (
-            <Select
-              value={districtSelectValue}
-              onValueChange={(v) => void pickDistrict(v)}
-              disabled={!state || loadingDistricts}
-            >
-              <SelectTrigger className="h-11">
-                <SelectValue
-                  placeholder={
-                    loadingDistricts
-                      ? "Loading…"
-                      : state
-                        ? "Select district"
-                        : "Pick state first"
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent position="popper" className="z-200 max-h-72">
-                {districts.map((d) => (
-                  <SelectItem key={d.code} value={d.name}>
-                    {d.name}
-                  </SelectItem>
-                ))}
-                <SelectItem value={OTHER}>Other — type district</SelectItem>
-              </SelectContent>
-            </Select>
-          )}
+          ) : null}
         </div>
 
         <div className="grid min-w-0 gap-2">
           <Label>
             City / court complex <span className="text-destructive">*</span>
           </Label>
-          {customCity ? (
+          {customDistrict ? (
             <Input
               className="h-11"
               value={city}
@@ -466,37 +505,54 @@ export function CourtCascade({
                   state,
                   district,
                   city: e.target.value,
-                  courtName: "",
+                  courtName,
                 })
               }
               placeholder="Type city / complex"
             />
           ) : (
-            <Select
-              value={citySelectValue}
-              onValueChange={(v) => void pickComplex(v)}
-              disabled={!district || loadingComplexes}
-            >
-              <SelectTrigger className="h-11">
-                <SelectValue
-                  placeholder={
-                    loadingComplexes
-                      ? "Loading…"
-                      : district
-                        ? "Select city / complex"
-                        : "Pick district first"
+            <>
+              <Select
+                value={citySelectValue}
+                onValueChange={(v) => void pickComplex(v)}
+                disabled={!district || loadingComplexes}
+              >
+                <SelectTrigger className="h-11">
+                  <SelectValue
+                    placeholder={
+                      loadingComplexes
+                        ? "Loading…"
+                        : district
+                          ? "Select city / complex"
+                          : "Pick district first"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent position="popper" className="z-200 max-h-72">
+                  {complexes.map((c) => (
+                    <SelectItem key={c.code} value={c.name}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value={OTHER}>Other — type city</SelectItem>
+                </SelectContent>
+              </Select>
+              {customCity ? (
+                <Input
+                  className="h-11"
+                  value={city}
+                  onChange={(e) =>
+                    onChange({
+                      state,
+                      district,
+                      city: e.target.value,
+                      courtName,
+                    })
                   }
+                  placeholder="Type city / complex"
                 />
-              </SelectTrigger>
-              <SelectContent position="popper" className="z-200 max-h-72">
-                {complexes.map((c) => (
-                  <SelectItem key={c.code} value={c.name}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-                <SelectItem value={OTHER}>Other — type city</SelectItem>
-              </SelectContent>
-            </Select>
+              ) : null}
+            </>
           )}
         </div>
 
@@ -504,7 +560,7 @@ export function CourtCascade({
           <Label>
             Court <span className="text-destructive">*</span>
           </Label>
-          {customCourt ? (
+          {customDistrict || customCity ? (
             <Input
               className="h-11"
               value={courtName}
@@ -519,54 +575,71 @@ export function CourtCascade({
               placeholder="Type court name"
             />
           ) : (
-            <Select
-              value={courtSelectValue}
-              onValueChange={(v) => {
-                if (v === OTHER) {
-                  setCustomCourt(true);
-                  onChange({ state, district, city, courtName: "" });
-                  return;
-                }
-                setCustomCourt(false);
-                onChange({ state, district, city, courtName: v });
-              }}
-              disabled={!city || loadingCourts}
-            >
-              <SelectTrigger className="h-11">
-                <SelectValue
-                  placeholder={
-                    loadingCourts
-                      ? "Loading…"
-                      : city
-                        ? "Select court"
-                        : "Pick city first"
+            <>
+              <Select
+                value={courtSelectValue}
+                onValueChange={(v) => {
+                  if (v === OTHER) {
+                    setCustomCourt(true);
+                    onChange({ state, district, city, courtName: "" });
+                    return;
                   }
+                  setCustomCourt(false);
+                  onChange({ state, district, city, courtName: v });
+                }}
+                disabled={!city || loadingCourts}
+              >
+                <SelectTrigger className="h-11">
+                  <SelectValue
+                    placeholder={
+                      loadingCourts
+                        ? "Loading…"
+                        : city
+                          ? "Select court"
+                          : "Pick city first"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent position="popper" className="z-200 max-h-80">
+                  {courts.length > 8 ? (
+                    <div
+                      className="sticky top-0 z-10 border-b border-border bg-white p-2"
+                      onPointerDown={(e) => e.stopPropagation()}
+                    >
+                      <Input
+                        value={courtFilter}
+                        onChange={(e) => setCourtFilter(e.target.value)}
+                        placeholder="Search court…"
+                        className="h-8"
+                        onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
+                      />
+                    </div>
+                  ) : null}
+                  {filteredCourts.map((c) => (
+                    <SelectItem key={c.code} value={c.name}>
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value={OTHER}>Other — type court</SelectItem>
+                </SelectContent>
+              </Select>
+              {customCourt ? (
+                <Input
+                  className="h-11"
+                  value={courtName}
+                  onChange={(e) =>
+                    onChange({
+                      state,
+                      district,
+                      city,
+                      courtName: e.target.value,
+                    })
+                  }
+                  placeholder="Type court name"
                 />
-              </SelectTrigger>
-              <SelectContent position="popper" className="z-200 max-h-80">
-                {courts.length > 8 ? (
-                  <div
-                    className="sticky top-0 z-10 border-b border-border bg-white p-2"
-                    onPointerDown={(e) => e.stopPropagation()}
-                  >
-                    <Input
-                      value={courtFilter}
-                      onChange={(e) => setCourtFilter(e.target.value)}
-                      placeholder="Search court…"
-                      className="h-8"
-                      onClick={(e) => e.stopPropagation()}
-                      onKeyDown={(e) => e.stopPropagation()}
-                    />
-                  </div>
-                ) : null}
-                {filteredCourts.map((c) => (
-                  <SelectItem key={c.code} value={c.name}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-                <SelectItem value={OTHER}>Other — type court</SelectItem>
-              </SelectContent>
-            </Select>
+              ) : null}
+            </>
           )}
         </div>
       </div>

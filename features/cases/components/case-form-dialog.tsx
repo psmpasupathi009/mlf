@@ -315,6 +315,7 @@ export function CaseFormDialog({
               className="md:col-span-2"
             >
               <CourtCascade
+                key={`${open}-${caseItem?.unitId ?? "new"}`}
                 state={state}
                 district={district}
                 city={city}

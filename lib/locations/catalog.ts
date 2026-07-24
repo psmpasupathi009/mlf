@@ -6,7 +6,7 @@
 import { locationsSeed } from "@/config/company/locations-seed";
 import {
   INDIA_STATES,
-  stateNameFromCode,
+  resolveIndiaStateName,
 } from "@/lib/courts/india-states";
 
 export type LocationOption = { code: string; name: string };
@@ -14,13 +14,6 @@ export type LocationsSource = "seed" | "static";
 
 /** Real states/UTs only — excludes “Supreme Court of India”. */
 export const ADDRESS_STATES = INDIA_STATES.filter((s) => s.code !== "SC");
-
-function resolveStateName(stateCodeOrName: string): string {
-  if (stateCodeOrName.length <= 3) {
-    return stateNameFromCode(stateCodeOrName.toUpperCase()) ?? stateCodeOrName;
-  }
-  return stateCodeOrName;
-}
 
 export function listLocationStates(): {
   options: LocationOption[];
@@ -36,7 +29,7 @@ export function listLocationDistricts(stateCodeOrName: string): {
   options: LocationOption[];
   source: LocationsSource;
 } {
-  const stateName = resolveStateName(stateCodeOrName);
+  const stateName = resolveIndiaStateName(stateCodeOrName);
   const set = new Map<string, string>();
   for (const row of locationsSeed) {
     if (row.state !== stateName) continue;

@@ -175,7 +175,8 @@ const TN_MULTI_CITY: Record<string, { city: string; courts: string[] }[]> = {
       courts: ["JMFC, Srirangam"],
     },
   ],
-  Kanniyakumari: [
+  /** LGD / locations-seed spelling is Kanyakumari (not Kanniyakumari). */
+  Kanyakumari: [
     {
       city: "Nagercoil",
       courts: [
@@ -316,7 +317,7 @@ const KA_CITY_DISTRICTS = new Set([
   "Kalaburagi",
   "Shivamogga",
   "Tumakuru",
-  "Davangere",
+  "Davanagere",
 ]);
 
 /**

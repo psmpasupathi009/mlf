@@ -5,21 +5,14 @@
  */
 import {
   INDIA_STATES,
+  resolveIndiaStateName,
   stateCodeFromName,
-  stateNameFromCode,
 } from "@/lib/courts/india-states";
 import { courtsSeed, type CourtSeed } from "@/config/company/courts-seed";
 import { prisma } from "@/lib/db/prisma";
 
 export type CourtOption = { code: string; name: string };
 export type CourtsSource = "seed" | "static" | "seed+db";
-
-function resolveStateName(stateCodeOrName: string): string {
-  if (stateCodeOrName.length <= 3) {
-    return stateNameFromCode(stateCodeOrName.toUpperCase()) ?? stateCodeOrName;
-  }
-  return stateCodeOrName;
-}
 
 let cachedDbRows: CourtSeed[] | null = null;
 let cachedDbAt = 0;
@@ -76,7 +69,7 @@ export async function listIndiaDistricts(stateCodeOrName: string): Promise<{
   options: CourtOption[];
   source: CourtsSource;
 }> {
-  const stateName = resolveStateName(stateCodeOrName);
+  const stateName = resolveIndiaStateName(stateCodeOrName);
   const { rows, source } = await allRows();
   const set = new Map<string, string>();
   for (const row of rows) {
@@ -95,7 +88,7 @@ export async function listIndiaComplexes(
   stateCodeOrName: string,
   districtName: string
 ): Promise<{ options: CourtOption[]; source: CourtsSource }> {
-  const stateName = resolveStateName(stateCodeOrName);
+  const stateName = resolveIndiaStateName(stateCodeOrName);
   const { rows, source } = await allRows();
   const set = new Map<string, string>();
   for (const row of rows) {
@@ -116,7 +109,7 @@ export async function listIndiaCourts(
   districtName: string,
   cityOrComplex: string
 ): Promise<{ options: CourtOption[]; source: CourtsSource }> {
-  const stateName = resolveStateName(stateCodeOrName);
+  const stateName = resolveIndiaStateName(stateCodeOrName);
   const { rows, source } = await allRows();
   const set = new Map<string, string>();
   for (const row of rows) {
