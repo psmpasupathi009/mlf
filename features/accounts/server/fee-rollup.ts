@@ -37,3 +37,35 @@ export async function feeRollupForCase(
 
   return { agreedFee, collected, outstanding };
 }
+
+/** Paid fee-purpose totals across all matters for a client. */
+export async function feeRollupForClient(
+  clientUnitId: string
+): Promise<FeeRollup> {
+  const cases = await prisma.case.findMany({
+    where: { clientUnitId },
+    select: { agreedFee: true },
+  });
+
+  const agg = await prisma.cashPayment.aggregate({
+    where: {
+      clientUnitId,
+      status: "paid",
+      type: { in: [...FEE_PURPOSES] },
+    },
+    _sum: { amount: true },
+  });
+
+  const collected = agg._sum.amount ?? 0;
+  const agreedParts = cases
+    .map((c) => c.agreedFee)
+    .filter((n): n is number => n != null);
+  const agreedFee =
+    agreedParts.length > 0
+      ? agreedParts.reduce((sum, n) => sum + n, 0)
+      : null;
+  const outstanding =
+    agreedFee != null ? Math.max(0, agreedFee - collected) : null;
+
+  return { agreedFee, collected, outstanding };
+}

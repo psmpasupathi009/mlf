@@ -1,8 +1,11 @@
 import { apiHandler, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
+import { hasPermission } from "@/lib/rbac";
 import { prisma } from "@/lib/db/prisma";
 import { istDayBounds, istDateKey } from "@/lib/utils/ist";
 import { displayMobile } from "@/lib/auth/mobile";
+import { toAppointmentSummary } from "@/features/appointments/server/serialize";
+import { toOfficeTaskSummary } from "@/features/tasks/server/serialize";
 
 const DIARY_LIMIT = 100;
 
@@ -27,39 +30,91 @@ export const GET = apiHandler(async (request) => {
   const dateKey = dateParam || istDateKey(new Date());
   const { start, end } = istDayBounds(dateKey);
 
+  const canAppointments = await hasPermission(user.id, "appointments", "view");
+  const canTasks = await hasPermission(user.id, "tasks", "view");
+  const isOfficeAdmin =
+    user.roles.includes("admin") || user.roles.includes("sub_admin");
+
   let caseUnitIdFilter: string[] | null = null;
+  let advocateKeys: string[] | null = null;
   if (advocateParam) {
-    const keys = mobileMatchKeys(advocateParam);
-    if (keys.length) {
+    advocateKeys = mobileMatchKeys(advocateParam);
+    if (advocateKeys.length) {
       const advocateCases = await prisma.case.findMany({
-        where: { primaryAdvocateMobile: { in: keys } },
+        where: { primaryAdvocateMobile: { in: advocateKeys } },
         select: { unitId: true },
       });
       caseUnitIdFilter = advocateCases.map((c) => c.unitId);
-      if (caseUnitIdFilter.length === 0) {
-        return jsonOk({
-          date: dateKey,
-          items: [],
-          meta: { truncated: false, limit: DIARY_LIMIT },
-        });
-      }
+    } else {
+      caseUnitIdFilter = [];
     }
   }
 
-  const hearings = await prisma.hearing.findMany({
-    where: {
-      hearingDate: { gte: start, lte: end },
-      isAdjourned: false,
-      ...(caseUnitIdFilter ? { caseUnitId: { in: caseUnitIdFilter } } : {}),
-    },
-    orderBy: { hearingDate: "asc" },
-    take: DIARY_LIMIT + 1,
-  });
+  const emptyHearings =
+    caseUnitIdFilter !== null && caseUnitIdFilter.length === 0;
+
+  const hearingsPromise = emptyHearings
+    ? Promise.resolve([])
+    : prisma.hearing.findMany({
+        where: {
+          hearingDate: { gte: start, lte: end },
+          isAdjourned: false,
+          ...(caseUnitIdFilter ? { caseUnitId: { in: caseUnitIdFilter } } : {}),
+        },
+        orderBy: { hearingDate: "asc" },
+        take: DIARY_LIMIT + 1,
+      });
+
+  const appointmentsPromise =
+    !canAppointments
+      ? Promise.resolve([])
+      : advocateParam && (!advocateKeys || advocateKeys.length === 0)
+        ? Promise.resolve([])
+        : prisma.appointment.findMany({
+            where: {
+              scheduledAt: { gte: start, lte: end },
+              status: "scheduled",
+              ...(advocateKeys && advocateKeys.length
+                ? { advocateMobile: { in: advocateKeys } }
+                : {}),
+            },
+            orderBy: { scheduledAt: "asc" },
+            take: DIARY_LIMIT,
+          });
+
+  const tasksPromise = canTasks
+    ? prisma.officeTask.findMany({
+        where: {
+          status: "open",
+          ...(isOfficeAdmin ? {} : { assigneeUnitId: user.unitId }),
+          OR: [
+            { workDate: { gte: start, lte: end } },
+            { dueDate: { gte: start, lte: end } },
+          ],
+        },
+        orderBy: [{ dueDate: "asc" }, { createdAt: "asc" }],
+        take: DIARY_LIMIT,
+      })
+    : Promise.resolve([]);
+
+  const [hearings, appointmentsRaw, tasksRaw] = await Promise.all([
+    hearingsPromise,
+    appointmentsPromise,
+    tasksPromise,
+  ]);
 
   const truncated = hearings.length > DIARY_LIMIT;
   const pageHearings = truncated ? hearings.slice(0, DIARY_LIMIT) : hearings;
 
-  const caseUnitIds = [...new Set(pageHearings.map((h) => h.caseUnitId))];
+  const caseUnitIds = [
+    ...new Set([
+      ...pageHearings.map((h) => h.caseUnitId),
+      ...appointmentsRaw
+        .map((a) => a.caseUnitId)
+        .filter(Boolean) as string[],
+      ...tasksRaw.map((t) => t.caseUnitId).filter(Boolean) as string[],
+    ]),
+  ];
   const cases = caseUnitIds.length
     ? await prisma.case.findMany({
         where: { unitId: { in: caseUnitIds } },
@@ -67,7 +122,14 @@ export const GET = apiHandler(async (request) => {
     : [];
   const caseMap = new Map(cases.map((c) => [c.unitId, c]));
 
-  const clientUnitIds = [...new Set(cases.map((c) => c.clientUnitId))];
+  const clientUnitIds = [
+    ...new Set([
+      ...cases.map((c) => c.clientUnitId),
+      ...appointmentsRaw
+        .map((a) => a.clientUnitId)
+        .filter(Boolean) as string[],
+    ]),
+  ];
   const clients = clientUnitIds.length
     ? await prisma.client.findMany({
         where: { unitId: { in: clientUnitIds } },
@@ -77,9 +139,10 @@ export const GET = apiHandler(async (request) => {
 
   const advocateMobiles = [
     ...new Set(
-      cases
-        .map((c) => c.primaryAdvocateMobile)
-        .filter(Boolean) as string[]
+      [
+        ...cases.map((c) => c.primaryAdvocateMobile),
+        ...appointmentsRaw.map((a) => a.advocateMobile),
+      ].filter(Boolean) as string[]
     ),
   ];
   const advocates = advocateMobiles.length
@@ -138,9 +201,45 @@ export const GET = apiHandler(async (request) => {
       return a.hearingDate.localeCompare(b.hearingDate);
     });
 
+  const appointments = appointmentsRaw.map((a) => {
+    const mob = a.advocateMobile;
+    return toAppointmentSummary(a, {
+      clientName: a.clientUnitId
+        ? clientMap.get(a.clientUnitId)?.name ?? null
+        : null,
+      advocateName: mob
+        ? advName.get(mob) ?? advName.get(toTen(mob)) ?? null
+        : null,
+    });
+  });
+
+  const assigneeUnitIds = [
+    ...new Set(tasksRaw.map((t) => t.assigneeUnitId).filter(Boolean) as string[]),
+  ];
+  const assignees = assigneeUnitIds.length
+    ? await prisma.user.findMany({
+        where: { unitId: { in: assigneeUnitIds } },
+        select: { unitId: true, name: true },
+      })
+    : [];
+  const assigneeMap = new Map(assignees.map((a) => [a.unitId, a.name]));
+
+  const tasks = tasksRaw.map((t) =>
+    toOfficeTaskSummary(t, {
+      assigneeName: t.assigneeUnitId
+        ? assigneeMap.get(t.assigneeUnitId) ?? null
+        : null,
+      caseNumber: t.caseUnitId
+        ? caseMap.get(t.caseUnitId)?.caseNumber ?? null
+        : null,
+    })
+  );
+
   return jsonOk({
     date: dateKey,
     items,
+    appointments,
+    tasks,
     meta: { truncated, limit: DIARY_LIMIT },
   });
 });

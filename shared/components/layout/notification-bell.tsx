@@ -30,6 +30,15 @@ function formatWhen(iso: string) {
   }
 }
 
+function urgencyTone(
+  type: string
+): "danger" | "warning" | "info" | null {
+  if (type === "batta_due" || type === "filing_defect") return "danger";
+  if (type === "hearing_tomorrow" || type === "task_assigned") return "warning";
+  if (type === "leave_request") return "info";
+  return null;
+}
+
 function NotificationRow({
   item,
   onOpen,
@@ -38,11 +47,15 @@ function NotificationRow({
   onOpen: (item: NotificationPayload) => void;
 }) {
   const unread = !item.readAt;
+  const urgency = urgencyTone(item.type);
   return (
     <DropdownMenuItem
       className={cn(
         "flex cursor-pointer flex-col items-start gap-0.5 rounded-md px-2.5 py-2",
-        unread && "bg-muted/60"
+        unread && "bg-muted/60",
+        urgency === "danger" && unread && "border-l-2 border-l-destructive",
+        urgency === "warning" && unread && "border-l-2 border-l-amber-500",
+        urgency === "info" && unread && "border-l-2 border-l-sky-500"
       )}
       onSelect={(e) => {
         e.preventDefault();
@@ -58,9 +71,25 @@ function NotificationRow({
         >
           {item.title}
         </span>
-        {unread ? (
-          <span className="mt-1 size-1.5 shrink-0 rounded-full bg-brand" />
-        ) : null}
+        <div className="flex shrink-0 items-center gap-1.5">
+          {urgency && unread ? (
+            <Badge
+              variant={
+                urgency === "danger"
+                  ? "destructive"
+                  : urgency === "warning"
+                    ? "warning"
+                    : "default"
+              }
+              className="h-5 px-1.5 text-[10px] capitalize"
+            >
+              {item.type.replace(/_/g, " ")}
+            </Badge>
+          ) : null}
+          {unread ? (
+            <span className="mt-1 size-1.5 shrink-0 rounded-full bg-brand" />
+          ) : null}
+        </div>
       </div>
       {item.body ? (
         <span className="line-clamp-2 text-xs text-muted-foreground">

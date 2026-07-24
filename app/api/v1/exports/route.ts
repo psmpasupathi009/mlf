@@ -2,12 +2,14 @@ import ExcelJS from "exceljs";
 import { NextResponse } from "next/server";
 import { apiHandler, jsonFail } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
+import { hasPermission } from "@/lib/rbac";
 import { prisma } from "@/lib/db/prisma";
 import {
   buildAccountsWhere,
   parseAccountsFilters,
 } from "@/features/accounts/server/filters";
 import { resolveActorsByIds } from "@/features/accounts/server/actors";
+import { FEE_PURPOSES } from "@/features/accounts/lib/payment-purposes";
 
 export const GET = apiHandler(async (request) => {
   const url = new URL(request.url);
@@ -113,6 +115,81 @@ export const GET = apiHandler(async (request) => {
         voidedByUnitId: r.voidedById
           ? actorMap.get(r.voidedById)?.unitId ?? ""
           : "",
+      });
+    }
+  } else if (type === "fees-outstanding") {
+    const { user, response } = await requirePerm(request, "accounts", "view");
+    if (!user) return response;
+    const canReports = await hasPermission(user.id, "reports", "view");
+    if (!canReports) {
+      return jsonFail("FORBIDDEN", "Reports permission required", 403);
+    }
+
+    const cases = await prisma.case.findMany({
+      where: { agreedFee: { not: null } },
+      orderBy: { updatedAt: "desc" },
+      take: 5000,
+      select: {
+        unitId: true,
+        caseNumber: true,
+        clientUnitId: true,
+        status: true,
+        courtName: true,
+        agreedFee: true,
+      },
+    });
+
+    const caseUnitIds = cases.map((c) => c.unitId);
+    const paidRows = caseUnitIds.length
+      ? await prisma.cashPayment.groupBy({
+          by: ["caseUnitId"],
+          where: {
+            caseUnitId: { in: caseUnitIds },
+            status: "paid",
+            type: { in: [...FEE_PURPOSES] },
+          },
+          _sum: { amount: true },
+        })
+      : [];
+    const collectedMap = new Map(
+      paidRows
+        .filter((r) => r.caseUnitId)
+        .map((r) => [r.caseUnitId as string, r._sum.amount ?? 0])
+    );
+
+    const clientIds = Array.from(new Set(cases.map((c) => c.clientUnitId)));
+    const clients = await prisma.client.findMany({
+      where: { unitId: { in: clientIds } },
+      select: { unitId: true, name: true },
+    });
+    const clientMap = new Map(clients.map((c) => [c.unitId, c.name]));
+
+    const sheet = workbook.addWorksheet("Fees outstanding");
+    sheet.columns = [
+      { header: "caseUnitId", key: "caseUnitId", width: 14 },
+      { header: "caseNumber", key: "caseNumber", width: 18 },
+      { header: "clientUnitId", key: "clientUnitId", width: 14 },
+      { header: "clientName", key: "clientName", width: 24 },
+      { header: "status", key: "status", width: 14 },
+      { header: "courtName", key: "courtName", width: 24 },
+      { header: "agreedFee", key: "agreedFee", width: 12 },
+      { header: "collected", key: "collected", width: 12 },
+      { header: "outstanding", key: "outstanding", width: 12 },
+    ];
+    for (const c of cases) {
+      const agreed = c.agreedFee ?? 0;
+      const collected = collectedMap.get(c.unitId) ?? 0;
+      const outstanding = Math.max(0, agreed - collected);
+      sheet.addRow({
+        caseUnitId: c.unitId,
+        caseNumber: c.caseNumber ?? "",
+        clientUnitId: c.clientUnitId,
+        clientName: clientMap.get(c.clientUnitId) ?? "",
+        status: c.status,
+        courtName: c.courtName ?? "",
+        agreedFee: agreed,
+        collected,
+        outstanding,
       });
     }
   } else {

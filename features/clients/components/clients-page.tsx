@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { PageHeader } from "@/shared/components/data/page-header";
@@ -175,7 +176,12 @@ export function ClientsPage({ user }: { user: PublicUser }) {
                         </TableCell>
                         <TableCell>
                           <div className="min-w-0">
-                            <p className="font-medium text-navy">{c.name}</p>
+                            <Link
+                              href={`/clients/${c.unitId}`}
+                              className="font-medium text-navy hover:underline"
+                            >
+                              {c.name}
+                            </Link>
                             <p className="mt-0.5 text-xs text-muted-foreground sm:hidden">
                               +91 {c.mobile}
                               {secondary ? ` · ${secondary}` : ""}

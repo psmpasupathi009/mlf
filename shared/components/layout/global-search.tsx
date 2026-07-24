@@ -148,7 +148,7 @@ export function GlobalSearch() {
                     {results.clients.map((c) => (
                       <ResultRow
                         key={c.unitId}
-                        onClick={() => go(`/clients?q=${encodeURIComponent(c.unitId)}`)}
+                        onClick={() => go(`/clients/${c.unitId}`)}
                         primary={c.name ?? c.unitId}
                         secondary={
                           c.mobile ? `+91 ${c.mobile} · ${c.unitId}` : c.unitId

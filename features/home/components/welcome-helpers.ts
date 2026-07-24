@@ -57,6 +57,14 @@ export type AdminStaffPresence = {
   }[];
 };
 
+export type AttentionItem = {
+  label: string;
+  value: string;
+  href: string;
+  cta: string;
+  tone: "warning" | "danger" | "info";
+};
+
 export type DashboardSummary = {
   todayKey?: string;
   isOfficeAdmin?: boolean;
@@ -70,6 +78,9 @@ export type DashboardSummary = {
     active?: number;
     weekHearings: number;
     missingCourtNumber: number;
+    battaDue?: number;
+    filingDefect?: number;
+    tomorrowHearings?: number;
     todayHearings: TodayHearing[];
   };
   accounts?: {
@@ -105,6 +116,7 @@ export type DashboardSummary = {
     advocateCount: number;
     officeHoliday?: { title: string; notes: string | null } | null;
   };
+  attention?: AttentionItem[];
 };
 
 export type DayKindFilter = "all" | "appointments" | "hearings";
@@ -122,14 +134,6 @@ export type TimelineRow = {
   detail: string;
   refId: string;
   advocateMobile: string | null;
-};
-
-export type AttentionItem = {
-  label: string;
-  value: string;
-  href: string;
-  cta: string;
-  tone: "warning" | "danger" | "info";
 };
 
 export type MetricItem = {

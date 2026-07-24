@@ -2,7 +2,7 @@ import type { UserRole } from "@prisma/client";
 
 export type PermissionKey = `${string}.${string}`;
 
-/** Seed matrix — empty matrix = broken office. Reports kept out of MVP seed. */
+/** Seed matrix — empty matrix = broken office. */
 export const PERMISSION_CATALOG: {
   module: string;
   action: string;
@@ -40,6 +40,7 @@ export const PERMISSION_CATALOG: {
   { module: "tasks", action: "view" },
   { module: "tasks", action: "create" },
   { module: "tasks", action: "edit" },
+  { module: "reports", action: "view" },
 ];
 
 export const MODULE_LABELS: Record<string, string> = {
@@ -53,6 +54,7 @@ export const MODULE_LABELS: Record<string, string> = {
   hrms: "HRMS",
   dak: "Dak / Postal",
   tasks: "Work allotment",
+  reports: "Reports",
 };
 
 export const ACTION_LABELS: Record<string, string> = {
@@ -158,6 +160,7 @@ function buildMatrix(): Matrix {
     ["tasks", "view"],
     ["tasks", "create"],
     ["tasks", "edit"],
+    ["reports", "view"],
   ]);
 
   // advocate
@@ -209,6 +212,7 @@ function buildMatrix(): Matrix {
     ["accounts", "create"],
     ["accounts", "edit"],
     ["accounts", "upload"],
+    ["reports", "view"],
   ]);
 
   return m;

@@ -1,10 +1,14 @@
 import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
+import { hasPermission } from "@/lib/rbac";
 import { prisma } from "@/lib/db/prisma";
 import { writeAudit } from "@/lib/audit";
 import { normalizeMobile } from "@/lib/auth/mobile";
 import { updateClientSchema } from "@/lib/validations/clients.schema";
 import { toClientSummary } from "@/features/clients/server/serialize";
+import { toPaymentSummary } from "@/features/accounts/server/serialize";
+import { feeRollupForClient } from "@/features/accounts/server/fee-rollup";
+import { toDocumentSummary } from "@/features/documents/server/serialize";
 
 export const GET = apiHandler(async (request, context) => {
   const { user, response } = await requirePerm(request, "clients", "view");
@@ -17,10 +21,67 @@ export const GET = apiHandler(async (request, context) => {
   const cases = await prisma.case.findMany({
     where: { clientId: client.id },
     orderBy: { createdAt: "desc" },
-    select: { unitId: true, caseNumber: true, courtName: true, status: true, nextHearingAt: true },
+    select: {
+      unitId: true,
+      caseNumber: true,
+      courtName: true,
+      status: true,
+      nextHearingAt: true,
+      agreedFee: true,
+    },
   });
 
-  return jsonOk({ client: toClientSummary(client), cases });
+  const canAccounts = await hasPermission(user.id, "accounts", "view");
+  const canDocs = await hasPermission(user.id, "cases", "view");
+  const caseUnitIds = cases.map((c) => c.unitId);
+
+  const [payments, documents, fee] = await Promise.all([
+    canAccounts
+      ? prisma.cashPayment.findMany({
+          where: { clientUnitId: client.unitId },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+        })
+      : Promise.resolve([]),
+    canDocs
+      ? prisma.document.findMany({
+          where: {
+            OR: [
+              { clientUnitId: client.unitId },
+              ...(caseUnitIds.length
+                ? [{ caseUnitId: { in: caseUnitIds } }]
+                : []),
+            ],
+          },
+          orderBy: { createdAt: "desc" },
+          take: 50,
+        })
+      : Promise.resolve([]),
+    canAccounts ? feeRollupForClient(client.unitId) : Promise.resolve(null),
+  ]);
+
+  // Dedupe if a doc matches both client and case filters
+  const seenDocs = new Set<string>();
+  const uniqueDocuments = documents.filter((d) => {
+    if (seenDocs.has(d.unitId)) return false;
+    seenDocs.add(d.unitId);
+    return true;
+  });
+
+  return jsonOk({
+    client: toClientSummary(client),
+    cases: cases.map((c) => ({
+      unitId: c.unitId,
+      caseNumber: c.caseNumber,
+      courtName: c.courtName,
+      status: c.status,
+      nextHearingAt: c.nextHearingAt ? c.nextHearingAt.toISOString() : null,
+      agreedFee: c.agreedFee,
+    })),
+    payments: payments.map((p) => toPaymentSummary(p)),
+    documents: uniqueDocuments.map(toDocumentSummary),
+    fee,
+  });
 });
 
 export const PATCH = apiHandler(async (request, context) => {

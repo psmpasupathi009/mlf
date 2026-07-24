@@ -1,7 +1,12 @@
 import type { User } from "@prisma/client";
 import { hasPermission } from "@/lib/rbac";
 import { prisma } from "@/lib/db/prisma";
-import { istDateKey, istDayBounds, formatIstTime } from "@/lib/utils/ist";
+import {
+  istDateKey,
+  istDayBounds,
+  formatIstTime,
+  istAddCalendarDays,
+} from "@/lib/utils/ist";
 import { displayMobile } from "@/lib/auth/mobile";
 import { personDisplayName } from "@/shared/lib/person";
 import { userPhotoUrl } from "@/lib/auth/user-photo";
@@ -15,8 +20,22 @@ function toTen(mobile: string): string {
   return d.length === 12 && d.startsWith("91") ? d.slice(2) : d.slice(-10);
 }
 
+type AttentionTone = "warning" | "danger" | "info";
+
+type AttentionItem = {
+  label: string;
+  value: string;
+  href: string;
+  cta: string;
+  tone: AttentionTone;
+};
+
+function rupee(n: number) {
+  return `₹${n.toLocaleString("en-IN")}`;
+}
+
 export async function buildDashboardSummary(
-  user: Pick<User, "id" | "roles">
+  user: Pick<User, "id" | "roles" | "unitId">
 ): Promise<Record<string, unknown>> {
   const can = (module: string, action: string) =>
     hasPermission(user.id, module, action);
@@ -25,7 +44,9 @@ export async function buildDashboardSummary(
     user.roles.includes("admin") || user.roles.includes("sub_admin");
 
   const todayKey = istDateKey();
+  const tomorrowKey = istAddCalendarDays(todayKey, 1);
   const { start: todayStart, end: todayEnd } = istDayBounds(todayKey);
+  const { start: tomorrowStart, end: tomorrowEnd } = istDayBounds(tomorrowKey);
   const weekEnd = new Date(todayStart.getTime() + 7 * 24 * 60 * 60 * 1000);
 
   // IST calendar month start (not server-local midnight)
@@ -38,46 +59,85 @@ export async function buildDashboardSummary(
     isOfficeAdmin,
   };
 
+  let missingCourtNumber = 0;
+  let battaDue = 0;
+  let filingDefect = 0;
+  let tomorrowHearings = 0;
+  let pendingPayments = 0;
+  let pendingAmount = 0;
+  let pendingLeave = 0;
+  let unassignedAppointments = 0;
+  let tasksDueToday = 0;
+  let tasksOverdue = 0;
+
   if (await can("cases", "view")) {
-    const [total, preNumber, active, open, weekHearings, missingCourtNumber, todayCases] =
-      await Promise.all([
-        prisma.case.count(),
-        prisma.case.count({ where: { status: { in: [...PRE_NUMBER_STATUSES] } } }),
-        prisma.case.count({ where: { status: "active" } }),
-        prisma.case.count({ where: { status: { in: [...OPEN_CASE_STATUSES] } } }),
-        prisma.case.count({
-          where: {
-            nextHearingAt: { gte: todayStart, lt: weekEnd },
-            status: { in: [...OPEN_CASE_STATUSES] },
-          },
-        }),
-        prisma.case.count({
-          where: {
-            OR: [{ caseNumber: null }, { caseNumber: "" }],
-            status: { in: [...PRE_NUMBER_STATUSES] },
-          },
-        }),
-        prisma.case.findMany({
-          where: {
-            nextHearingAt: { gte: todayStart, lte: todayEnd },
-            status: { in: [...OPEN_CASE_STATUSES] },
-          },
-          orderBy: { nextHearingAt: "asc" },
-          take: 20,
-          select: {
-            unitId: true,
-            caseNumber: true,
-            courtName: true,
-            district: true,
-            status: true,
-            nextHearingAt: true,
-            clientUnitId: true,
-            clientId: true,
-            primaryAdvocateMobile: true,
-            caseType: true,
-          },
-        }),
-      ]);
+    const [
+      total,
+      preNumber,
+      active,
+      open,
+      weekHearings,
+      missingCourtNumberCount,
+      battaDueCount,
+      filingDefectCount,
+      tomorrowHearingCount,
+      todayCases,
+    ] = await Promise.all([
+      prisma.case.count(),
+      prisma.case.count({ where: { status: { in: [...PRE_NUMBER_STATUSES] } } }),
+      prisma.case.count({ where: { status: "active" } }),
+      prisma.case.count({ where: { status: { in: [...OPEN_CASE_STATUSES] } } }),
+      prisma.case.count({
+        where: {
+          nextHearingAt: { gte: todayStart, lt: weekEnd },
+          status: { in: [...OPEN_CASE_STATUSES] },
+        },
+      }),
+      prisma.case.count({
+        where: {
+          OR: [{ caseNumber: null }, { caseNumber: "" }],
+          status: { in: [...PRE_NUMBER_STATUSES] },
+        },
+      }),
+      prisma.case.count({
+        where: {
+          battaDue: true,
+          status: { in: [...OPEN_CASE_STATUSES] },
+        },
+      }),
+      prisma.case.count({ where: { status: "filing_defect" } }),
+      prisma.hearing.count({
+        where: {
+          hearingDate: { gte: tomorrowStart, lte: tomorrowEnd },
+          isAdjourned: false,
+        },
+      }),
+      prisma.case.findMany({
+        where: {
+          nextHearingAt: { gte: todayStart, lte: todayEnd },
+          status: { in: [...OPEN_CASE_STATUSES] },
+        },
+        orderBy: { nextHearingAt: "asc" },
+        take: 20,
+        select: {
+          unitId: true,
+          caseNumber: true,
+          courtName: true,
+          district: true,
+          status: true,
+          nextHearingAt: true,
+          clientUnitId: true,
+          clientId: true,
+          primaryAdvocateMobile: true,
+          caseType: true,
+        },
+      }),
+    ]);
+
+    missingCourtNumber = missingCourtNumberCount;
+    battaDue = battaDueCount;
+    filingDefect = filingDefectCount;
+    tomorrowHearings = tomorrowHearingCount;
 
     const clientIds = [...new Set(todayCases.map((c) => c.clientId))];
     const advocateMobiles = [
@@ -149,6 +209,9 @@ export async function buildDashboardSummary(
       active,
       weekHearings,
       missingCourtNumber,
+      battaDue,
+      filingDefect,
+      tomorrowHearings,
       todayHearings,
     };
   }
@@ -180,8 +243,10 @@ export async function buildDashboardSummary(
       }),
       prisma.cashPayment.count({ where: { status: "pending" } }),
     ]);
+    pendingPayments = pendingCount;
+    pendingAmount = pendingAgg._sum.amount ?? 0;
     summary.accounts = {
-      pendingAmount: pendingAgg._sum.amount ?? 0,
+      pendingAmount,
       pendingCount,
       paidThisMonth: paidThisMonthAgg._sum.amount ?? 0,
     };
@@ -218,6 +283,8 @@ export async function buildDashboardSummary(
         take: 80,
       }),
     ]);
+
+    unassignedAppointments = todayRows.filter((a) => !a.advocateMobile).length;
 
     const allForNames = [...todayRows, ...weekRows];
     const clientUnitIds = [
@@ -357,9 +424,42 @@ export async function buildDashboardSummary(
     };
   }
 
+  if (await can("tasks", "view")) {
+    const assigneeScope = isOfficeAdmin
+      ? {}
+      : { assigneeUnitId: user.unitId };
+    const [dueToday, overdue] = await Promise.all([
+      prisma.officeTask.count({
+        where: {
+          status: "open",
+          ...assigneeScope,
+          OR: [
+            { dueDate: { gte: todayStart, lte: todayEnd } },
+            { workDate: { gte: todayStart, lte: todayEnd } },
+          ],
+        },
+      }),
+      // Prefer dueDate when set — past workDate alone with a future due is not overdue
+      prisma.officeTask.count({
+        where: {
+          status: "open",
+          ...assigneeScope,
+          OR: [
+            { dueDate: { lt: todayStart } },
+            {
+              AND: [{ dueDate: null }, { workDate: { lt: todayStart } }],
+            },
+          ],
+        },
+      }),
+    ]);
+    tasksDueToday = dueToday;
+    tasksOverdue = overdue;
+  }
+
   if (await can("hrms", "view")) {
     try {
-      const [myAttendance, pendingLeave, onLeaveToday, holiday] =
+      const [myAttendance, pendingLeaveCount, onLeaveToday, holiday] =
         await Promise.all([
           prisma.attendance.findUnique({
             where: { userId_date: { userId: user.id, date: todayKey } },
@@ -386,6 +486,7 @@ export async function buildDashboardSummary(
             }
           })(),
         ]);
+      pendingLeave = pendingLeaveCount ?? 0;
       summary.hrms = {
         checkedInToday: Boolean(myAttendance?.checkInAt),
         checkedOutToday: Boolean(myAttendance?.checkOutAt),
@@ -393,7 +494,7 @@ export async function buildDashboardSummary(
         officeHolidayToday: holiday
           ? { title: holiday.title, notes: holiday.notes ?? null }
           : null,
-        pendingLeaveApprovals: pendingLeave,
+        pendingLeaveApprovals: pendingLeaveCount,
       };
     } catch {
       // Keep home usable if attendance/holiday queries fail.
@@ -445,6 +546,91 @@ export async function buildDashboardSummary(
       // Presence board is optional on home — don't fail the whole dashboard.
     }
   }
+
+  const attention: AttentionItem[] = [];
+  if (tasksOverdue > 0) {
+    attention.push({
+      label: "Overdue tasks",
+      value: String(tasksOverdue),
+      href: "/tasks",
+      cta: "Open",
+      tone: "danger",
+    });
+  }
+  if (tasksDueToday > 0) {
+    attention.push({
+      label: "Tasks due today",
+      value: String(tasksDueToday),
+      href: "/tasks",
+      cta: "Open",
+      tone: "warning",
+    });
+  }
+  if (pendingPayments > 0) {
+    attention.push({
+      label: "Pending payments",
+      value: `${pendingPayments} · ${rupee(pendingAmount)}`,
+      href: "/accounts",
+      cta: "Review",
+      tone: "danger",
+    });
+  }
+  if (battaDue > 0) {
+    attention.push({
+      label: "Batta due",
+      value: String(battaDue),
+      href: "/cases?battaDue=1",
+      cta: "Open",
+      tone: "warning",
+    });
+  }
+  if (filingDefect > 0) {
+    attention.push({
+      label: "Filing defects",
+      value: String(filingDefect),
+      href: "/cases?status=filing_defect",
+      cta: "Open",
+      tone: "warning",
+    });
+  }
+  if (tomorrowHearings > 0) {
+    attention.push({
+      label: "Tomorrow’s hearings",
+      value: String(tomorrowHearings),
+      href: `/diary?date=${tomorrowKey}`,
+      cta: "Day board",
+      tone: "info",
+    });
+  }
+  if (missingCourtNumber > 0) {
+    attention.push({
+      label: "Cases missing court number",
+      value: String(missingCourtNumber),
+      href: "/cases?missingCourtNumber=1",
+      cta: "Open",
+      tone: "warning",
+    });
+  }
+  if (pendingLeave > 0) {
+    attention.push({
+      label: "Leave approvals waiting",
+      value: String(pendingLeave),
+      href: "/hrms?section=leave",
+      cta: "Approve",
+      tone: "info",
+    });
+  }
+  if (unassignedAppointments > 0) {
+    attention.push({
+      label: "Appointments without advocate",
+      value: String(unassignedAppointments),
+      href: "/appointments?hearing=today",
+      cta: "Assign",
+      tone: "warning",
+    });
+  }
+
+  summary.attention = attention;
 
   return summary;
 }

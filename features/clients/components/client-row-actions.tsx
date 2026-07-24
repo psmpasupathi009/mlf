@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Briefcase, MoreHorizontal, Pencil } from "lucide-react";
+import { Briefcase, MoreHorizontal, Pencil, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -57,6 +57,12 @@ export function ClientRowActions({ client, canEdit, onEdit }: Props) {
             {client.name}
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
+          <DropdownMenuItem asChild>
+            <Link href={`/clients/${client.unitId}`}>
+              <UserRound />
+              Open
+            </Link>
+          </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link href={`/cases?clientUnitId=${client.unitId}`}>
               <Briefcase />

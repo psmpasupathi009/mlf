@@ -57,7 +57,7 @@ export const navItems: NavItem[] = [
   },
   {
     href: "/diary",
-    label: "Diary",
+    label: "Day board",
     module: "cases",
     group: "matters",
     permission: { module: "cases", action: "view" },
@@ -103,6 +103,13 @@ export const navItems: NavItem[] = [
     module: "tasks",
     group: "office",
     permission: { module: "tasks", action: "view" },
+  },
+  {
+    href: "/reports",
+    label: "Reports",
+    module: "reports",
+    group: "office",
+    permission: { module: "reports", action: "view" },
   },
   {
     href: "/employees",

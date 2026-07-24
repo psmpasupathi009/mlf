@@ -2,12 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
+  CalendarClock,
+  CheckSquare,
   ChevronLeft,
   ChevronRight,
   MessageSquareWarning,
   Phone,
   Printer,
+  Scale,
   Search,
   Send,
 } from "lucide-react";
@@ -15,9 +19,11 @@ import { toast } from "sonner";
 import { apiFetch, getErrorMessage } from "@/lib/api/client";
 import { PageHeader } from "@/shared/components/data/page-header";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
+import { FilterChipGroup } from "@/shared/components/data/filter-chip-group";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { DatePicker } from "@/shared/components/forms/date-picker";
 import { AdvocatePicker } from "@/features/employees/components/advocate-picker";
 import { AdjournHearingDialog } from "@/features/cases/components/adjourn-hearing-dialog";
@@ -25,6 +31,8 @@ import {
   DiaryHearingCard,
   type DiaryItem,
 } from "@/features/diary/components/diary-hearing-card";
+import type { AppointmentSummary } from "@/features/appointments/server/serialize";
+import type { OfficeTaskSummary } from "@/features/tasks/server/serialize";
 import type { PublicUser } from "@/lib/auth/session";
 import { displayMobile } from "@/lib/auth/mobile";
 import { canBookForAnyAdvocate } from "@/lib/appointments/booking-rules";
@@ -34,11 +42,14 @@ import {
   istDisplayDate,
   istDisplayWeekday,
 } from "@/lib/utils/ist";
+import { OFFICE_TASK_KIND_OPTIONS } from "@/lib/validations/tasks.schema";
 import { cn } from "@/lib/utils/cn";
 
 type DiaryResponse = {
   date: string;
   items: DiaryItem[];
+  appointments?: AppointmentSummary[];
+  tasks?: OfficeTaskSummary[];
   meta: { truncated: boolean; limit: number };
 };
 
@@ -67,20 +78,69 @@ type TomorrowNotifyResponse = {
   };
 };
 
+type BoardKind = "all" | "hearings" | "appointments" | "tasks";
+
 function courtLabel(name: string | null) {
   return name?.trim() || "Court TBD";
 }
 
+function kindLabel(kind: string) {
+  return OFFICE_TASK_KIND_OPTIONS.find((k) => k.value === kind)?.label ?? kind;
+}
+
+function appointmentTime(iso: string) {
+  return new Date(iso).toLocaleTimeString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Asia/Kolkata",
+  });
+}
+
+function isDateKey(value: string | null): value is string {
+  return Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value));
+}
+
 export function DiaryPage({ user }: { user: PublicUser }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const canEdit = user.permissions.includes("cases.edit");
+  const canAppointments = user.permissions.includes("appointments.view");
+  const canTasks = user.permissions.includes("tasks.view");
   const bookAny = canBookForAnyAdvocate(user.roles);
   const todayKey = istDateKey();
 
-  const [date, setDate] = useState(todayKey);
+  const dateFromUrl = searchParams.get("date");
+  const [date, setDateState] = useState(() =>
+    isDateKey(dateFromUrl) ? dateFromUrl : todayKey
+  );
+
+  function setDate(next: string | ((prev: string) => string)) {
+    setDateState((prev) => {
+      const value = typeof next === "function" ? next(prev) : next;
+      const params = new URLSearchParams(searchParams.toString());
+      if (value === todayKey) params.delete("date");
+      else params.set("date", value);
+      const qs = params.toString();
+      router.replace(qs ? `/diary?${qs}` : "/diary", { scroll: false });
+      return value;
+    });
+  }
+
+  useEffect(() => {
+    if (isDateKey(dateFromUrl) && dateFromUrl !== date) {
+      setDateState(dateFromUrl);
+    }
+    // Sync when home attention / external links change ?date=
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to URL
+  }, [dateFromUrl]);
+
   const [items, setItems] = useState<DiaryItem[]>([]);
+  const [appointments, setAppointments] = useState<AppointmentSummary[]>([]);
+  const [tasks, setTasks] = useState<OfficeTaskSummary[]>([]);
   const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
+  const [kind, setKind] = useState<BoardKind>("all");
   const [advocateFilter, setAdvocateFilter] = useState<string | null>(
     bookAny ? null : displayMobile(user.mobile)
   );
@@ -102,6 +162,13 @@ export function DiaryPage({ user }: { user: PublicUser }) {
     if (res.ok) setTomorrowNotify(res.data);
   }
 
+  const applyDiary = useCallback((data: DiaryResponse) => {
+    setItems(data.items ?? []);
+    setAppointments(data.appointments ?? []);
+    setTasks(data.tasks ?? []);
+    setTruncated(Boolean(data.meta?.truncated));
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -117,20 +184,21 @@ export function DiaryPage({ user }: { user: PublicUser }) {
         toast.error(
           getErrorMessage(
             res.data as Record<string, unknown>,
-            "Failed to load diary"
+            "Failed to load day board"
           )
         );
         setItems([]);
+        setAppointments([]);
+        setTasks([]);
         setTruncated(false);
         return;
       }
-      setItems(res.data.items ?? []);
-      setTruncated(Boolean(res.data.meta?.truncated));
+      applyDiary(res.data);
     })();
     return () => {
       cancelled = true;
     };
-  }, [date, advocateFilter]);
+  }, [date, advocateFilter, applyDiary]);
 
   useEffect(() => {
     let cancelled = false;
@@ -169,14 +237,13 @@ export function DiaryPage({ user }: { user: PublicUser }) {
       toast.error(
         getErrorMessage(
           res.data as Record<string, unknown>,
-          "Failed to load diary"
+          "Failed to load day board"
         )
       );
       return;
     }
-    setItems(res.data.items ?? []);
-    setTruncated(Boolean(res.data.meta?.truncated));
-  }, [date, advocateFilter]);
+    applyDiary(res.data);
+  }, [date, advocateFilter, applyDiary]);
 
   async function sendTomorrowSms() {
     if (!canEdit || smsSending) return;
@@ -205,8 +272,10 @@ export function DiaryPage({ user }: { user: PublicUser }) {
     await reloadTomorrowNotify();
     if (date === tomorrowKey) await reload();
   }
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
+
+  const q = search.trim().toLowerCase();
+
+  const filteredHearings = useMemo(() => {
     if (!q) return items;
     return items.filter((item) => {
       const hay = [
@@ -224,11 +293,49 @@ export function DiaryPage({ user }: { user: PublicUser }) {
         .toLowerCase();
       return hay.includes(q);
     });
-  }, [items, search]);
+  }, [items, q]);
+
+  const filteredAppointments = useMemo(() => {
+    if (!canAppointments) return [];
+    if (!q) return appointments;
+    return appointments.filter((a) => {
+      const hay = [
+        a.title,
+        a.clientName,
+        a.advocateName,
+        a.location,
+        a.notes,
+        a.caseUnitId,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [appointments, canAppointments, q]);
+
+  const filteredTasks = useMemo(() => {
+    if (!canTasks) return [];
+    if (!q) return tasks;
+    return tasks.filter((t) => {
+      const hay = [
+        t.title,
+        t.kind,
+        t.assigneeName,
+        t.caseNumber,
+        t.caseUnitId,
+        t.notes,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return hay.includes(q);
+    });
+  }, [tasks, canTasks, q]);
 
   const groups = useMemo(() => {
     const map = new Map<string, DiaryItem[]>();
-    for (const item of filtered) {
+    for (const item of filteredHearings) {
       const key = courtLabel(item.courtName);
       const list = map.get(key) ?? [];
       list.push(item);
@@ -237,7 +344,7 @@ export function DiaryPage({ user }: { user: PublicUser }) {
     return [...map.entries()].sort(([a], [b]) =>
       a.toLocaleLowerCase("en").localeCompare(b.toLocaleLowerCase("en"))
     );
-  }, [filtered]);
+  }, [filteredHearings]);
 
   const courtCount = useMemo(
     () => new Set(items.map((i) => courtLabel(i.courtName))).size,
@@ -248,24 +355,54 @@ export function DiaryPage({ user }: { user: PublicUser }) {
     [items]
   );
 
+  const showHearings = kind === "all" || kind === "hearings";
+  const showAppointments =
+    (kind === "all" || kind === "appointments") && canAppointments;
+  const showTasks = (kind === "all" || kind === "tasks") && canTasks;
+
+  const totalVisible =
+    (showHearings ? filteredHearings.length : 0) +
+    (showAppointments ? filteredAppointments.length : 0) +
+    (showTasks ? filteredTasks.length : 0);
+
+  const printDisabled =
+    loading ||
+    (items.length === 0 && appointments.length === 0 && tasks.length === 0);
+
   const isToday = date === todayKey;
   const dateObj = new Date(`${date}T12:00:00+05:30`);
   const weekday = istDisplayWeekday(dateObj);
   const displayDate = istDisplayDate(dateObj);
 
+  const kindChips: { id: BoardKind; label: string }[] = [
+    { id: "all", label: "All" },
+    { id: "hearings", label: `Hearings (${items.length})` },
+    ...(canAppointments
+      ? [
+          {
+            id: "appointments" as const,
+            label: `Appointments (${appointments.length})`,
+          },
+        ]
+      : []),
+    ...(canTasks
+      ? [{ id: "tasks" as const, label: `Tasks (${tasks.length})` }]
+      : []),
+  ];
+
   return (
     <div className="space-y-5">
       <div className="print:hidden">
         <PageHeader
-          title="Advocate diary"
-          description="Court cause list (IST) — board by court for the selected day."
+          title="Day board"
+          description="Hearings, appointments, and open tasks for the selected IST day."
           actions={
             <Button
               type="button"
               variant="outline"
               className="h-11 gap-2"
               onClick={() => window.print()}
-              disabled={loading || items.length === 0}
+              disabled={printDisabled}
             >
               <Printer className="size-4" />
               Print day
@@ -275,9 +412,9 @@ export function DiaryPage({ user }: { user: PublicUser }) {
       </div>
 
       <div className="hidden print:block print:mb-4">
-        <h1 className="text-xl font-semibold text-navy">Advocate diary</h1>
+        <h1 className="text-xl font-semibold text-navy">Day board</h1>
         <p className="text-sm text-muted-foreground">
-          {weekday}, {displayDate} · Court cause list
+          {weekday}, {displayDate} · Hearings, appointments & tasks
         </p>
       </div>
 
@@ -464,6 +601,14 @@ export function DiaryPage({ user }: { user: PublicUser }) {
           </div>
         </div>
 
+        <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-border/60 pt-3">
+          <FilterChipGroup
+            value={kind}
+            onChange={setKind}
+            options={kindChips}
+          />
+        </div>
+
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-border/60 pt-3 text-sm text-muted-foreground">
           <p>
             <span className="font-medium text-navy">{weekday}</span>
@@ -474,16 +619,25 @@ export function DiaryPage({ user }: { user: PublicUser }) {
               <span>
                 {items.length} hearing{items.length === 1 ? "" : "s"}
               </span>
+              {canAppointments ? (
+                <span>
+                  {appointments.length} appointment
+                  {appointments.length === 1 ? "" : "s"}
+                </span>
+              ) : null}
+              {canTasks ? (
+                <span>
+                  {tasks.length} task{tasks.length === 1 ? "" : "s"}
+                </span>
+              ) : null}
               <span>
                 {courtCount} court{courtCount === 1 ? "" : "s"}
               </span>
-              <span>
-                {smsPending} SMS pending
-              </span>
-              {search.trim() && filtered.length !== items.length ? (
+              <span>{smsPending} SMS pending</span>
+              {q && totalVisible !== items.length + appointments.length + tasks.length ? (
                 <span>
-                  Showing {filtered.length} match
-                  {filtered.length === 1 ? "" : "es"}
+                  Showing {totalVisible} match
+                  {totalVisible === 1 ? "" : "es"}
                 </span>
               ) : null}
             </>
@@ -509,46 +663,126 @@ export function DiaryPage({ user }: { user: PublicUser }) {
             />
           ))}
         </div>
-      ) : items.length === 0 ? (
+      ) : totalVisible === 0 ? (
         <EmptyState
-          title="No hearings this day"
-          description="Pick another date or add a hearing on a case."
+          title={q ? "No matches" : "Nothing on this day"}
+          description={
+            q
+              ? "Try a different search or clear filters."
+              : "Pick another date, or add a hearing, appointment, or task."
+          }
           action={
-            <Button asChild type="button" variant="outline">
-              <Link href="/cases">Open cases</Link>
-            </Button>
+            !q ? (
+              <Button asChild type="button" variant="outline">
+                <Link href="/cases">Open cases</Link>
+              </Button>
+            ) : undefined
           }
         />
-      ) : filtered.length === 0 ? (
-        <EmptyState
-          title="No matches"
-          description="Try a different search or clear the advocate filter."
-        />
       ) : (
-        <div className="space-y-6">
-          {groups.map(([court, groupItems]) => (
-            <section key={court} className="space-y-3">
-              <div className="flex items-baseline justify-between gap-2 border-b border-border/70 pb-2">
-                <h2 className="text-sm font-semibold tracking-wide text-navy uppercase">
-                  {court}
+        <div className="space-y-8">
+          {showHearings && filteredHearings.length > 0 ? (
+            <div className="space-y-6">
+              <div className="flex items-center gap-2 print:hidden">
+                <Scale className="size-4 text-navy" />
+                <h2 className="text-base font-semibold text-navy">Hearings</h2>
+              </div>
+              {groups.map(([court, groupItems]) => (
+                <section key={court} className="space-y-3">
+                  <div className="flex items-baseline justify-between gap-2 border-b border-border/70 pb-2">
+                    <h3 className="text-sm font-semibold tracking-wide text-navy uppercase">
+                      {court}
+                    </h3>
+                    <span className="text-xs text-muted-foreground">
+                      {groupItems.length} matter
+                      {groupItems.length === 1 ? "" : "s"}
+                    </span>
+                  </div>
+                  <ul className="space-y-3">
+                    {groupItems.map((item) => (
+                      <DiaryHearingCard
+                        key={item.hearingUnitId}
+                        item={item}
+                        canEdit={canEdit}
+                        onAdjourn={() => setAdjourning(item.hearingUnitId)}
+                      />
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          ) : null}
+
+          {showAppointments && filteredAppointments.length > 0 ? (
+            <section className="space-y-3">
+              <div className="flex items-center gap-2 border-b border-border/70 pb-2">
+                <CalendarClock className="size-4 text-navy" />
+                <h2 className="text-base font-semibold text-navy">
+                  Appointments
                 </h2>
                 <span className="text-xs text-muted-foreground">
-                  {groupItems.length} matter
-                  {groupItems.length === 1 ? "" : "s"}
+                  {filteredAppointments.length}
                 </span>
               </div>
               <ul className="space-y-3">
-                {groupItems.map((item) => (
-                  <DiaryHearingCard
-                    key={item.hearingUnitId}
-                    item={item}
-                    canEdit={canEdit}
-                    onAdjourn={() => setAdjourning(item.hearingUnitId)}
-                  />
+                {filteredAppointments.map((a) => (
+                  <li key={a.unitId}>
+                    <Card>
+                      <CardContent className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="font-medium text-navy">{a.title}</p>
+                          <p className="mt-0.5 text-sm text-muted-foreground">
+                            {appointmentTime(a.scheduledAt)}
+                            {a.clientName ? ` · ${a.clientName}` : ""}
+                            {a.advocateName ? ` · ${a.advocateName}` : ""}
+                            {a.mode ? ` · ${a.mode}` : ""}
+                          </p>
+                        </div>
+                        <Button asChild type="button" size="sm" variant="outline">
+                          <Link href="/appointments">Open</Link>
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </li>
                 ))}
               </ul>
             </section>
-          ))}
+          ) : null}
+
+          {showTasks && filteredTasks.length > 0 ? (
+            <section className="space-y-3">
+              <div className="flex items-center gap-2 border-b border-border/70 pb-2">
+                <CheckSquare className="size-4 text-navy" />
+                <h2 className="text-base font-semibold text-navy">Tasks</h2>
+                <span className="text-xs text-muted-foreground">
+                  {filteredTasks.length} open
+                </span>
+              </div>
+              <ul className="space-y-3">
+                {filteredTasks.map((t) => (
+                  <li key={t.unitId}>
+                    <Card>
+                      <CardContent className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                          <p className="font-medium text-navy">{t.title}</p>
+                          <p className="mt-0.5 text-sm text-muted-foreground">
+                            {kindLabel(t.kind)}
+                            {t.assigneeName ? ` · ${t.assigneeName}` : ""}
+                            {t.caseNumber || t.caseUnitId
+                              ? ` · ${t.caseNumber || t.caseUnitId}`
+                              : ""}
+                          </p>
+                        </div>
+                        <Button asChild type="button" size="sm" variant="outline">
+                          <Link href="/tasks">Work allotment</Link>
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
         </div>
       )}
 

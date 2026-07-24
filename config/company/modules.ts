@@ -14,7 +14,7 @@ export const modules = {
     hrms: true,
     dak: true,
     tasks: true,
-    reports: false,
+    reports: true,
   },
 } as const;
 

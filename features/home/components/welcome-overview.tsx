@@ -233,62 +233,69 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
     user?.permissions,
   ]);
 
-  const attention: AttentionItem[] = [];
+  const attention: AttentionItem[] =
+    summary?.attention && summary.attention.length > 0
+      ? summary.attention
+      : [];
 
-  if (
-    moduleOn("cases") &&
-    can("cases.view") &&
-    (summary?.cases?.missingCourtNumber ?? 0) > 0
-  ) {
-    attention.push({
-      label: "Cases missing court number",
-      value: String(summary!.cases!.missingCourtNumber),
-      href: "/cases?missingCourtNumber=1",
-      cta: "Open",
-      tone: "warning",
-    });
-  }
-  if (
-    moduleOn("accounts") &&
-    can("accounts.view") &&
-    (summary?.accounts?.pendingCount ?? 0) > 0
-  ) {
-    attention.push({
-      label: "Pending payments",
-      value: `${summary!.accounts!.pendingCount} · ${rupee(summary!.accounts!.pendingAmount)}`,
-      href: "/accounts",
-      cta: "Review",
-      tone: "danger",
-    });
-  }
-  if (
-    moduleOn("hrms") &&
-    can("hrms.approve_leave") &&
-    (summary?.hrms?.pendingLeaveApprovals ?? 0) > 0
-  ) {
-    attention.push({
-      label: "Leave approvals waiting",
-      value: String(summary!.hrms!.pendingLeaveApprovals),
-      href: "/hrms?section=leave",
-      cta: "Approve",
-      tone: "info",
-    });
-  }
-  if (
-    moduleOn("appointments") &&
-    can("appointments.view") &&
-    (summary?.appointments?.todayList.filter((a) => !a.advocateMobile).length ??
-      0) > 0
-  ) {
-    attention.push({
-      label: "Appointments without advocate",
-      value: String(
-        summary!.appointments!.todayList.filter((a) => !a.advocateMobile).length
-      ),
-      href: "/appointments?hearing=today",
-      cta: "Assign",
-      tone: "warning",
-    });
+  // Fallback if older summary payloads omit attention
+  if (attention.length === 0) {
+    if (
+      moduleOn("cases") &&
+      can("cases.view") &&
+      (summary?.cases?.missingCourtNumber ?? 0) > 0
+    ) {
+      attention.push({
+        label: "Cases missing court number",
+        value: String(summary!.cases!.missingCourtNumber),
+        href: "/cases?missingCourtNumber=1",
+        cta: "Open",
+        tone: "warning",
+      });
+    }
+    if (
+      moduleOn("accounts") &&
+      can("accounts.view") &&
+      (summary?.accounts?.pendingCount ?? 0) > 0
+    ) {
+      attention.push({
+        label: "Pending payments",
+        value: `${summary!.accounts!.pendingCount} · ${rupee(summary!.accounts!.pendingAmount)}`,
+        href: "/accounts",
+        cta: "Review",
+        tone: "danger",
+      });
+    }
+    if (
+      moduleOn("hrms") &&
+      can("hrms.approve_leave") &&
+      (summary?.hrms?.pendingLeaveApprovals ?? 0) > 0
+    ) {
+      attention.push({
+        label: "Leave approvals waiting",
+        value: String(summary!.hrms!.pendingLeaveApprovals),
+        href: "/hrms?section=leave",
+        cta: "Approve",
+        tone: "info",
+      });
+    }
+    if (
+      moduleOn("appointments") &&
+      can("appointments.view") &&
+      (summary?.appointments?.todayList.filter((a) => !a.advocateMobile).length ??
+        0) > 0
+    ) {
+      attention.push({
+        label: "Appointments without advocate",
+        value: String(
+          summary!.appointments!.todayList.filter((a) => !a.advocateMobile)
+            .length
+        ),
+        href: "/appointments?hearing=today",
+        cta: "Assign",
+        tone: "warning",
+      });
+    }
   }
 
   const metrics: MetricItem[] = [];

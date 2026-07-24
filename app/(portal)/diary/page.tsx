@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { getSessionUser } from "@/lib/auth/session-user";
 import { ForbiddenState } from "@/shared/components/feedback/forbidden-state";
 import { DiaryPage } from "@/features/diary/components/diary-page";
@@ -12,5 +13,11 @@ export default async function DiaryRoutePage() {
   ) {
     return <ForbiddenState />;
   }
-  return <DiaryPage user={user} />;
+  return (
+    <Suspense
+      fallback={<p className="text-sm text-muted-foreground">Loading…</p>}
+    >
+      <DiaryPage user={user} />
+    </Suspense>
+  );
 }
