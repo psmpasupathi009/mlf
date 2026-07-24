@@ -151,7 +151,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
           sortAt: new Date(a.scheduledAt).getTime(),
           timeLabel: a.timeLabel,
           title: a.title,
-          href: "/appointments",
+          href: `/appointments?q=${encodeURIComponent(a.unitId)}`,
           client: a.clientName ?? "No client",
           advocate:
             a.advocateName || a.advocateMobile ? (

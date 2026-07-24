@@ -20,12 +20,13 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiFetch, getErrorMessage } from "@/lib/api/client";
+import { apiFetch, apiDownload, getErrorMessage } from "@/lib/api/client";
 import type { PublicUser } from "@/lib/auth/session";
 import type { ClientSummary } from "@/features/clients/server/serialize";
 import { ClientFormDialog } from "@/features/clients/components/client-form-dialog";
 import { ClientRowActions } from "@/features/clients/components/client-row-actions";
 import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
+import { Download } from "lucide-react";
 
 type ListResponse = { data: ClientSummary[]; meta: { page: number; pageSize: number; total: number } };
 
@@ -89,6 +90,22 @@ export function ClientsPage({ user }: { user: PublicUser }) {
         description="The office client book — everyone with access sees the same list."
         actions={
           <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={async () => {
+                const params = new URLSearchParams({ type: "clients" });
+                if (debouncedSearch) params.set("q", debouncedSearch);
+                const result = await apiDownload(
+                  `/api/v1/exports?${params.toString()}`,
+                  "clients.xlsx"
+                );
+                if (!result.ok) toast.error(result.error ?? "Export failed");
+              }}
+            >
+              <Download className="size-4" />
+              Export Excel
+            </Button>
             {can("create") ? (
               <Button type="button" variant="outline" onClick={() => setImportOpen(true)}>
                 Import CSV

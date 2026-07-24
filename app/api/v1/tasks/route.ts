@@ -7,7 +7,7 @@ import { writeAudit } from "@/lib/audit";
 import { createOfficeTaskSchema } from "@/lib/validations/tasks.schema";
 import { toOfficeTaskSummary } from "@/features/tasks/server/serialize";
 import { containsInsensitive } from "@/lib/db/search";
-import { istDayBounds } from "@/lib/utils/ist";
+import { istDateKey, istDayBounds } from "@/lib/utils/ist";
 import { notifyUser, scheduleNotify } from "@/lib/notifications/notify";
 
 async function resolveAssignee(assigneeUnitId: string | undefined | null) {
@@ -67,29 +67,50 @@ export const GET = apiHandler(async (request) => {
   const kind = searchParams.get("kind")?.trim();
   const workDate = searchParams.get("workDate")?.trim();
   const assigneeUnitId = searchParams.get("assigneeUnitId")?.trim();
+  const due = searchParams.get("due")?.trim();
+
+  const todayKey = istDateKey();
+  const { start: todayStart, end: todayEnd } = istDayBounds(todayKey);
+  const and: Prisma.OfficeTaskWhereInput[] = [];
+  if (due === "overdue") {
+    and.push({
+      OR: [
+        { dueDate: { lt: todayStart } },
+        { AND: [{ dueDate: null }, { workDate: { lt: todayStart } }] },
+      ],
+    });
+  } else if (due === "today") {
+    and.push({
+      OR: [
+        { dueDate: { gte: todayStart, lte: todayEnd } },
+        { workDate: { gte: todayStart, lte: todayEnd } },
+      ],
+    });
+  }
+  if (q) {
+    and.push({
+      OR: [
+        { title: containsInsensitive(q) },
+        { notes: containsInsensitive(q) },
+        { finishNote: containsInsensitive(q) },
+        { unitId: containsInsensitive(q) },
+        { caseUnitId: containsInsensitive(q) },
+        { assigneeUnitId: containsInsensitive(q) },
+      ],
+    });
+  }
 
   const where: Prisma.OfficeTaskWhereInput = {
-    ...(status ? { status } : {}),
+    ...(status ? { status } : due ? { status: "open" } : {}),
     ...(kind ? { kind } : {}),
     ...(assigneeUnitId ? { assigneeUnitId } : {}),
-    ...(workDate
+    ...(workDate && !due
       ? (() => {
           const { start, end } = istDayBounds(workDate);
           return { workDate: { gte: start, lte: end } };
         })()
       : {}),
-    ...(q
-      ? {
-          OR: [
-            { title: containsInsensitive(q) },
-            { notes: containsInsensitive(q) },
-            { finishNote: containsInsensitive(q) },
-            { unitId: containsInsensitive(q) },
-            { caseUnitId: containsInsensitive(q) },
-            { assigneeUnitId: containsInsensitive(q) },
-          ],
-        }
-      : {}),
+    ...(and.length ? { AND: and } : {}),
   };
 
   const [rows, total] = await Promise.all([
@@ -172,7 +193,7 @@ export const POST = apiHandler(async (request) => {
         type: "task_assigned",
         title: `Task assigned: ${created.title}`,
         body: created.notes ?? null,
-        href: "/tasks",
+        href: `/tasks?q=${encodeURIComponent(created.unitId)}&status=all`,
         meta: { taskUnitId: created.unitId },
       });
     });
@@ -190,7 +211,7 @@ export const POST = apiHandler(async (request) => {
         userUnitId: creator.unitId,
         type: "task_done",
         title: `Task done: ${created.title}`,
-        href: "/tasks",
+        href: `/tasks?q=${encodeURIComponent(created.unitId)}&status=all`,
         meta: { taskUnitId: created.unitId },
       });
     });

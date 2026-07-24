@@ -247,7 +247,12 @@ export function CaseFormDialog({
       status,
       filingDate: filingDate || undefined,
       nextHearingAt: nextHearingAt || undefined,
-      agreedFee: agreedFee || undefined,
+      agreedFee:
+        agreedFee === ""
+          ? undefined
+          : Number.isFinite(Number(agreedFee))
+            ? Number(agreedFee)
+            : undefined,
       notes: notes || undefined,
     };
 

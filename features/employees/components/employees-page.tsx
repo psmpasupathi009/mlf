@@ -27,7 +27,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { apiFetch, getErrorMessage } from "@/lib/api/client";
+import { apiFetch, apiDownload, getErrorMessage } from "@/lib/api/client";
+import { Download } from "lucide-react";
 import type { PublicUser } from "@/lib/auth/session";
 import type { EmployeeSummary } from "@/features/employees/server/serialize";
 import { EmployeeFormDialog } from "@/features/employees/components/employee-form-dialog";
@@ -130,6 +131,20 @@ export function EmployeesPage({ user }: { user: PublicUser }) {
         description="Staff directory — designation is the job title; roles control app access."
         actions={
           <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={async () => {
+                const result = await apiDownload(
+                  "/api/v1/exports?type=employees",
+                  "employees.xlsx"
+                );
+                if (!result.ok) toast.error(result.error ?? "Export failed");
+              }}
+            >
+              <Download className="size-4" />
+              Export Excel
+            </Button>
             {can("create") ? (
               <Button type="button" variant="outline" onClick={() => setImportOpen(true)}>
                 Import CSV

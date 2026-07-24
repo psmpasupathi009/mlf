@@ -22,7 +22,28 @@ export const createDakSchema = z.object({
   mode: z.string().trim().max(80).optional().or(z.literal("")),
   trackingNo: z.string().trim().max(80).optional().or(z.literal("")),
   caseUnitId: z.string().trim().optional().or(z.literal("")),
+  clientUnitId: z.string().trim().optional().or(z.literal("")),
   notes: z.string().trim().max(1000).optional().or(z.literal("")),
+});
+
+const optionalText = (max: number) =>
+  z.string().trim().max(max).optional().or(z.literal(""));
+
+export const importDakRowSchema = z.object({
+  direction: z.string().trim().min(1, "direction is required (in|out)"),
+  entryDate: z.string().trim().min(1, "entryDate is required (YYYY-MM-DD)"),
+  subject: z.string().trim().min(1, "Subject is required").max(300),
+  fromTo: optionalText(200),
+  mode: optionalText(80),
+  trackingNo: optionalText(80),
+  caseUnitId: optionalText(40),
+  clientUnitId: optionalText(40),
+  notes: optionalText(1000),
+});
+
+export const importDakSchema = z.object({
+  dryRun: z.boolean().default(true),
+  rows: z.array(importDakRowSchema).max(500, "Max 500 rows per import"),
 });
 
 export const updateDakSchema = z.object({
@@ -33,6 +54,7 @@ export const updateDakSchema = z.object({
   mode: z.string().trim().max(80).optional().or(z.literal("")),
   trackingNo: z.string().trim().max(80).optional().or(z.literal("")),
   caseUnitId: z.string().trim().optional().or(z.literal("")),
+  clientUnitId: z.string().trim().optional().or(z.literal("")),
   notes: z.string().trim().max(1000).optional().or(z.literal("")),
 });
 

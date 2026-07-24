@@ -43,3 +43,26 @@ export const APPOINTMENT_MODE_OPTIONS = [
   { value: "call", label: "Phone call" },
   { value: "video", label: "Video call" },
 ] as const;
+
+const optionalText = (max: number) =>
+  z.string().trim().max(max).optional().or(z.literal(""));
+
+export const importAppointmentsRowSchema = z.object({
+  title: z.string().trim().min(1, "Title is required").max(160),
+  scheduledAt: z.string().trim().min(1, "scheduledAt is required"),
+  advocateMobile: z.string().trim().min(10, "advocateMobile is required").max(15),
+  clientUnitId: optionalText(40),
+  clientMobile: optionalText(15),
+  caseUnitId: optionalText(40),
+  durationMin: optionalText(10),
+  mode: optionalText(20),
+  location: optionalText(200),
+  notes: optionalText(1000),
+});
+
+export const importAppointmentsSchema = z.object({
+  dryRun: z.boolean().default(true),
+  rows: z
+    .array(importAppointmentsRowSchema)
+    .max(500, "Max 500 rows per import"),
+});

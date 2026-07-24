@@ -68,3 +68,26 @@ export const OFFICE_TASK_STATUS_OPTIONS = [
   { value: "done", label: "Done" },
   { value: "cancelled", label: "Cancelled" },
 ] as const;
+
+const optionalText = (max: number) =>
+  z.string().trim().max(max).optional().or(z.literal(""));
+
+/** CSV import rows — create open tasks only (morning allotment). */
+export const importTasksRowSchema = z.object({
+  title: z.string().trim().min(1, "Title is required").max(200),
+  workDate: z
+    .string()
+    .trim()
+    .min(1, "workDate is required (YYYY-MM-DD)"),
+  assigneeUnitId: optionalText(40),
+  caseUnitId: optionalText(40),
+  kind: optionalText(40),
+  dueDate: optionalText(40),
+  notes: optionalText(1000),
+});
+
+export const importTasksSchema = z.object({
+  dryRun: z.boolean().default(true),
+  rows: z.array(importTasksRowSchema).max(500, "Max 500 rows per import"),
+});
+

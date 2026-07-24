@@ -77,6 +77,16 @@ export const POST = apiHandler(async (request) => {
         continue;
       }
 
+      if (row.unitId?.trim() && !existingByUnitId) {
+        results.push({
+          row: rowNum,
+          unitId: row.unitId,
+          status: "error",
+          message: "Employee unitId not found (remove unitId to create a new employee)",
+        });
+        continue;
+      }
+
       if (dryRun) {
         results.push({
           row: rowNum,
@@ -93,6 +103,7 @@ export const POST = apiHandler(async (request) => {
           data: {
             name: row.name,
             designation,
+            roles,
             mobile,
             email: row.email || undefined,
             address: row.address || undefined,

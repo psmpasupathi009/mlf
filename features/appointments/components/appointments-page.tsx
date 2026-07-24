@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   Briefcase,
@@ -17,6 +17,7 @@ import {
   Building2,
   X,
 } from "lucide-react";
+import { ImportDialog } from "@/shared/components/data/import-dialog";
 import { PageHeader } from "@/shared/components/data/page-header";
 import { PaginationBar } from "@/shared/components/data/pagination-bar";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
@@ -109,27 +110,32 @@ function modeLabel(mode: string | null | undefined): string {
 
 export function AppointmentsPage({ user }: { user: PublicUser }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const can = (action: string) =>
     user.permissions.includes(`appointments.${action}`);
   const canOpenCase =
-    user.permissions.includes("appointments.edit") ||
-    user.permissions.includes("cases.create");
+    (user.permissions.includes("appointments.edit") ||
+      user.permissions.includes("cases.create")) &&
+    user.permissions.includes("cases.view");
   const bookAny = canBookForAnyAdvocate(user.roles);
+
+  const initialQ = searchParams.get("q") ?? "";
 
   const [rows, setRows] = useState<AppointmentSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const pageSize = 20;
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialQ);
   const debouncedSearch = useDebouncedValue(search, 300);
-  const [status, setStatus] = useState("scheduled");
-  const [range, setRange] = useState<Range>("today");
+  const [status, setStatus] = useState(initialQ ? "all" : "scheduled");
+  const [range, setRange] = useState<Range>(initialQ ? "all" : "today");
   const [advocateFilter, setAdvocateFilter] = useState("all");
   const [advocateFilterLabel, setAdvocateFilterLabel] = useState<string | null>(
     null
   );
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<AppointmentSummary | null>(null);
   const [formMode, setFormMode] = useState<AppointmentFormMode>("create");
   const [actionBusy, setActionBusy] = useState<string | null>(null);
@@ -190,6 +196,12 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
       }
       if (params.get("hearing") === "today") {
         setRange("today");
+      }
+      const q = params.get("q");
+      if (q) {
+        setSearch(q);
+        setStatus("all");
+        setRange("all");
       }
     });
   }, [canCreate]);
@@ -295,12 +307,24 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
             : "Your consultation diary — book call-ins or move a slot if you cannot meet."
         }
         actions={
-          can("create") ? (
-            <Button type="button" className="h-11 gap-2 px-4" onClick={openCreate}>
-              <CalendarPlus className="size-4" />
-              Book appointment
-            </Button>
-          ) : undefined
+          <>
+            {can("create") ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 gap-2 px-4"
+                onClick={() => setImportOpen(true)}
+              >
+                Import CSV
+              </Button>
+            ) : null}
+            {can("create") ? (
+              <Button type="button" className="h-11 gap-2 px-4" onClick={openCreate}>
+                <CalendarPlus className="size-4" />
+                Book appointment
+              </Button>
+            ) : null}
+          </>
         }
       />
 
@@ -619,6 +643,16 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
         formMode={formMode}
         user={user}
         onSaved={load}
+      />
+
+      <ImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        title="Import appointments"
+        endpoint="/api/v1/appointments/import"
+        sampleHref="/samples/appointments.sample.csv"
+        columnsHint="Required: title, scheduledAt (ISO), advocateMobile. Optional: clientUnitId or clientMobile, caseUnitId, durationMin, mode, location, notes. Slot clash checks are skipped on bulk import."
+        onImported={load}
       />
     </section>
   );

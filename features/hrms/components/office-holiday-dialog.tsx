@@ -74,6 +74,10 @@ export function OfficeHolidayDialog({
       setError("Enter a title");
       return;
     }
+    if (title.trim().length < 2) {
+      setError("Title must be at least 2 characters");
+      return;
+    }
     if (!fromDate || !toDate) {
       setError("Select both dates");
       return;

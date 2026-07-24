@@ -15,6 +15,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { apiFetch, getErrorMessage } from "@/lib/api/client";
 import { parseCsv } from "@/lib/utils/csv";
+import { compliance } from "@/config/company/compliance";
 
 type RowResult = {
   row: number;
@@ -86,8 +87,12 @@ export function ImportDialog({
       return;
     }
 
-    toast.success(`Imported ${data.succeeded} of ${data.total} rows`);
-    onImported();
+    if (data.succeeded > 0) {
+      toast.success(`Imported ${data.succeeded} of ${data.total} rows`);
+      onImported();
+    } else {
+      toast.error(`Nothing imported — ${data.failed} row(s) failed`);
+    }
   }
 
   async function handleFile(file: File) {
@@ -116,7 +121,8 @@ export function ImportDialog({
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            Upload a CSV, review the dry-run, then confirm. Dates use YYYY-MM-DD (IST).
+            Upload a CSV, review the dry-run, then confirm. Dates use YYYY-MM-DD
+            (IST). Max {compliance.csv.maxRows} rows per file.
             {sampleHref ? (
               <>
                 {" "}

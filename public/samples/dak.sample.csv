@@ -1,0 +1,3 @@
+direction,entryDate,subject,fromTo,mode,trackingNo,caseUnitId,clientUnitId,notes
+in,2026-07-25,Court notice - Murugan,Gobichettipalayam Court,post,,,,Sample incoming
+out,2026-07-25,Vakalat to client,Client Lakshmi,courier,,,,Sample outgoing

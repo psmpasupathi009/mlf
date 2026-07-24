@@ -286,9 +286,22 @@ export function ClientDetailPage({
               Matters linked to this client
             </p>
           </div>
-          <Button asChild type="button" size="sm" variant="outline">
-            <Link href={`/cases?clientUnitId=${client.unitId}`}>View in cases</Link>
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild type="button" size="sm" variant="outline">
+              <Link href={`/cases?clientUnitId=${client.unitId}`}>
+                View in cases
+              </Link>
+            </Button>
+            {can("cases", "create") ? (
+              <Button asChild type="button" size="sm">
+                <Link
+                  href={`/cases?clientUnitId=${client.unitId}&new=1`}
+                >
+                  Register case
+                </Link>
+              </Button>
+            ) : null}
+          </div>
         </div>
         <CardContent className="p-0 pt-0">
           {cases.length === 0 ? (

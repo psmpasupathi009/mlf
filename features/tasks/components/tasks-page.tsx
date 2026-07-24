@@ -1,9 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import {
   Check,
+  Download,
   MoreHorizontal,
   Pencil,
   Plus,
@@ -14,6 +16,7 @@ import { DataToolbar } from "@/shared/components/data/data-toolbar";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { UnitIdBadge } from "@/shared/components/data/unit-id-badge";
 import { FilterChipGroup } from "@/shared/components/data/filter-chip-group";
+import { ImportDialog } from "@/shared/components/data/import-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DatePicker } from "@/shared/components/forms/date-picker";
-import { apiFetch, getErrorMessage } from "@/lib/api/client";
+import { apiFetch, apiDownload, getErrorMessage } from "@/lib/api/client";
 import type { PublicUser } from "@/lib/auth/session";
 import type { OfficeTaskSummary } from "@/features/tasks/server/serialize";
 import { TaskFormDialog } from "@/features/tasks/components/task-form-dialog";
@@ -37,7 +40,6 @@ import {
   OFFICE_TASK_STATUS_OPTIONS,
 } from "@/lib/validations/tasks.schema";
 import { cn } from "@/lib/utils/cn";
-
 type ListResponse = {
   data: OfficeTaskSummary[];
   meta: { page: number; pageSize: number; total: number };
@@ -59,15 +61,33 @@ function statusVariant(status: string): "default" | "success" | "muted" | "warni
 export function TasksPage({ user }: { user: PublicUser }) {
   const can = (action: string) => user.permissions.includes(`tasks.${action}`);
   const todayKey = istDateKey();
+  const searchParams = useSearchParams();
+  const dueFilter = searchParams.get("due");
+  const attentionMode = dueFilter === "overdue" || dueFilter === "today";
 
-  const [view, setView] = useState<ViewMode>("allotment");
+  const [view, setView] = useState<ViewMode>(
+    attentionMode ? "finishing" : "allotment"
+  );
+  // When deep-linked from Attention, show all kinds (use finishing chip layout loosely)
   const [workDate, setWorkDate] = useState(todayKey);
-  const [status, setStatus] = useState<StatusFilter>("open");
-  const [search, setSearch] = useState("");
+  const [status, setStatus] = useState<StatusFilter>(
+    attentionMode || searchParams.get("status") === "open"
+      ? "open"
+      : searchParams.get("status") === "done"
+        ? "done"
+        : searchParams.get("status") === "all"
+          ? "all"
+          : "open"
+  );
+  const [search, setSearch] = useState(searchParams.get("q") ?? "");
+  const [due, setDue] = useState<"overdue" | "today" | null>(
+    dueFilter === "overdue" || dueFilter === "today" ? dueFilter : null
+  );
   const debouncedSearch = useDebouncedValue(search, 300);
   const [rows, setRows] = useState<OfficeTaskSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<OfficeTaskSummary | null>(null);
   const [finishing, setFinishing] = useState<OfficeTaskSummary | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -77,12 +97,20 @@ export function TasksPage({ user }: { user: PublicUser }) {
     const params = new URLSearchParams({
       page: "1",
       pageSize: "50",
-      workDate,
     });
-    if (view === "allotment") {
-      params.set("kind", "allotment");
+    const globalSearch = Boolean(debouncedSearch) && status === "all" && !due;
+    if (due) {
+      params.set("due", due);
+      if (status !== "all") params.set("status", status);
+    } else if (globalSearch) {
+      // Deep-link / unit-id search — don't pin to work day or allotment kind
+    } else {
+      params.set("workDate", workDate);
+      if (view === "allotment") {
+        params.set("kind", "allotment");
+      }
+      if (status !== "all") params.set("status", status);
     }
-    if (status !== "all") params.set("status", status);
     if (debouncedSearch) params.set("q", debouncedSearch);
 
     const { ok, data } = await apiFetch<ListResponse>(
@@ -96,7 +124,7 @@ export function TasksPage({ user }: { user: PublicUser }) {
       return;
     }
     setRows((data as unknown as ListResponse).data ?? []);
-  }, [workDate, view, status, debouncedSearch]);
+  }, [workDate, view, status, debouncedSearch, due]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -167,18 +195,52 @@ export function TasksPage({ user }: { user: PublicUser }) {
         title="Office tasks"
         description="Morning allotment and evening finishing for the office work day."
         actions={
-          can("create") ? (
+          <>
             <Button
               type="button"
-              onClick={() => {
-                setEditing(null);
-                setFormOpen(true);
+              variant="outline"
+              onClick={async () => {
+                const params = new URLSearchParams({ type: "tasks" });
+                if (due) {
+                  params.set("due", due);
+                } else {
+                  params.set("workDate", workDate);
+                  if (view === "allotment") params.set("kind", "allotment");
+                }
+                if (status !== "all") params.set("status", status);
+                if (debouncedSearch) params.set("q", debouncedSearch);
+                const result = await apiDownload(
+                  `/api/v1/exports?${params.toString()}`,
+                  "tasks.xlsx"
+                );
+                if (!result.ok) toast.error(result.error ?? "Export failed");
               }}
             >
-              <Plus className="size-4" />
-              Allot work
+              <Download className="size-4" />
+              Export Excel
             </Button>
-          ) : null
+            {can("create") ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setImportOpen(true)}
+              >
+                Import CSV
+              </Button>
+            ) : null}
+            {can("create") ? (
+              <Button
+                type="button"
+                onClick={() => {
+                  setEditing(null);
+                  setFormOpen(true);
+                }}
+              >
+                <Plus className="size-4" />
+                Allot work
+              </Button>
+            ) : null}
+          </>
         }
       />
 
@@ -188,8 +250,9 @@ export function TasksPage({ user }: { user: PublicUser }) {
             aria-label="View"
             value={view}
             onChange={(v) => {
+              setDue(null);
               setView(v);
-              setStatus(v === "finishing" ? "open" : "open");
+              setStatus("open");
             }}
             options={[
               { id: "allotment", label: "Morning allotment" },
@@ -199,10 +262,13 @@ export function TasksPage({ user }: { user: PublicUser }) {
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => setWorkDate(todayKey)}
+              onClick={() => {
+                setDue(null);
+                setWorkDate(todayKey);
+              }}
               className={cn(
                 "shrink-0 rounded-xl px-3.5 py-2 text-sm font-semibold transition-colors",
-                isToday
+                isToday && !due
                   ? "bg-brand text-brand-foreground shadow-sm"
                   : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-navy"
               )}
@@ -210,18 +276,37 @@ export function TasksPage({ user }: { user: PublicUser }) {
               Today
             </button>
             <div className="min-w-0 flex-1 sm:w-44">
-              <DatePicker value={workDate} onChange={setWorkDate} />
+              <DatePicker
+                value={workDate}
+                onChange={(d) => {
+                  setDue(null);
+                  setWorkDate(d);
+                }}
+              />
             </div>
           </div>
         </div>
         <p className="mt-3 border-t border-border/60 pt-3 text-sm text-muted-foreground">
-          Work day · {istDisplayDate(new Date(`${workDate}T12:00:00+05:30`))}
+          {due === "overdue"
+            ? "Open tasks past due"
+            : due === "today"
+              ? "Open tasks due today"
+              : `Work day · ${istDisplayDate(new Date(`${workDate}T12:00:00+05:30`))}`}
           {!loading ? (
             <span>
               {" "}
               · {rows.length} task{rows.length === 1 ? "" : "s"}
-              {view === "allotment" ? " (allotment)" : ""}
+              {!due && view === "allotment" ? " (allotment)" : ""}
             </span>
+          ) : null}
+          {due ? (
+            <button
+              type="button"
+              className="ml-2 text-navy underline underline-offset-2"
+              onClick={() => setDue(null)}
+            >
+              Clear due filter
+            </button>
           ) : null}
         </p>
       </div>
@@ -461,6 +546,16 @@ export function TasksPage({ user }: { user: PublicUser }) {
         }}
         task={finishing}
         onSaved={refresh}
+      />
+
+      <ImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        title="Import work allotment"
+        endpoint="/api/v1/tasks/import"
+        sampleHref="/samples/tasks.sample.csv"
+        columnsHint={`Required: title, workDate (YYYY-MM-DD). Optional: assigneeUnitId, caseUnitId, kind (default allotment), dueDate, notes. Prefill workDate as ${workDate} for today’s board.`}
+        onImported={refresh}
       />
     </section>
   );

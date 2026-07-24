@@ -739,7 +739,9 @@ export function DiaryPage({ user }: { user: PublicUser }) {
                           </p>
                         </div>
                         <Button asChild type="button" size="sm" variant="outline">
-                          <Link href="/appointments">Open</Link>
+                          <Link href={`/appointments?q=${encodeURIComponent(a.unitId)}`}>
+                            Open
+                          </Link>
                         </Button>
                       </CardContent>
                     </Card>

@@ -41,6 +41,16 @@ export const POST = apiHandler(async (request) => {
         ? await prisma.client.findUnique({ where: { unitId: row.unitId } })
         : null;
 
+      if (row.unitId?.trim() && !existingByUnitId) {
+        results.push({
+          row: rowNum,
+          unitId: row.unitId,
+          status: "error",
+          message: "Client unitId not found (remove unitId to create a new client)",
+        });
+        continue;
+      }
+
       if (dryRun) {
         results.push({
           row: rowNum,

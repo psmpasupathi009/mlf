@@ -6,12 +6,10 @@ import { nextUnitId } from "@/lib/ids";
 import { writeAudit } from "@/lib/audit";
 import { createCaseSchema } from "@/lib/validations/cases.schema";
 import { toCaseSummary } from "@/features/cases/server/serialize";
-import { istDateKey, istDayBounds } from "@/lib/utils/ist";
-import { containsInsensitive } from "@/lib/db/search";
 import {
-  OPEN_CASE_STATUSES,
-  PRE_NUMBER_STATUSES,
-} from "@/config/company/case-pipeline";
+  buildCaseListWhere,
+  parseCaseListFilters,
+} from "@/features/cases/server/filters";
 
 export const GET = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "cases", "view");
@@ -19,55 +17,7 @@ export const GET = apiHandler(async (request) => {
 
   const { searchParams } = new URL(request.url);
   const { page, pageSize, skip } = parsePagination(searchParams);
-  const q = searchParams.get("q")?.trim() ?? "";
-  const status = searchParams.get("status")?.trim();
-  const clientUnitId = searchParams.get("clientUnitId")?.trim();
-  const hearing = searchParams.get("hearing")?.trim(); // today | week
-  const missingCourtNumber = searchParams.get("missingCourtNumber") === "1";
-  const battaDue =
-    searchParams.get("battaDue") === "1" ||
-    searchParams.get("battaDue") === "true";
-
-  const where: Prisma.CaseWhereInput = {
-    ...(clientUnitId ? { clientUnitId } : {}),
-    ...(status ? { status: status as never } : {}),
-    ...(battaDue ? { battaDue: true } : {}),
-    ...(q
-      ? {
-          OR: [
-            { caseNumber: containsInsensitive(q) },
-            { unitId: containsInsensitive(q) },
-            { clientUnitId: containsInsensitive(q) },
-            { courtName: containsInsensitive(q) },
-            { opposingParty: containsInsensitive(q) },
-          ],
-        }
-      : {}),
-  };
-
-  if (missingCourtNumber) {
-    where.AND = [
-      ...(Array.isArray(where.AND) ? where.AND : where.AND ? [where.AND] : []),
-      { OR: [{ caseNumber: null }, { caseNumber: "" }] },
-      { status: { in: [...PRE_NUMBER_STATUSES] } },
-    ];
-  }
-
-  if (hearing === "today" || hearing === "week") {
-    const todayKey = istDateKey();
-    const { start, end } = istDayBounds(todayKey);
-    const rangeEnd =
-      hearing === "week"
-        ? new Date(start.getTime() + 7 * 24 * 60 * 60 * 1000)
-        : end;
-    where.nextHearingAt = {
-      gte: start,
-      lte: hearing === "today" ? end : rangeEnd,
-    };
-    if (!status) {
-      where.status = { in: [...OPEN_CASE_STATUSES] };
-    }
-  }
+  const where = buildCaseListWhere(parseCaseListFilters(searchParams));
 
   const [rows, total] = await Promise.all([
     prisma.case.findMany({ where, orderBy: { createdAt: "desc" }, skip, take: pageSize }),

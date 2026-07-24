@@ -98,6 +98,16 @@ export const POST = apiHandler(async (request) => {
     caseUnitId = caseItem.unitId;
   }
 
+  let clientUnitId: string | undefined;
+  if (input.clientUnitId) {
+    const client = await prisma.client.findUnique({
+      where: { unitId: input.clientUnitId },
+      select: { unitId: true },
+    });
+    if (!client) return jsonFail("VALIDATION", "Client not found", 400);
+    clientUnitId = client.unitId;
+  }
+
   const unitId = await nextUnitId("dak");
   const created = await prisma.dakEntry.create({
     data: {
@@ -109,6 +119,7 @@ export const POST = apiHandler(async (request) => {
       mode: input.mode || undefined,
       trackingNo: input.trackingNo || undefined,
       caseUnitId,
+      clientUnitId,
       notes: input.notes || undefined,
       createdById: user.id,
     },

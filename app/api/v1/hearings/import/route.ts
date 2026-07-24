@@ -137,5 +137,11 @@ export const POST = apiHandler(async (request) => {
     });
   }
 
-  return jsonOk({ dryRun, results, ok: okCount, errors: errCount });
+  return jsonOk({
+    dryRun,
+    total: rows.length,
+    succeeded: okCount,
+    failed: errCount,
+    results,
+  });
 });

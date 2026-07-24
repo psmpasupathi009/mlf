@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
+import { Download, MoreHorizontal, Pencil, Plus, Trash2 } from "lucide-react";
 import { PageHeader } from "@/shared/components/data/page-header";
 import { DataToolbar } from "@/shared/components/data/data-toolbar";
 import { PaginationBar } from "@/shared/components/data/pagination-bar";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { UnitIdBadge } from "@/shared/components/data/unit-id-badge";
 import { FilterChipGroup } from "@/shared/components/data/filter-chip-group";
+import { ImportDialog } from "@/shared/components/data/import-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -27,7 +28,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { DatePicker } from "@/shared/components/forms/date-picker";
-import { apiFetch, getErrorMessage } from "@/lib/api/client";
+import { apiFetch, apiDownload, getErrorMessage } from "@/lib/api/client";
 import type { PublicUser } from "@/lib/auth/session";
 import type { DakSummary } from "@/features/dak/server/serialize";
 import { DakFormDialog } from "@/features/dak/components/dak-form-dialog";
@@ -69,6 +70,7 @@ export function DakPage({ user }: { user: PublicUser }) {
   const [dateFilter, setDateFilter] = useState("");
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [editing, setEditing] = useState<DakSummary | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
 
@@ -131,18 +133,47 @@ export function DakPage({ user }: { user: PublicUser }) {
         title="Dak register"
         description="Incoming and outgoing postal / courier book for the office."
         actions={
-          can("create") ? (
+          <>
             <Button
               type="button"
-              onClick={() => {
-                setEditing(null);
-                setFormOpen(true);
+              variant="outline"
+              onClick={async () => {
+                const params = new URLSearchParams({ type: "dak" });
+                if (direction !== "all") params.set("direction", direction);
+                if (dateFilter) params.set("date", dateFilter);
+                if (debouncedSearch) params.set("q", debouncedSearch);
+                const result = await apiDownload(
+                  `/api/v1/exports?${params.toString()}`,
+                  "dak.xlsx"
+                );
+                if (!result.ok) toast.error(result.error ?? "Export failed");
               }}
             >
-              <Plus className="size-4" />
-              Add entry
+              <Download className="size-4" />
+              Export Excel
             </Button>
-          ) : null
+            {can("create") ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setImportOpen(true)}
+              >
+                Import CSV
+              </Button>
+            ) : null}
+            {can("create") ? (
+              <Button
+                type="button"
+                onClick={() => {
+                  setEditing(null);
+                  setFormOpen(true);
+                }}
+              >
+                <Plus className="size-4" />
+                Add entry
+              </Button>
+            ) : null}
+          </>
         }
       />
 
@@ -369,6 +400,16 @@ export function DakPage({ user }: { user: PublicUser }) {
         onOpenChange={setFormOpen}
         entry={editing}
         onSaved={load}
+      />
+
+      <ImportDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        title="Import dak register"
+        endpoint="/api/v1/dak/import"
+        sampleHref="/samples/dak.sample.csv"
+        columnsHint="Required: direction (in|out), entryDate (YYYY-MM-DD), subject. Optional: fromTo, mode, trackingNo, caseUnitId, clientUnitId, notes."
+        onImported={load}
       />
     </section>
   );

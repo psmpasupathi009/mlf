@@ -98,15 +98,51 @@ export function CasesPage({ user }: { user: PublicUser }) {
   const [formOpen, setFormOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [hearingsImportOpen, setHearingsImportOpen] = useState(false);
+  const [defaultClient, setDefaultClient] = useState<{
+    unitId: string;
+    name: string;
+  } | null>(null);
 
   useEffect(() => {
     if (searchParams.get("new") !== "1" || !can("create")) return;
     queueMicrotask(() => {
       setFormOpen(true);
-      router.replace("/cases", { scroll: false });
+      const next = new URLSearchParams();
+      if (clientUnitId) next.set("clientUnitId", clientUnitId);
+      const qs = next.toString();
+      router.replace(qs ? `/cases?${qs}` : "/cases", { scroll: false });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- open once from query
   }, []);
+
+  useEffect(() => {
+    if (!clientUnitId) {
+      setDefaultClient(null);
+      return;
+    }
+    const fromRows = rows.find((r) => r.clientUnitId === clientUnitId);
+    if (fromRows?.clientName) {
+      setDefaultClient({ unitId: clientUnitId, name: fromRows.clientName });
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const { ok, data } = await apiFetch<{
+        client: { name: string; unitId: string };
+      }>(`/api/v1/clients/${clientUnitId}`);
+      if (cancelled || !ok) return;
+      const body = data as { client?: { name?: string; unitId?: string } };
+      if (body.client?.name && body.client?.unitId) {
+        setDefaultClient({
+          unitId: body.client.unitId,
+          name: body.client.name,
+        });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [clientUnitId, rows]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -235,8 +271,22 @@ export function CasesPage({ user }: { user: PublicUser }) {
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem
                 onSelect={async () => {
+                  const params = new URLSearchParams({ type: "cases" });
+                  if (debouncedSearch) params.set("q", debouncedSearch);
+                  if (quick === "filingDefect") {
+                    params.set("status", "filing_defect");
+                  } else if (status !== "all") {
+                    params.set("status", status);
+                  }
+                  if (clientUnitId) params.set("clientUnitId", clientUnitId);
+                  if (quick === "today") params.set("hearing", "today");
+                  if (quick === "week") params.set("hearing", "week");
+                  if (quick === "missingCourt") {
+                    params.set("missingCourtNumber", "1");
+                  }
+                  if (quick === "battaDue") params.set("battaDue", "1");
                   const result = await apiDownload(
-                    "/api/v1/exports?type=cases",
+                    `/api/v1/exports?${params.toString()}`,
                     "cases.xlsx"
                   );
                   if (!result.ok) toast.error(result.error ?? "Export failed");
@@ -371,6 +421,7 @@ export function CasesPage({ user }: { user: PublicUser }) {
       <CaseFormDialog
         open={formOpen}
         onOpenChange={setFormOpen}
+        defaultClient={defaultClient}
         onSaved={(createdUnitId) => {
           void load();
           if (createdUnitId) {

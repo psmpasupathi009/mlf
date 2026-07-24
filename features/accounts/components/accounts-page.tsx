@@ -68,7 +68,12 @@ export function AccountsPage({ user }: { user: PublicUser }) {
   const [fee, setFee] = useState<FeeSummary | null>(null);
   const [page, setPage] = useState(1);
   const pageSize = 20;
-  const [status, setStatus] = useState("all");
+  const [status, setStatus] = useState(
+    searchParams.get("status") === "pending" ||
+      searchParams.get("status") === "paid"
+      ? (searchParams.get("status") as string)
+      : "all"
+  );
   const [purpose, setPurpose] = useState("all");
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebouncedValue(search, 300);
@@ -460,7 +465,7 @@ export function AccountsPage({ user }: { user: PublicUser }) {
         title="Import cash entries"
         endpoint="/api/v1/accounts/import"
         sampleHref="/samples/payments.sample.csv"
-        columnsHint="Need caseUnitId or clientUnitId, amount, type (advance/partial/full/consultation/court_fee/stamp/copying/travel/clerkage/other), status (pending/paid). Notes required for other."
+        columnsHint="Need clientUnitId or clientMobile, amount, type (advance/partial/full/consultation/court_fee/stamp/copying/travel/clerkage/other), status (pending/paid). caseUnitId optional. Notes required for other."
         onImported={load}
       />
     </section>

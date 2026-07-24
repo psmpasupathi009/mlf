@@ -230,10 +230,7 @@ export function TaskFormDialog({
 
           <div className="grid gap-2">
             <Label>Due date (optional)</Label>
-            <DatePicker
-              value={dueDate || workDate}
-              onChange={setDueDate}
-            />
+            <DatePicker value={dueDate} onChange={setDueDate} />
             {dueDate ? (
               <Button
                 type="button"
@@ -243,7 +240,11 @@ export function TaskFormDialog({
               >
                 Clear due date
               </Button>
-            ) : null}
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                Leave empty to use the work date ({workDate}).
+              </p>
+            )}
           </div>
 
           <CasePicker value={caseLink} onChange={setCaseLink} />

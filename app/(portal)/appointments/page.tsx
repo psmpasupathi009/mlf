@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { getSessionUser } from "@/lib/auth/session-user";
 import { ForbiddenState } from "@/shared/components/feedback/forbidden-state";
 import { AppointmentsPage } from "@/features/appointments/components/appointments-page";
@@ -12,5 +13,11 @@ export default async function Page() {
   ) {
     return <ForbiddenState />;
   }
-  return <AppointmentsPage user={user} />;
+  return (
+    <Suspense
+      fallback={<p className="text-sm text-muted-foreground">Loading…</p>}
+    >
+      <AppointmentsPage user={user} />
+    </Suspense>
+  );
 }

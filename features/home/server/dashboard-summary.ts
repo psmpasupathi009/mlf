@@ -552,7 +552,7 @@ export async function buildDashboardSummary(
     attention.push({
       label: "Overdue tasks",
       value: String(tasksOverdue),
-      href: "/tasks",
+      href: "/tasks?due=overdue&status=open",
       cta: "Open",
       tone: "danger",
     });
@@ -561,7 +561,7 @@ export async function buildDashboardSummary(
     attention.push({
       label: "Tasks due today",
       value: String(tasksDueToday),
-      href: "/tasks",
+      href: "/tasks?due=today&status=open",
       cta: "Open",
       tone: "warning",
     });
@@ -570,7 +570,7 @@ export async function buildDashboardSummary(
     attention.push({
       label: "Pending payments",
       value: `${pendingPayments} · ${rupee(pendingAmount)}`,
-      href: "/accounts",
+      href: "/accounts?status=pending",
       cta: "Review",
       tone: "danger",
     });
