@@ -532,7 +532,7 @@ export function AvailabilityPage({ user }: { user: PublicUser }) {
     <div className="space-y-6 pb-4">
       <PageHeader
         title="Availability"
-        description="When clients can book you — open days, hours, and time away."
+        description="When clients can book you. Stay checked in on HRMS if you are in the office; use time away for court or travel, appointments for client meets, and leave only for full days off."
         actions={
           <Button asChild variant="outline" className="h-11 gap-2 px-4">
             <Link href="/hrms">

@@ -391,6 +391,8 @@ export const GET = apiHandler(async (request) => {
         checkedIn: p.status === "in" || p.status === "out",
         checkedOut: p.status === "out",
         status: p.status,
+        notes: p.notes,
+        busyToday: p.busyToday,
       })),
       counts: board.counts,
       // Legacy keys used by older home widgets
@@ -402,6 +404,8 @@ export const GET = apiHandler(async (request) => {
         checkedIn: p.status === "in" || p.status === "out",
         checkedOut: p.status === "out",
         status: p.status,
+        notes: p.notes,
+        busyToday: p.busyToday,
       })),
       checkedInCount: board.counts.present + board.counts.out,
       advocateCount: board.counts.total,

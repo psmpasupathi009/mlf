@@ -88,6 +88,13 @@ type AdminStaffPresence = {
   checkedIn: boolean;
   checkedOut: boolean;
   status?: "absent" | "in" | "out" | "on_leave";
+  notes?: string | null;
+  busyToday?: {
+    kind: string;
+    startsAt: string;
+    endsAt: string;
+    reason: string | null;
+  }[];
 };
 
 type DashboardSummary = {
@@ -301,7 +308,14 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
           onLeave: rows.filter((a) => a.status === "on_leave").length,
         };
 
-    return { rows, presenceStats };
+    const busyBooking = roster.filter(
+      (a) =>
+        a.status !== "on_leave" &&
+        Array.isArray(a.busyToday) &&
+        a.busyToday.length > 0
+    ).length;
+
+    return { rows, presenceStats, busyBooking };
   }, [summary?.adminBoard]);
 
   const timelineRows = useMemo(() => {
@@ -923,6 +937,11 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
               {officePresence.presenceStats.onLeave > 0 ? (
                 <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
                   {officePresence.presenceStats.onLeave} on leave
+                </span>
+              ) : null}
+              {officePresence.busyBooking > 0 ? (
+                <span className="inline-flex items-center gap-1 rounded-md bg-navy/5 px-2.5 py-1 text-xs font-medium text-navy">
+                  {officePresence.busyBooking} busy (court / meet)
                 </span>
               ) : null}
             </div>

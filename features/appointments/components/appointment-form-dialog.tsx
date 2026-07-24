@@ -75,7 +75,7 @@ const CONFLICT_HINTS: Record<string, string> = {
   ADVOCATE_BUSY: "That advocate is already booked then — pick another free slot.",
   CLIENT_BUSY: "This client already has an appointment then — pick another time.",
   OUTSIDE_HOURS: "Outside working hours — check Availability.",
-  BLOCKED: "Blocked on the advocate’s diary (break/court).",
+  BLOCKED: "Blocked on the advocate’s diary (court, travel, or break).",
   ON_LEAVE: "Advocate is on approved leave that day.",
   IN_PAST: "Choose a future time.",
 };

@@ -86,9 +86,10 @@ export function LeaveApplyDialog({
         <DialogHeader>
           <DialogTitle>Apply for leave</DialogTitle>
           <DialogDescription>
-            Submit dates for office approval. Pending or approved leave that
-            overlaps these dates is blocked. Approved leave shows as On leave on
-            the team board — it is not the same as Checked out.
+            Submit full calendar day(s) for office approval. Half-day court or
+            travel belongs on Availability (time away), not leave. Approved leave
+            shows as On leave on the team board and closes booking for those
+            days — it is not the same as Checked out.
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="grid gap-4">

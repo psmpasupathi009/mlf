@@ -62,5 +62,5 @@ export const BLOCK_KIND_OPTIONS = [
   { value: "break", label: "Break / lunch" },
   { value: "court", label: "Court" },
   { value: "personal", label: "Personal" },
-  { value: "other", label: "Other" },
+  { value: "other", label: "Travel / site" },
 ] as const;

@@ -61,7 +61,7 @@ const KIND_META: Record<
     chip: "bg-navy/10 text-navy",
   },
   other: {
-    label: "Other",
+    label: "Travel / site",
     icon: MoreHorizontal,
     accent: "border-l-border",
     chip: "bg-muted text-muted-foreground",
@@ -117,8 +117,9 @@ export function TimeAwaySection({
             <h2 className="text-base font-semibold tracking-tight text-navy">
               Time away
             </h2>
-            <p className="mt-0.5 text-sm text-muted-foreground">
-              Court or personal blocks on a specific date.
+            <p className="mt-0.5 max-w-xl text-sm text-muted-foreground">
+              In office but court or travel? Add a block here. Client
+              consultation? Book an appointment. Full day off? Leave (HRMS).
             </p>
           </div>
         </div>
@@ -151,8 +152,8 @@ export function TimeAwaySection({
             <div className="mb-3 h-1 w-10 rounded-full bg-gold/80" aria-hidden />
             <p className="text-base font-semibold text-navy">Diary is clear</p>
             <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted-foreground">
-              Your weekly break covers lunch. Add a block when court or personal
-              time takes a day off the diary.
+              Your weekly break covers lunch. Block court or travel here so
+              booking closes those hours — client meets go on Appointments.
             </p>
             {canEdit ? (
               <Button

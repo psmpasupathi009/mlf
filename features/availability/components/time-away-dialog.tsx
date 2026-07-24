@@ -30,21 +30,42 @@ export type TimeAwayForm = {
   reason: string;
 };
 
+/** Default Add form — court morning is the common advocate half-day block. */
 export function emptyTimeAwayForm(): TimeAwayForm {
   return {
     date: istDateKey(),
-    startTime: "13:00",
-    endTime: "14:00",
-    kind: "break",
+    startTime: "10:30",
+    endTime: "13:00",
+    kind: "court",
     reason: "",
   };
 }
 
 const KIND_CHIPS = [
-  { value: "court", label: "Court", icon: Gavel, hint: "Hearing / chamber" },
-  { value: "break", label: "Break", icon: Coffee, hint: "Extra lunch gap" },
-  { value: "personal", label: "Personal", icon: UserRound, hint: "Private time" },
-  { value: "other", label: "Other", icon: MoreHorizontal, hint: "Anything else" },
+  {
+    value: "court",
+    label: "Court",
+    icon: Gavel,
+    hint: "Hearing / chamber",
+  },
+  {
+    value: "other",
+    label: "Travel / site",
+    icon: MoreHorizontal,
+    hint: "Client site · errand",
+  },
+  {
+    value: "personal",
+    label: "Personal",
+    icon: UserRound,
+    hint: "Private time",
+  },
+  {
+    value: "break",
+    label: "Break",
+    icon: Coffee,
+    hint: "Extra lunch gap",
+  },
 ] as const;
 
 export type TimeAwayDialogProps = {
@@ -66,6 +87,15 @@ export function TimeAwayDialog({
   busy,
   onSave,
 }: TimeAwayDialogProps) {
+  const notePlaceholder =
+    form.kind === "court"
+      ? "e.g. Gobichettipalayam court"
+      : form.kind === "other"
+        ? "e.g. Client site — Nambiyur"
+        : form.kind === "personal"
+          ? "e.g. Personal appointment"
+          : "e.g. Extra lunch";
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="md">
@@ -74,7 +104,8 @@ export function TimeAwayDialog({
             {editing ? "Edit time away" : "Add time away"}
           </DialogTitle>
           <DialogDescription>
-            Clients will not see free slots in this window.
+            Blocks booking for this window. Stay checked in on HRMS if you are
+            still in for the office day — leave is only for full days off.
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="grid gap-5">
@@ -156,7 +187,7 @@ export function TimeAwayDialog({
               onChange={(e) =>
                 onFormChange({ ...form, reason: e.target.value })
               }
-              placeholder="e.g. Sessions Court — Gobichettipalayam"
+              placeholder={notePlaceholder}
               className="h-11"
             />
           </div>

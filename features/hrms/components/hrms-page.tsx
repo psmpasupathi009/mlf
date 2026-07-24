@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { PageHeader } from "@/shared/components/data/page-header";
@@ -39,6 +40,7 @@ import type {
   PresencePerson,
   PresenceStatus,
 } from "@/features/hrms/server/presence";
+import { summarizeBusyToday } from "@/features/availability/lib/busy-labels";
 import { LeaveApplyDialog } from "@/features/hrms/components/leave-apply-dialog";
 import {
   last30DateKeys,
@@ -683,7 +685,10 @@ export function HrmsPage({ user }: { user: PublicUser }) {
                 <div>
                   <CardTitle>Who’s in today</CardTitle>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Color bar: amber absent · green present · grey on leave
+                    Color bar: amber absent · green present · grey on leave.
+                    Busy chips (court / travel / client meet) mean booking is
+                    blocked — status can still be In. Check-in notes are
+                    board-only.
                   </p>
                 </div>
               </CardHeader>
@@ -731,13 +736,20 @@ export function HrmsPage({ user }: { user: PublicUser }) {
                             className={cn(STATUS_ROW[row.status])}
                           >
                             <TableCell>
-                              <PersonChip
-                                name={row.displayName}
-                                photoUrl={row.photoUrl}
-                                mobile={row.mobile}
-                                unitId={row.unitId}
-                                subtitle={row.mobile ? `+91 ${row.mobile}` : row.unitId}
-                              />
+                              <div className="space-y-1">
+                                <PersonChip
+                                  name={row.displayName}
+                                  photoUrl={row.photoUrl}
+                                  mobile={row.mobile}
+                                  unitId={row.unitId}
+                                  subtitle={row.mobile ? `+91 ${row.mobile}` : row.unitId}
+                                />
+                                {row.notes ? (
+                                  <p className="pl-10.5 text-[11px] text-muted-foreground">
+                                    Note: {row.notes}
+                                  </p>
+                                ) : null}
+                              </div>
                             </TableCell>
                             <TableCell className="hidden xl:table-cell">
                               {row.designation ? (
@@ -749,12 +761,19 @@ export function HrmsPage({ user }: { user: PublicUser }) {
                               )}
                             </TableCell>
                             <TableCell>
-                              <Badge
-                                variant={PRESENCE_VARIANT[row.status]}
-                                className="normal-case"
-                              >
-                                {PRESENCE_LABEL[row.status]}
-                              </Badge>
+                              <div className="space-y-1.5">
+                                <Badge
+                                  variant={PRESENCE_VARIANT[row.status]}
+                                  className="normal-case"
+                                >
+                                  {PRESENCE_LABEL[row.status]}
+                                </Badge>
+                                {busyChip(row) ? (
+                                  <p className="text-[11px] font-medium text-navy/80">
+                                    {busyChip(row)}
+                                  </p>
+                                ) : null}
+                              </div>
                             </TableCell>
                             <TableCell className="text-right tabular-nums text-muted-foreground">
                               {formatTime(row.checkInAt)}
@@ -1044,19 +1063,33 @@ export function HrmsPage({ user }: { user: PublicUser }) {
           <DialogHeader>
             <DialogTitle>Check in</DialogTitle>
             <DialogDescription>
-              Optional note for today (court visit, site work, etc.). Checked out
-              later means you left for the day — use Apply leave for full days away.
+              Notes are for the team board only — they do not close booking
+              slots. Checked out later means you left for the day. Use Apply
+              leave for full days away.
             </DialogDescription>
           </DialogHeader>
-          <DialogBody className="space-y-2">
-            <Label htmlFor="checkin-notes">Note (optional)</Label>
-            <Textarea
-              id="checkin-notes"
-              value={checkInNotes}
-              onChange={(e) => setCheckInNotes(e.target.value)}
-              placeholder="e.g. At Gobichettipalayam court"
-              rows={3}
-            />
+          <DialogBody className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="checkin-notes">Note (optional)</Label>
+              <Textarea
+                id="checkin-notes"
+                value={checkInNotes}
+                onChange={(e) => setCheckInNotes(e.target.value)}
+                placeholder="e.g. At Gobichettipalayam court"
+                rows={3}
+              />
+            </div>
+            <p className="rounded-xl border border-border/80 bg-muted/25 px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+              Going to court or a client site for part of the day?{" "}
+              <Link
+                href="/availability"
+                className="font-medium text-navy underline-offset-2 hover:underline"
+                onClick={() => setCheckInOpen(false)}
+              >
+                Block booking hours on Availability
+              </Link>{" "}
+              so clients cannot book that window.
+            </p>
           </DialogBody>
           <DialogFooter>
             <Button
@@ -1166,7 +1199,13 @@ export function HrmsPage({ user }: { user: PublicUser }) {
   );
 }
 
+function busyChip(row: PresencePerson): string | null {
+  if (row.status === "on_leave") return null;
+  return summarizeBusyToday(row.busyToday ?? []);
+}
+
 function PresenceCard({ row }: { row: PresencePerson }) {
+  const busy = busyChip(row);
   return (
     <div className={cn("flex items-start gap-3 px-4 py-3", STATUS_ROW[row.status])}>
       <div className="min-w-0 flex-1">
@@ -1182,6 +1221,16 @@ function PresenceCard({ row }: { row: PresencePerson }) {
             {formatTime(row.checkInAt)}
             <span className="mx-1.5 text-border">→</span>
             {formatTime(row.checkOutAt)}
+          </p>
+        ) : null}
+        {busy ? (
+          <p className="mt-1 pl-10.5 text-[11px] font-medium text-navy/80">
+            {busy}
+          </p>
+        ) : null}
+        {row.notes ? (
+          <p className="mt-1 pl-10.5 text-[11px] text-muted-foreground">
+            Note: {row.notes}
           </p>
         ) : null}
       </div>

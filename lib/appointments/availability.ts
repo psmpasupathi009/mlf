@@ -2,6 +2,7 @@ import { bookingDefaults } from "@/config/company/booking";
 import { prisma } from "@/lib/db/prisma";
 import { normalizeMobile } from "@/lib/auth/mobile";
 import { istDateKey, istDayBounds } from "@/lib/utils/ist";
+import { busySegmentLabel } from "@/features/availability/lib/busy-labels";
 
 export type ConflictCode =
   | "ADVOCATE_BUSY"
@@ -45,7 +46,7 @@ const CONFLICT_MESSAGES: Record<ConflictCode, string> = {
   ADVOCATE_BUSY: "This advocate already has an appointment at that time",
   CLIENT_BUSY: "This client already has an appointment at that time",
   OUTSIDE_HOURS: "That time is outside the advocate’s working hours",
-  BLOCKED: "That time is blocked (break, court, or personal)",
+  BLOCKED: "That time is blocked on the advocate’s diary (court, travel, or break)",
   ON_LEAVE: "The advocate is on approved leave that day",
   IN_PAST: "Cannot book a time in the past",
   NO_ADVOCATE: "Advocate not found",
@@ -409,7 +410,10 @@ export async function getDayAvailability(
       start: a.scheduledAt.toISOString(),
       end: aEnd.toISOString(),
       reason: "appointment",
-      label: a.title,
+      label: busySegmentLabel({
+        reason: "appointment",
+        label: a.title,
+      }),
     });
   }
   for (const b of blocks) {
@@ -417,7 +421,11 @@ export async function getDayAvailability(
       start: b.startsAt.toISOString(),
       end: b.endsAt.toISOString(),
       reason: "block",
-      label: b.reason || b.kind,
+      label: busySegmentLabel({
+        reason: "block",
+        label: b.reason,
+        kind: b.kind,
+      }),
     });
   }
 

@@ -1,13 +1,17 @@
 import { prisma } from "@/lib/db/prisma";
-import { displayMobile } from "@/lib/auth/mobile";
+import { displayMobile, normalizeMobile } from "@/lib/auth/mobile";
 import { userPhotoUrl } from "@/lib/auth/user-photo";
 import { personDisplayName } from "@/shared/lib/person";
+import { istDayBounds } from "@/lib/utils/ist";
 import {
   derivePresenceStatus,
   type PresenceStatus,
 } from "@/features/hrms/lib/status";
+import type { BusyTodayBlock } from "@/features/availability/lib/busy-labels";
 
 export type { PresenceStatus };
+
+export type PresenceBusyBlock = BusyTodayBlock;
 
 export type PresencePerson = {
   unitId: string;
@@ -20,7 +24,11 @@ export type PresencePerson = {
   status: PresenceStatus;
   checkInAt: string | null;
   checkOutAt: string | null;
+  /** Attendance check-in note (board-only; does not block booking). */
+  notes: string | null;
   leaveUnitId: string | null;
+  /** Overlapping time-away blocks + scheduled appointments for this date. */
+  busyToday: PresenceBusyBlock[];
 };
 
 export type PresenceCounts = {
@@ -44,6 +52,17 @@ const STATUS_RANK: Record<PresenceStatus, number> = {
   in: 3,
 };
 
+function mobileVariants(mobile: string): string[] {
+  const n = normalizeMobile(mobile) ?? mobile.replace(/\D/g, "");
+  const ten = n.startsWith("91") && n.length === 12 ? n.slice(2) : n;
+  const with91 = ten.length === 10 ? `91${ten}` : n;
+  return Array.from(new Set([n, ten, with91].filter(Boolean)));
+}
+
+function addMinutes(date: Date, minutes: number): Date {
+  return new Date(date.getTime() + minutes * 60_000);
+}
+
 export async function buildPresenceBoard(dateKey: string): Promise<PresenceBoard> {
   const staff = await prisma.user.findMany({
     where: { isActive: true },
@@ -62,7 +81,13 @@ export async function buildPresenceBoard(dateKey: string): Promise<PresenceBoard
   const userIds = staff.map((s) => s.id);
   const unitIds = staff.map((s) => s.unitId);
 
-  const [attendance, leaves] = await Promise.all([
+  const { start: dayStart, end: dayEnd } = istDayBounds(dateKey);
+
+  const advocateMobiles = Array.from(
+    new Set(staff.flatMap((s) => mobileVariants(s.mobile)))
+  );
+
+  const [attendance, leaves, timeBlocks, appointments] = await Promise.all([
     userIds.length
       ? prisma.attendance.findMany({
           where: { date: dateKey, userId: { in: userIds } },
@@ -70,6 +95,7 @@ export async function buildPresenceBoard(dateKey: string): Promise<PresenceBoard
             userId: true,
             checkInAt: true,
             checkOutAt: true,
+            notes: true,
           },
         })
       : Promise.resolve([]),
@@ -84,10 +110,92 @@ export async function buildPresenceBoard(dateKey: string): Promise<PresenceBoard
           select: { unitId: true, userUnitId: true },
         })
       : Promise.resolve([]),
+    userIds.length
+      ? prisma.advocateTimeBlock.findMany({
+          where: {
+            userId: { in: userIds },
+            startsAt: { lt: dayEnd },
+            endsAt: { gt: dayStart },
+          },
+          select: {
+            userId: true,
+            kind: true,
+            startsAt: true,
+            endsAt: true,
+            reason: true,
+          },
+          orderBy: { startsAt: "asc" },
+        })
+      : Promise.resolve([]),
+    advocateMobiles.length
+      ? prisma.appointment.findMany({
+          where: {
+            status: "scheduled",
+            advocateMobile: { in: advocateMobiles },
+            scheduledAt: {
+              gte: addMinutes(dayStart, -12 * 60),
+              lt: dayEnd,
+            },
+          },
+          select: {
+            advocateMobile: true,
+            title: true,
+            scheduledAt: true,
+            durationMin: true,
+          },
+          orderBy: { scheduledAt: "asc" },
+        })
+      : Promise.resolve([]),
   ]);
 
   const attByUser = new Map(attendance.map((a) => [a.userId, a]));
   const leaveByUnit = new Map(leaves.map((l) => [l.userUnitId, l.unitId]));
+  const blocksByUser = new Map<string, PresenceBusyBlock[]>();
+  for (const b of timeBlocks) {
+    const list = blocksByUser.get(b.userId) ?? [];
+    list.push({
+      kind: b.kind,
+      startsAt: b.startsAt.toISOString(),
+      endsAt: b.endsAt.toISOString(),
+      reason: b.reason,
+    });
+    blocksByUser.set(b.userId, list);
+  }
+
+  const userIdByMobile = new Map<string, string>();
+  for (const s of staff) {
+    for (const v of mobileVariants(s.mobile)) {
+      userIdByMobile.set(v, s.id);
+    }
+  }
+
+  for (const a of appointments) {
+    if (!a.advocateMobile) continue;
+    const userId = userIdByMobile.get(a.advocateMobile);
+    if (!userId) continue;
+    const start = a.scheduledAt;
+    const end = addMinutes(a.scheduledAt, a.durationMin);
+    // Only count appointments that overlap this IST calendar day.
+    if (end.getTime() <= dayStart.getTime() || start.getTime() >= dayEnd.getTime()) {
+      continue;
+    }
+    const list = blocksByUser.get(userId) ?? [];
+    list.push({
+      kind: "appointment",
+      startsAt: start.toISOString(),
+      endsAt: end.toISOString(),
+      reason: a.title,
+    });
+    blocksByUser.set(userId, list);
+  }
+
+  // Keep each person's busy list sorted by start.
+  for (const [userId, list] of blocksByUser) {
+    list.sort(
+      (a, b) => new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime()
+    );
+    blocksByUser.set(userId, list);
+  }
 
   const people: PresencePerson[] = staff.map((s) => {
     const mobile = displayMobile(s.mobile);
@@ -115,7 +223,9 @@ export async function buildPresenceBoard(dateKey: string): Promise<PresenceBoard
       status,
       checkInAt: att?.checkInAt ? att.checkInAt.toISOString() : null,
       checkOutAt: att?.checkOutAt ? att.checkOutAt.toISOString() : null,
+      notes: att?.notes ?? null,
       leaveUnitId,
+      busyToday: blocksByUser.get(s.id) ?? [],
     };
   });
 
