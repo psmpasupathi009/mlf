@@ -13,15 +13,21 @@ export const GET = apiHandler(async (request) => {
   const userUnitId = searchParams.get("userUnitId")?.trim();
   const from = searchParams.get("from")?.trim();
   const to = searchParams.get("to")?.trim();
+  const all = searchParams.get("all") === "1" || searchParams.get("all") === "true";
+  const mine = searchParams.get("mine") === "1" || searchParams.get("mine") === "true";
 
   const canManage = await hasPermission(user.id, "hrms", "manage_attendance");
 
-  const where = {
-    ...(canManage
-      ? userUnitId
+  // Default to self. Managers may query one person (userUnitId) or everyone (all=1).
+  const scope =
+    canManage && all && !mine
+      ? {}
+      : canManage && userUnitId && !mine
         ? { userUnitId }
-        : {}
-      : { userId: user.id }),
+        : { userId: user.id };
+
+  const where = {
+    ...scope,
     ...(from || to
       ? {
           date: {

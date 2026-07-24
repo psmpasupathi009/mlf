@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { getSessionUser } from "@/lib/auth/session-user";
 import { ForbiddenState } from "@/shared/components/feedback/forbidden-state";
 import { HrmsPage } from "@/features/hrms/components/hrms-page";
@@ -12,5 +13,9 @@ export default async function Page() {
   ) {
     return <ForbiddenState />;
   }
-  return <HrmsPage user={user} />;
+  return (
+    <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
+      <HrmsPage user={user} />
+    </Suspense>
+  );
 }

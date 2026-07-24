@@ -1,9 +1,11 @@
 import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
+import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { writeAudit } from "@/lib/audit";
+import { toLeaveSummary } from "@/features/hrms/server/serialize";
 
-/** Owner can withdraw a pending leave request (e.g. applied by mistake). */
+/** Owner can withdraw a pending leave request (soft-cancel for audit). */
 export const POST = apiHandler(async (request, context) => {
   const { user, response } = await requirePerm(request, "hrms", "own_leave");
   if (!user) return response;
@@ -25,7 +27,16 @@ export const POST = apiHandler(async (request, context) => {
     );
   }
 
-  await prisma.leaveRequest.delete({ where: { id: leave.id } });
+  // Soft-cancel — LeaveStatus.cancelled in schema.prisma.
+  // Assert via unknown so a stale TS server (pre-generate) does not block.
+  const data = {
+    status: "cancelled",
+  } as unknown as Prisma.LeaveRequestUpdateInput;
+
+  const updated = await prisma.leaveRequest.update({
+    where: { id: leave.id },
+    data,
+  });
 
   await writeAudit({
     actorUnitId: user.unitId,
@@ -34,5 +45,9 @@ export const POST = apiHandler(async (request, context) => {
     entityUnitId: leave.unitId,
   });
 
-  return jsonOk({ cancelled: true, unitId: leave.unitId });
+  return jsonOk({
+    cancelled: true,
+    unitId: leave.unitId,
+    leave: toLeaveSummary(updated),
+  });
 });

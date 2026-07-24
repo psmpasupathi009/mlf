@@ -80,13 +80,14 @@ type AdvocateLoad = {
   week: number;
 };
 
-type AdminAdvocate = {
+type AdminStaffPresence = {
   unitId: string;
   name: string;
   mobile: string | null;
   photoUrl?: string | null;
   checkedIn: boolean;
   checkedOut: boolean;
+  status?: "absent" | "in" | "out" | "on_leave";
 };
 
 type DashboardSummary = {
@@ -118,10 +119,19 @@ type DashboardSummary = {
   hrms?: {
     checkedInToday: boolean;
     checkedOutToday: boolean;
+    onApprovedLeaveToday?: boolean;
     pendingLeaveApprovals: number | null;
   };
   adminBoard?: {
-    advocates: AdminAdvocate[];
+    staff?: AdminStaffPresence[];
+    advocates: AdminStaffPresence[];
+    counts?: {
+      total: number;
+      present: number;
+      out: number;
+      onLeave: number;
+      absent: number;
+    };
     checkedInCount: number;
     advocateCount: number;
   };
@@ -231,88 +241,68 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
   const firstName = personFirstName({ name: user?.name, fallback: "" });
   const todayHearings = summary?.cases?.todayHearings ?? [];
 
-  const advocateBoard = useMemo(() => {
-    const loadMap = new Map(
-      (summary?.appointments?.byAdvocate ?? []).map((a) => [
-        a.mobile || a.name,
-        a,
-      ])
-    );
-    const attendance = summary?.adminBoard?.advocates ?? [];
+  const officePresence = useMemo(() => {
+    const roster =
+      summary?.adminBoard?.staff ?? summary?.adminBoard?.advocates ?? [];
+    const counts = summary?.adminBoard?.counts;
 
     type BoardRow = {
       key: string;
       name: string;
       mobile: string | null;
       photoUrl?: string | null;
-      today: number;
-      week: number;
-      checkedIn: boolean;
-      checkedOut: boolean;
-      filterKey: string;
+      status: "absent" | "in" | "out" | "on_leave" | "unknown";
       showAttendance: boolean;
-      status: "absent" | "in" | "out" | "unknown";
     };
 
-    const statusRank = { absent: 0, out: 1, in: 2, unknown: 3 } as const;
+    const statusRank = {
+      absent: 0,
+      on_leave: 1,
+      out: 2,
+      in: 3,
+      unknown: 4,
+    } as const;
 
-    let rows: BoardRow[];
-
-    if (attendance.length > 0) {
-      rows = attendance.map((a) => {
-        const load =
-          (a.mobile ? loadMap.get(a.mobile) : undefined) ?? loadMap.get(a.name);
-        const status: BoardRow["status"] = a.checkedOut
-          ? "out"
-          : a.checkedIn
-            ? "in"
-            : "absent";
-        return {
-          key: a.unitId,
-          name: personDisplayName({
-            name: a.name,
-            mobile: a.mobile,
-            unitId: a.unitId,
-          }),
+    const rows: BoardRow[] = roster.map((a) => {
+      const status: BoardRow["status"] =
+        a.status ??
+        (a.checkedOut ? "out" : a.checkedIn ? "in" : "absent");
+      return {
+        key: a.unitId,
+        name: personDisplayName({
+          name: a.name,
           mobile: a.mobile,
-          photoUrl: a.photoUrl,
-          today: load?.today ?? 0,
-          week: load?.week ?? 0,
-          checkedIn: a.checkedIn,
-          checkedOut: a.checkedOut,
-          filterKey: a.mobile || "unassigned",
-          showAttendance: true,
-          status,
-        };
-      });
-    } else {
-      rows = (summary?.appointments?.byAdvocate ?? []).map((a) => ({
-        key: a.mobile || a.name,
-        name: personDisplayName({ name: a.name, mobile: a.mobile }),
-        mobile: a.mobile || null,
-        today: a.today,
-        week: a.week,
-        checkedIn: false,
-        checkedOut: false,
-        filterKey: a.mobile || "unassigned",
-        showAttendance: false,
-        status: "unknown" as const,
-      }));
-    }
+          unitId: a.unitId,
+        }),
+        mobile: a.mobile,
+        photoUrl: a.photoUrl,
+        showAttendance: true,
+        status,
+      };
+    });
 
-    return rows.sort((a, b) => {
+    rows.sort((a, b) => {
       const rank = statusRank[a.status] - statusRank[b.status];
       if (rank !== 0) return rank;
       return a.name.localeCompare(b.name);
     });
-  }, [summary?.appointments?.byAdvocate, summary?.adminBoard?.advocates]);
 
-  const presenceStats = useMemo(() => {
-    const absent = advocateBoard.filter((a) => a.status === "absent").length;
-    const present = advocateBoard.filter((a) => a.status === "in").length;
-    const out = advocateBoard.filter((a) => a.status === "out").length;
-    return { absent, present, out };
-  }, [advocateBoard]);
+    const presenceStats = counts
+      ? {
+          absent: counts.absent,
+          present: counts.present,
+          out: counts.out,
+          onLeave: counts.onLeave,
+        }
+      : {
+          absent: rows.filter((a) => a.status === "absent").length,
+          present: rows.filter((a) => a.status === "in").length,
+          out: rows.filter((a) => a.status === "out").length,
+          onLeave: rows.filter((a) => a.status === "on_leave").length,
+        };
+
+    return { rows, presenceStats };
+  }, [summary?.adminBoard]);
 
   const timelineRows = useMemo(() => {
     const rows: TimelineRow[] = [];
@@ -449,7 +439,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
     attention.push({
       label: "Leave approvals waiting",
       value: String(summary!.hrms!.pendingLeaveApprovals),
-      href: "/hrms",
+      href: "/hrms?section=leave",
       cta: "Approve",
       tone: "info",
     });
@@ -905,33 +895,36 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
         </section>
       ) : null}
 
-      {/* 3. Advocate presence — compact counts only; details in HRMS */}
-      {isAdmin && !loading && advocateBoard.some((a) => a.showAttendance) ? (
+      {/* 3. Office presence — compact counts; details in HRMS */}
+      {isAdmin && !loading && officePresence.rows.some((a) => a.showAttendance) ? (
         <Link
           href="/hrms"
           className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/80 bg-card px-4 py-3 shadow-sm shadow-black/2 transition-colors hover:border-navy/30 sm:px-5"
         >
           <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-navy">
-                Advocate presence
-              </p>
+              <p className="text-sm font-semibold text-navy">Who’s in today</p>
               <p className="text-xs text-muted-foreground">
-                Today · open HRMS for full list
+                Full office · open HRMS for the list
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
               <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-900 dark:bg-amber-950/50 dark:text-amber-300">
                 <UserX className="size-3.5" />
-                {presenceStats.absent} absent
+                {officePresence.presenceStats.absent} absent
               </span>
               <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
                 <UserCheck className="size-3.5" />
-                {presenceStats.present} present
+                {officePresence.presenceStats.present} present
               </span>
               <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                {presenceStats.out} out
+                {officePresence.presenceStats.out} checked out
               </span>
+              {officePresence.presenceStats.onLeave > 0 ? (
+                <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                  {officePresence.presenceStats.onLeave} on leave
+                </span>
+              ) : null}
             </div>
           </div>
           <span className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-navy">
@@ -941,9 +934,8 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
         </Link>
       ) : null}
 
-      {/* Personal attendance (non-admin) */}
-      {!isAdmin &&
-      moduleOn("hrms") &&
+      {/* Personal attendance */}
+      {moduleOn("hrms") &&
       can("hrms.own_attendance") &&
       summary?.hrms ? (
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/80 bg-card px-4 py-3.5 shadow-sm shadow-black/2 sm:px-5">
@@ -952,11 +944,13 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
             <div>
               <p className="text-sm font-semibold text-navy">Your attendance</p>
               <p className="text-xs text-muted-foreground">
-                {summary.hrms.checkedOutToday
-                  ? "Checked out"
-                  : summary.hrms.checkedInToday
-                    ? "Checked in"
-                    : "Not checked in"}
+                {summary.hrms.onApprovedLeaveToday
+                  ? "On approved leave today"
+                  : summary.hrms.checkedOutToday
+                    ? "Checked out"
+                    : summary.hrms.checkedInToday
+                      ? "Checked in"
+                      : "Not checked in"}
               </p>
             </div>
           </div>

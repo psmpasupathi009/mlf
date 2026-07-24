@@ -4,13 +4,16 @@ import { prisma } from "@/lib/db/prisma";
 import { writeAudit } from "@/lib/audit";
 import { decideLeaveSchema } from "@/lib/validations/hrms.schema";
 import { toLeaveSummary } from "@/features/hrms/server/serialize";
+import { istDateKey } from "@/lib/utils/ist";
 
 export const POST = apiHandler(async (request, context) => {
   const { user, response } = await requirePerm(request, "hrms", "approve_leave");
   if (!user) return response;
 
   const { unitId } = (await context.params) ?? {};
-  const leave = unitId ? await prisma.leaveRequest.findUnique({ where: { unitId } }) : null;
+  const leave = unitId
+    ? await prisma.leaveRequest.findUnique({ where: { unitId } })
+    : null;
   if (!leave) return jsonFail("NOT_FOUND", "Leave request not found", 404);
 
   if (leave.status !== "pending") {
@@ -23,12 +26,37 @@ export const POST = apiHandler(async (request, context) => {
   const raw = await request.json();
   const parsed = decideLeaveSchema.safeParse(raw);
   if (!parsed.success) {
-    return jsonFail("VALIDATION", parsed.error.issues[0]?.message ?? "Invalid request", 400, parsed.error.issues);
+    return jsonFail(
+      "VALIDATION",
+      parsed.error.issues[0]?.message ?? "Invalid request",
+      400,
+      parsed.error.issues
+    );
   }
   const input = parsed.data;
 
-  if (input.decision === "rejected" && !input.rejectReason) {
+  if (input.decision === "rejected" && !(input.rejectReason?.trim())) {
     return jsonFail("VALIDATION", "A reason is required to reject leave", 400);
+  }
+
+  if (input.decision === "approved") {
+    const overlap = await prisma.leaveRequest.findFirst({
+      where: {
+        userId: leave.userId,
+        status: "approved",
+        id: { not: leave.id },
+        fromDate: { lte: leave.toDate },
+        toDate: { gte: leave.fromDate },
+      },
+      select: { unitId: true, fromDate: true, toDate: true },
+    });
+    if (overlap) {
+      return jsonFail(
+        "CONFLICT",
+        `Overlaps existing approved leave (${overlap.fromDate} → ${overlap.toDate})`,
+        409
+      );
+    }
   }
 
   const updated = await prisma.leaveRequest.update({
@@ -37,9 +65,36 @@ export const POST = apiHandler(async (request, context) => {
       status: input.decision,
       approvedById: user.id,
       approvedAt: new Date(),
-      rejectReason: input.decision === "rejected" ? input.rejectReason : undefined,
+      rejectReason:
+        input.decision === "rejected" ? input.rejectReason?.trim() : undefined,
     },
   });
+
+  // If leave covers today and they already checked in, close the open attendance row.
+  if (input.decision === "approved") {
+    const today = istDateKey();
+    if (leave.fromDate <= today && leave.toDate >= today) {
+      const open = await prisma.attendance.findFirst({
+        where: {
+          userId: leave.userId,
+          date: today,
+          checkInAt: { not: null },
+          checkOutAt: null,
+        },
+      });
+      if (open) {
+        await prisma.attendance.update({
+          where: { id: open.id },
+          data: {
+            checkOutAt: new Date(),
+            notes: open.notes
+              ? `${open.notes} · auto check-out (leave approved)`
+              : "Auto check-out (leave approved)",
+          },
+        });
+      }
+    }
+  }
 
   await writeAudit({
     actorUnitId: user.unitId,

@@ -57,6 +57,7 @@ enum LeaveStatus {
   pending
   approved
   rejected
+  cancelled
 }
 
 enum DocumentType {

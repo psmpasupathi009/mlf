@@ -353,55 +353,58 @@ export const GET = apiHandler(async (request) => {
   }
 
   if (await can("hrms", "view")) {
-    const [myAttendance, pendingLeave] = await Promise.all([
+    const [myAttendance, pendingLeave, onLeaveToday] = await Promise.all([
       prisma.attendance.findUnique({
         where: { userId_date: { userId: user.id, date: todayKey } },
       }),
       (await can("hrms", "approve_leave"))
         ? prisma.leaveRequest.count({ where: { status: "pending" } })
         : Promise.resolve(null),
+      prisma.leaveRequest.findFirst({
+        where: {
+          userId: user.id,
+          status: "approved",
+          fromDate: { lte: todayKey },
+          toDate: { gte: todayKey },
+        },
+        select: { unitId: true },
+      }),
     ]);
     summary.hrms = {
       checkedInToday: Boolean(myAttendance?.checkInAt),
       checkedOutToday: Boolean(myAttendance?.checkOutAt),
+      onApprovedLeaveToday: Boolean(onLeaveToday),
       pendingLeaveApprovals: pendingLeave,
     };
   }
 
-  // Admin / sub-admin office board extras
-  if (isOfficeAdmin && (await can("employees", "view"))) {
-    const advocates = await prisma.user.findMany({
-      where: { isActive: true, roles: { has: "advocate" } },
-      select: { id: true, unitId: true, name: true, mobile: true, photoKey: true },
-      orderBy: { name: "asc" },
-    });
-    const attendance = await prisma.attendance.findMany({
-      where: {
-        date: todayKey,
-        userId: { in: advocates.map((a) => a.id) },
-      },
-      select: { userId: true, checkInAt: true, checkOutAt: true },
-    });
-    const attByUser = new Map(attendance.map((a) => [a.userId, a]));
-
+  // Admin / sub-admin office board — same gate as HRMS presence API
+  if (isOfficeAdmin && (await can("hrms", "manage_attendance"))) {
+    const { buildPresenceBoard } = await import("@/features/hrms/server/presence");
+    const board = await buildPresenceBoard(todayKey);
     summary.adminBoard = {
-      advocates: advocates.map((a) => {
-        const att = attByUser.get(a.id);
-        return {
-          unitId: a.unitId,
-          name: personDisplayName({
-            name: a.name,
-            mobile: a.mobile,
-            unitId: a.unitId,
-          }),
-          mobile: displayMobile(a.mobile),
-          photoUrl: userPhotoUrl(a.unitId, Boolean(a.photoKey)),
-          checkedIn: Boolean(att?.checkInAt),
-          checkedOut: Boolean(att?.checkOutAt),
-        };
-      }),
-      checkedInCount: attendance.filter((a) => a.checkInAt).length,
-      advocateCount: advocates.length,
+      staff: board.people.map((p) => ({
+        unitId: p.unitId,
+        name: p.displayName,
+        mobile: p.mobile,
+        photoUrl: p.photoUrl,
+        checkedIn: p.status === "in" || p.status === "out",
+        checkedOut: p.status === "out",
+        status: p.status,
+      })),
+      counts: board.counts,
+      // Legacy keys used by older home widgets
+      advocates: board.people.map((p) => ({
+        unitId: p.unitId,
+        name: p.displayName,
+        mobile: p.mobile,
+        photoUrl: p.photoUrl,
+        checkedIn: p.status === "in" || p.status === "out",
+        checkedOut: p.status === "out",
+        status: p.status,
+      })),
+      checkedInCount: board.counts.present + board.counts.out,
+      advocateCount: board.counts.total,
     };
   }
 

@@ -18,27 +18,57 @@ export const POST = apiHandler(async (request) => {
   }
 
   const today = istDateKey();
+
+  const onLeave = await prisma.leaveRequest.findFirst({
+    where: {
+      userId: user.id,
+      status: "approved",
+      fromDate: { lte: today },
+      toDate: { gte: today },
+    },
+    select: { unitId: true },
+  });
+  if (onLeave) {
+    return jsonFail(
+      "CONFLICT",
+      "You are on approved leave today — check-in is not needed",
+      409
+    );
+  }
+
   const existing = await prisma.attendance.findUnique({ where: { userId_date: { userId: user.id, date: today } } });
 
   if (existing?.checkInAt) {
     return jsonFail("CONFLICT", "Already checked in today", 409);
   }
 
-  const record = existing
-    ? await prisma.attendance.update({
-        where: { id: existing.id },
-        data: { checkInAt: new Date(), notes: parsed.data.notes || existing.notes },
-      })
-    : await prisma.attendance.create({
-        data: {
-          unitId: await nextUnitId("attendance"),
-          userId: user.id,
-          userUnitId: user.unitId,
-          date: today,
-          checkInAt: new Date(),
-          notes: parsed.data.notes || undefined,
-        },
-      });
+  let record;
+  try {
+    record = existing
+      ? await prisma.attendance.update({
+          where: { id: existing.id },
+          data: { checkInAt: new Date(), notes: parsed.data.notes || existing.notes },
+        })
+      : await prisma.attendance.create({
+          data: {
+            unitId: await nextUnitId("attendance"),
+            userId: user.id,
+            userUnitId: user.unitId,
+            date: today,
+            checkInAt: new Date(),
+            notes: parsed.data.notes || undefined,
+          },
+        });
+  } catch (err) {
+    const code =
+      err && typeof err === "object" && "code" in err
+        ? String((err as { code?: string }).code)
+        : "";
+    if (code === "P2002") {
+      return jsonFail("CONFLICT", "Already checked in today", 409);
+    }
+    throw err;
+  }
 
   await writeAudit({
     actorUnitId: user.unitId,

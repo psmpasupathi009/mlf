@@ -1,30 +1,62 @@
 import { apiHandler, jsonFail, jsonOk, jsonOkList, parsePagination } from "@/lib/api/response";
-import { requirePerm } from "@/lib/api/guard";
+import { requirePerm, requireUser } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
 import { writeAudit } from "@/lib/audit";
-import { hasPermission } from "@/lib/rbac";
+import { hasPermission, requireModuleEnabled } from "@/lib/rbac";
 import { applyLeaveSchema } from "@/lib/validations/hrms.schema";
 import { toLeaveSummary } from "@/features/hrms/server/serialize";
+import type { LeaveStatus } from "@prisma/client";
 
 export const GET = apiHandler(async (request) => {
-  const { user, response } = await requirePerm(request, "hrms", "own_leave");
+  const modFail = requireModuleEnabled("hrms");
+  if (modFail) return modFail;
+
+  const { user, response } = await requireUser(request);
   if (!user) return response;
+
+  const canOwn = await hasPermission(user.id, "hrms", "own_leave");
+  const canApprove = await hasPermission(user.id, "hrms", "approve_leave");
+  if (!canOwn && !canApprove) {
+    return jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403);
+  }
 
   const { searchParams } = new URL(request.url);
   const { page, pageSize, skip } = parsePagination(searchParams);
   const userUnitId = searchParams.get("userUnitId")?.trim();
   const status = searchParams.get("status")?.trim();
+  const mine = searchParams.get("mine") === "1" || searchParams.get("mine") === "true";
 
-  const canApprove = await hasPermission(user.id, "hrms", "approve_leave");
+  const allowedStatuses = new Set<LeaveStatus>([
+    "pending",
+    "approved",
+    "rejected",
+    "cancelled",
+  ]);
+
+  let statusFilter: LeaveStatus | { in: LeaveStatus[] } | undefined;
+  if (status === "decided") {
+    statusFilter = { in: ["approved", "rejected"] };
+  } else if (status && allowedStatuses.has(status as LeaveStatus)) {
+    statusFilter = status as LeaveStatus;
+  }
 
   const where = {
-    ...(canApprove ? (userUnitId ? { userUnitId } : {}) : { userId: user.id }),
-    ...(status ? { status: status as never } : {}),
+    ...(mine || !canApprove
+      ? { userId: user.id }
+      : userUnitId
+        ? { userUnitId }
+        : {}),
+    ...(statusFilter ? { status: statusFilter } : {}),
   };
 
   const [rows, total] = await Promise.all([
-    prisma.leaveRequest.findMany({ where, orderBy: { createdAt: "desc" }, skip, take: pageSize }),
+    prisma.leaveRequest.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: pageSize,
+    }),
     prisma.leaveRequest.count({ where }),
   ]);
 
@@ -51,9 +83,31 @@ export const POST = apiHandler(async (request) => {
   const raw = await request.json();
   const parsed = applyLeaveSchema.safeParse(raw);
   if (!parsed.success) {
-    return jsonFail("VALIDATION", parsed.error.issues[0]?.message ?? "Invalid request", 400, parsed.error.issues);
+    return jsonFail(
+      "VALIDATION",
+      parsed.error.issues[0]?.message ?? "Invalid request",
+      400,
+      parsed.error.issues
+    );
   }
   const input = parsed.data;
+
+  const overlap = await prisma.leaveRequest.findFirst({
+    where: {
+      userId: user.id,
+      status: { in: ["pending", "approved"] },
+      fromDate: { lte: input.toDate },
+      toDate: { gte: input.fromDate },
+    },
+    select: { unitId: true, fromDate: true, toDate: true, status: true },
+  });
+  if (overlap) {
+    return jsonFail(
+      "CONFLICT",
+      `Overlaps existing ${overlap.status} leave (${overlap.fromDate} → ${overlap.toDate})`,
+      409
+    );
+  }
 
   const unitId = await nextUnitId("leave");
   const created = await prisma.leaveRequest.create({
