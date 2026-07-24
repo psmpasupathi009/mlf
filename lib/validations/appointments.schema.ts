@@ -37,7 +37,7 @@ export const updateAppointmentSchema = z.object({
 });
 
 export const APPOINTMENT_MODE_OPTIONS = [
-  { value: "office", label: "Office" },
+  { value: "office", label: "Office visit" },
   { value: "call", label: "Phone call" },
-  { value: "video", label: "Video" },
+  { value: "video", label: "Video call" },
 ] as const;

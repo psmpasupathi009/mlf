@@ -46,6 +46,16 @@ function parseValue(value: string): { dateKey: string; time: string } | null {
   return { dateKey, time: timePart.slice(0, 5) };
 }
 
+function nextWeekday(from: Date): Date {
+  let d = addDays(from, 1);
+  // Skip Sunday (0) — office default open Mon–Sat
+  for (let i = 0; i < 7; i++) {
+    if (d.getDay() !== 0) return d;
+    d = addDays(d, 1);
+  }
+  return d;
+}
+
 export function AvailabilitySlotPicker({
   advocateMobile,
   durationMin,
@@ -76,6 +86,13 @@ export function AvailabilitySlotPicker({
   const [avail, setAvail] = useState<DayAvailability | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (parsed?.dateKey && parsed.dateKey !== dateKey) {
+      setDateKey(parsed.dateKey);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync only when value changes
+  }, [value]);
 
   useEffect(() => {
     if (!advocateMobile || disabled) {
@@ -119,24 +136,43 @@ export function AvailabilitySlotPicker({
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- avoid fetch loops
-  }, [advocateMobile, dateKey, durationMin, clientUnitId, excludeAppointmentUnitId, disabled]);
+  }, [
+    advocateMobile,
+    dateKey,
+    durationMin,
+    clientUnitId,
+    excludeAppointmentUnitId,
+    disabled,
+  ]);
 
   const selected = parseDateKey(dateKey);
   const selectedTime = parsed?.dateKey === dateKey ? parsed.time : "";
 
+  const morningSlots =
+    avail?.freeSlots.filter((s) => Number(s.slice(0, 2)) < 13) ?? [];
+  const afternoonSlots =
+    avail?.freeSlots.filter((s) => Number(s.slice(0, 2)) >= 13) ?? [];
+
+  function pickDate(next: string) {
+    setDateKey(next);
+    onChange("");
+  }
+
   if (!advocateMobile) {
     return (
-      <p className="rounded-md border border-border bg-muted/30 px-3 py-3 text-sm text-muted-foreground">
+      <p className="rounded-xl border border-border bg-muted/30 px-3 py-3 text-sm text-muted-foreground">
         Select an advocate to see free times.
       </p>
     );
   }
 
   return (
-    <div className={cn("space-y-3", disabled && "pointer-events-none opacity-60")}>
-      <div className="flex items-start gap-2 rounded-md border border-border bg-muted/30 px-3 py-2.5 text-sm">
+    <div
+      className={cn("space-y-3", disabled && "pointer-events-none opacity-60")}
+    >
+      <div className="flex items-start gap-2 rounded-xl border border-border bg-muted/25 px-3 py-2.5 text-sm">
         <CalendarClock className="mt-0.5 size-4 shrink-0 text-navy" />
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="font-medium text-navy">
             {selected && selectedTime
               ? `${formatDisplayDate(selected)} · ${formatTimeLabel(selectedTime)}`
@@ -145,7 +181,8 @@ export function AvailabilitySlotPicker({
                 : "Pick a free date and time"}
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Only open slots for this advocate ({durationMin} min)
+            Only open slots · {durationMin} min · Times in India Standard Time
+            (IST)
           </p>
         </div>
       </div>
@@ -154,69 +191,127 @@ export function AvailabilitySlotPicker({
         <Button
           type="button"
           size="sm"
-          variant="outline"
-          onClick={() => setDateKey(toDateKey(today))}
+          variant={dateKey === toDateKey(today) ? "default" : "outline"}
+          onClick={() => pickDate(toDateKey(today))}
         >
           Today
         </Button>
         <Button
           type="button"
           size="sm"
-          variant="outline"
-          onClick={() => setDateKey(toDateKey(addDays(today, 1)))}
+          variant={
+            dateKey === toDateKey(addDays(today, 1)) ? "default" : "outline"
+          }
+          onClick={() => pickDate(toDateKey(addDays(today, 1)))}
         >
           Tomorrow
         </Button>
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={() => pickDate(toDateKey(nextWeekday(today)))}
+        >
+          Next open day
+        </Button>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_10rem]">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
         <OfficeDayPicker
+          compact
           selected={selected}
           onSelect={(d) => {
             if (!d) return;
-            const next = toDateKey(d);
-            setDateKey(next);
-            onChange("");
+            pickDate(toDateKey(d));
           }}
           disabled={{ before: today }}
         />
 
-        <div className="flex max-h-72 flex-col rounded-lg border border-border/80 bg-white">
-          <p className="shrink-0 border-b border-border/70 px-3 py-2 text-xs font-medium text-muted-foreground">
-            Free slots
-          </p>
-          <div className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-2">
+        <div className="flex min-h-56 flex-col rounded-xl border border-border/80 bg-white shadow-sm">
+          <div className="shrink-0 border-b border-border/70 px-3 py-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              Free slots
+            </p>
+            {selected ? (
+              <p className="mt-0.5 text-sm font-medium text-navy">
+                {formatDisplayDate(selected)}
+              </p>
+            ) : null}
+          </div>
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain p-2.5">
             {loading ? (
-              <p className="px-1 py-2 text-xs text-muted-foreground">Loading…</p>
+              <p className="px-1 py-4 text-center text-xs text-muted-foreground">
+                Loading free times…
+              </p>
             ) : error ? (
-              <p className="px-1 py-2 text-xs text-destructive">{error}</p>
+              <p className="px-1 py-4 text-center text-xs text-destructive">
+                {error}
+              </p>
             ) : avail?.onLeave ? (
-              <p className="px-1 py-2 text-xs text-amber-800">
-                Advocate on approved leave
+              <p className="px-1 py-4 text-center text-xs text-amber-800">
+                Advocate on approved leave this day
               </p>
             ) : !avail?.freeSlots.length ? (
-              <p className="px-1 py-2 text-xs text-muted-foreground">
-                No free slots this day
+              <p className="px-1 py-4 text-center text-xs text-muted-foreground">
+                No free slots — try another day or duration
               </p>
             ) : (
-              avail.freeSlots.map((slot) => {
-                const active = selectedTime === slot;
-                return (
-                  <button
-                    key={slot}
-                    type="button"
-                    onClick={() => onChange(combine(dateKey, slot))}
-                    className={cn(
-                      "flex w-full items-center justify-center rounded-md px-2 py-1.5 text-xs font-medium transition-colors",
-                      active
-                        ? "bg-navy text-white"
-                        : "text-navy hover:bg-muted"
-                    )}
-                  >
-                    {formatTimeLabel(slot)}
-                  </button>
-                );
-              })
+              <>
+                {morningSlots.length ? (
+                  <div className="space-y-1.5">
+                    <p className="px-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Morning
+                    </p>
+                    <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                      {morningSlots.map((slot) => {
+                        const active = selectedTime === slot;
+                        return (
+                          <button
+                            key={slot}
+                            type="button"
+                            onClick={() => onChange(combine(dateKey, slot))}
+                            className={cn(
+                              "rounded-lg px-2 py-2.5 text-xs font-semibold transition-colors",
+                              active
+                                ? "bg-navy text-white shadow-sm"
+                                : "bg-muted/60 text-navy hover:bg-muted"
+                            )}
+                          >
+                            {formatTimeLabel(slot)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+                {afternoonSlots.length ? (
+                  <div className="space-y-1.5">
+                    <p className="px-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                      Afternoon
+                    </p>
+                    <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+                      {afternoonSlots.map((slot) => {
+                        const active = selectedTime === slot;
+                        return (
+                          <button
+                            key={slot}
+                            type="button"
+                            onClick={() => onChange(combine(dateKey, slot))}
+                            className={cn(
+                              "rounded-lg px-2 py-2.5 text-xs font-semibold transition-colors",
+                              active
+                                ? "bg-navy text-white shadow-sm"
+                                : "bg-muted/60 text-navy hover:bg-muted"
+                            )}
+                          >
+                            {formatTimeLabel(slot)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+              </>
             )}
           </div>
         </div>

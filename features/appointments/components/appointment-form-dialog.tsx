@@ -31,7 +31,6 @@ import type { AppointmentSummary } from "@/features/appointments/server/serializ
 import { APPOINTMENT_MODE_OPTIONS } from "@/lib/validations/appointments.schema";
 import {
   APPOINTMENT_DURATION_OPTIONS,
-  APPOINTMENT_LOCATION_OPTIONS,
   APPOINTMENT_TITLE_OPTIONS,
 } from "@/config/company/form-options";
 import { SelectOrOther } from "@/shared/components/forms/select-or-other";
@@ -41,6 +40,7 @@ import { canBookForAnyAdvocate } from "@/lib/appointments/booking-rules";
 import { displayMobile } from "@/lib/auth/mobile";
 import { PersonChip } from "@/shared/components/user/person-chip";
 import { personDisplayName } from "@/shared/lib/person";
+import { cn } from "@/lib/utils/cn";
 
 type AdvocateOption = {
   unitId: string;
@@ -51,14 +51,29 @@ type AdvocateOption = {
   photoUrl?: string | null;
 };
 
-function toLocalInput(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
+export type AppointmentFormMode = "create" | "edit" | "reschedule";
 
 function tenDigit(mobile: string): string {
   return displayMobile(mobile);
+}
+
+function formatWhen(iso: string): string {
+  return new Date(iso).toLocaleString("en-IN", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function modeLabel(mode: string | null | undefined): string {
+  return (
+    APPOINTMENT_MODE_OPTIONS.find((m) => m.value === mode)?.label ??
+    mode ??
+    "Office visit"
+  );
 }
 
 const CONFLICT_HINTS: Record<string, string> = {
@@ -70,20 +85,93 @@ const CONFLICT_HINTS: Record<string, string> = {
   IN_PAST: "Choose a future time.",
 };
 
+function FormSection({
+  step,
+  title,
+  description,
+  children,
+  className,
+}: {
+  step?: number;
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "space-y-3 rounded-2xl border border-border/70 bg-white p-4 shadow-sm sm:p-5",
+        className
+      )}
+    >
+      <div className="flex items-start gap-3">
+        {step != null ? (
+          <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-navy text-xs font-semibold text-white">
+            {step}
+          </span>
+        ) : null}
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-navy">{title}</h3>
+          {description ? (
+            <p className="mt-0.5 text-xs text-muted-foreground">{description}</p>
+          ) : null}
+        </div>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function ModePicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  return (
+    <div className="grid grid-cols-3 gap-2">
+      {APPOINTMENT_MODE_OPTIONS.map((m) => {
+        const active = value === m.value;
+        return (
+          <button
+            key={m.value}
+            type="button"
+            onClick={() => onChange(m.value)}
+            className={cn(
+              "rounded-xl border px-2 py-2.5 text-center text-xs font-semibold transition-colors sm:text-sm",
+              active
+                ? "border-navy bg-navy text-white shadow-sm"
+                : "border-border bg-muted/40 text-navy hover:bg-muted"
+            )}
+          >
+            {m.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function AppointmentFormDialog({
   open,
   onOpenChange,
   appointment,
+  formMode = "create",
   user,
   onSaved,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   appointment: AppointmentSummary | null;
+  formMode?: AppointmentFormMode;
   user: PublicUser;
   onSaved: () => void;
 }) {
-  const isEdit = Boolean(appointment);
+  const isCreate = formMode === "create";
+  const isEditOnly = formMode === "edit";
+  const isReschedule = formMode === "reschedule";
   const bookAny = canBookForAnyAdvocate(user.roles);
   const selfMobile10 = tenDigit(user.mobile);
 
@@ -96,10 +184,13 @@ export function AppointmentFormDialog({
   const [scheduledAt, setScheduledAt] = useState("");
   const [durationMin, setDurationMin] = useState("30");
   const [mode, setMode] = useState("office");
-  const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  const originalAdvocateMobile = appointment?.advocateMobile
+    ? tenDigit(appointment.advocateMobile)
+    : "";
 
   useEffect(() => {
     if (!open) return;
@@ -144,10 +235,9 @@ export function AppointmentFormDialog({
         setAdvocateMobile(selfMobile10);
       }
       setTitle(appointment?.title ?? "");
-      setScheduledAt(appointment ? toLocalInput(appointment.scheduledAt) : "");
+      setScheduledAt("");
       setDurationMin(String(appointment?.durationMin ?? 30));
       setMode(appointment?.mode ?? "office");
-      setLocation(appointment?.location ?? "");
       setNotes(appointment?.notes ?? "");
       setError("");
     });
@@ -159,7 +249,26 @@ export function AppointmentFormDialog({
     [advocates, advocateMobile]
   );
 
+  const originalAdvocate = useMemo(() => {
+    if (!appointment?.advocateMobile) return null;
+    const m = tenDigit(appointment.advocateMobile);
+    return (
+      advocates.find((a) => tenDigit(a.mobile) === m) ?? {
+        unitId: appointment.advocateUnitId ?? "",
+        name: appointment.advocateName,
+        displayName: appointment.advocateName,
+        mobile: appointment.advocateMobile,
+        photoUrl: appointment.advocatePhotoUrl,
+      }
+    );
+  }, [advocates, appointment]);
+
   const effectiveAdvocateMobile = bookAny ? advocateMobile : selfMobile10;
+
+  const advocateChanged =
+    isReschedule &&
+    Boolean(originalAdvocateMobile) &&
+    tenDigit(effectiveAdvocateMobile) !== originalAdvocateMobile;
 
   async function handleSubmit() {
     setError("");
@@ -167,32 +276,45 @@ export function AppointmentFormDialog({
       setError("Title is required");
       return;
     }
-    if (!scheduledAt) {
+    if (!isEditOnly && !scheduledAt) {
       setError("Pick a free date and time");
       return;
     }
-    if (bookAny && !advocateMobile.trim()) {
+    if ((isCreate || isReschedule) && bookAny && !advocateMobile.trim()) {
       setError("Select an advocate");
       return;
     }
 
     setBusy(true);
-    const payload = {
-      clientUnitId: client?.unitId || undefined,
-      advocateMobile: bookAny ? tenDigit(advocateMobile) : selfMobile10,
-      title,
-      scheduledAt: new Date(scheduledAt).toISOString(),
-      durationMin: Number(durationMin) || 30,
-      mode,
-      location: location || undefined,
-      notes: notes || undefined,
-    };
+
+    let payload: Record<string, unknown>;
+
+    if (isEditOnly) {
+      payload = {
+        clientUnitId: client?.unitId || "",
+        title,
+        durationMin: Number(durationMin) || 30,
+        mode,
+        notes: notes || undefined,
+      };
+    } else {
+      payload = {
+        clientUnitId: client?.unitId || undefined,
+        advocateMobile: bookAny ? tenDigit(advocateMobile) : selfMobile10,
+        title,
+        scheduledAt: new Date(scheduledAt).toISOString(),
+        durationMin: Number(durationMin) || 30,
+        mode,
+        notes: notes || undefined,
+        ...(isReschedule ? { status: "scheduled" as const } : {}),
+      };
+    }
 
     const { ok, data } = await apiFetch(
-      isEdit
-        ? `/api/v1/appointments/${appointment!.unitId}`
-        : "/api/v1/appointments",
-      { method: isEdit ? "PATCH" : "POST", json: payload }
+      isCreate
+        ? "/api/v1/appointments"
+        : `/api/v1/appointments/${appointment!.unitId}`,
+      { method: isCreate ? "POST" : "PATCH", json: payload }
     );
     setBusy(false);
 
@@ -208,204 +330,448 @@ export function AppointmentFormDialog({
       return;
     }
 
-    toast.success(isEdit ? "Appointment updated" : "Appointment scheduled");
+    if (isReschedule && advocateChanged && selectedAdvocate) {
+      const name = personDisplayName({
+        name: selectedAdvocate.displayName || selectedAdvocate.name,
+        mobile: selectedAdvocate.mobile,
+        unitId: selectedAdvocate.unitId,
+      });
+      toast.success(`Moved to ${name} — previous slot is available again`);
+    } else if (isReschedule) {
+      toast.success("Rescheduled — previous slot is available again");
+    } else if (isEditOnly) {
+      toast.success("Appointment updated");
+    } else {
+      toast.success("Appointment scheduled");
+    }
     onSaved();
     onOpenChange(false);
   }
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="md">
-        <DialogHeader>
-          <DialogTitle>
-            {isEdit ? "Edit appointment" : "Book appointment"}
-          </DialogTitle>
-          <DialogDescription>
-            Choose advocate and duration, then pick a free slot. Conflicts are
-            blocked automatically.
-          </DialogDescription>
-        </DialogHeader>
+  const dialogTitle = isReschedule
+    ? "Reschedule / hand off"
+    : isEditOnly
+      ? "Edit appointment"
+      : "Book appointment";
 
-        <DialogBody className="grid gap-4">
-          <div className="grid gap-2">
-            <Label>Title</Label>
-            <SelectOrOther
-              value={title}
-              onChange={setTitle}
-              options={APPOINTMENT_TITLE_OPTIONS}
-              placeholder="Select title"
-              className="h-10"
-              otherPlaceholder="Custom title"
-            />
-          </div>
+  const dialogDescription = isReschedule
+    ? bookAny
+      ? "Send this booking to another advocate or a new time. The old diary slot opens for others."
+      : "Pick a new free slot on your diary. Ask office staff to hand off to another advocate."
+    : isEditOnly
+      ? "Update client, title, mode, or notes. Use Reschedule to change advocate or time."
+      : "Client called — book into the advocate diary. Only free slots are shown.";
 
-          <div className="grid gap-2">
-            <Label>
-              Advocate <span className="text-destructive">*</span>
-            </Label>
-            {bookAny ? (
-              <Select
-                value={advocateMobile}
-                onValueChange={(v) => {
-                  setAdvocateMobile(v);
-                  setScheduledAt("");
-                }}
-              >
-                <SelectTrigger className="h-11">
-                  <SelectValue placeholder="Select advocate by name" />
-                </SelectTrigger>
-                <SelectContent className="z-200 max-h-72">
-                  {advocates.map((a) => {
-                    const m = tenDigit(a.mobile);
-                    const label =
-                      a.displayName ||
-                      personDisplayName({
-                        name: a.name,
-                        mobile: a.mobile,
-                        unitId: a.unitId,
-                      });
-                    return (
-                      <SelectItem key={a.unitId} value={m}>
-                        <span className="flex items-center gap-2">
-                          <PersonChip
-                            name={label}
-                            photoUrl={a.photoUrl}
-                            avatarOnly
-                            className="gap-0"
-                          />
-                          <span>
-                            {label}
-                            {a.designation ? ` · ${a.designation}` : ""}
-                          </span>
-                        </span>
-                      </SelectItem>
-                    );
-                  })}
-                </SelectContent>
-              </Select>
-            ) : (
-              <div className="rounded-md border border-input bg-muted/30 px-3 py-2.5">
-                <PersonChip
-                  name={user.name}
-                  photoUrl={user.photoUrl}
-                  mobile={user.mobile}
-                  unitId={user.unitId}
-                  subtitle={`+91 ${selfMobile10}`}
-                  fallback="You"
-                />
-              </div>
-            )}
-            {bookAny && selectedAdvocate ? (
-              <p className="text-xs text-muted-foreground">
-                Booking for{" "}
-                {personDisplayName({
-                  name: selectedAdvocate.displayName || selectedAdvocate.name,
-                  mobile: selectedAdvocate.mobile,
-                  unitId: selectedAdvocate.unitId,
-                })}
-              </p>
-            ) : null}
-          </div>
+  const submitLabel = busy
+    ? "Saving…"
+    : isReschedule
+      ? "Move appointment"
+      : isEditOnly
+        ? "Save changes"
+        : "Book appointment";
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="grid gap-2">
-              <Label>Duration</Label>
-              <Select
-                value={durationMin}
-                onValueChange={(v) => {
-                  setDurationMin(v);
-                  setScheduledAt("");
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Duration" />
-                </SelectTrigger>
-                <SelectContent className="z-200">
-                  {APPOINTMENT_DURATION_OPTIONS.map((d) => (
-                    <SelectItem key={d.value} value={d.value}>
-                      {d.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label>Mode</Label>
-              <Select value={mode} onValueChange={setMode}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="z-200">
-                  {APPOINTMENT_MODE_OPTIONS.map((m) => (
-                    <SelectItem key={m.value} value={m.value}>
-                      {m.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+  const dialogSize = isEditOnly ? "md" : "lg";
 
-          <div className="grid gap-2">
-            <Label>
-              Date &amp; time <span className="text-destructive">*</span>
-            </Label>
-            <AvailabilitySlotPicker
-              advocateMobile={effectiveAdvocateMobile}
-              durationMin={Number(durationMin) || 30}
-              clientUnitId={client?.unitId}
-              excludeAppointmentUnitId={isEdit ? appointment?.unitId : undefined}
-              value={scheduledAt}
-              onChange={setScheduledAt}
-            />
-          </div>
-
-          <ClientPicker
-            value={client}
-            onChange={(c) => {
-              setClient(c);
+  function renderAdvocateSelect(label: string) {
+    return (
+      <div className="grid gap-2">
+        <Label>
+          {label} <span className="text-destructive">*</span>
+        </Label>
+        {bookAny ? (
+          <Select
+            value={advocateMobile || undefined}
+            onValueChange={(v) => {
+              setAdvocateMobile(v);
               setScheduledAt("");
             }}
-            label="Client (optional — blocks double-booking this client)"
-          />
+          >
+            <SelectTrigger className="h-11">
+              <SelectValue placeholder="Select advocate by name" />
+            </SelectTrigger>
+            <SelectContent className="z-200 max-h-72">
+              {advocates.map((a) => {
+                const m = tenDigit(a.mobile);
+                const name =
+                  a.displayName ||
+                  personDisplayName({
+                    name: a.name,
+                    mobile: a.mobile,
+                    unitId: a.unitId,
+                  });
+                return (
+                  <SelectItem key={a.unitId} value={m}>
+                    <span className="flex items-center gap-2">
+                      <PersonChip
+                        name={name}
+                        photoUrl={a.photoUrl}
+                        avatarOnly
+                        className="gap-0"
+                      />
+                      <span>
+                        {name}
+                        {a.designation ? ` · ${a.designation}` : ""}
+                      </span>
+                    </span>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+        ) : (
+          <>
+            <div className="rounded-md border border-input bg-muted/30 px-3 py-2.5">
+              <PersonChip
+                name={user.name}
+                photoUrl={user.photoUrl}
+                mobile={user.mobile}
+                unitId={user.unitId}
+                subtitle={`+91 ${selfMobile10}`}
+                fallback="You"
+              />
+            </div>
+            {isReschedule ? (
+              <p className="text-xs text-muted-foreground">
+                You can only move this on your own diary. Ask office staff to
+                assign another advocate.
+              </p>
+            ) : null}
+          </>
+        )}
+        {bookAny && selectedAdvocate && isReschedule ? (
+          <p className="text-xs text-muted-foreground">
+            {advocateChanged
+              ? `Handing off to ${personDisplayName({
+                  name:
+                    selectedAdvocate.displayName || selectedAdvocate.name,
+                  mobile: selectedAdvocate.mobile,
+                  unitId: selectedAdvocate.unitId,
+                })}`
+              : "Same advocate — choosing a new time only"}
+          </p>
+        ) : null}
+      </div>
+    );
+  }
 
-          <div className="grid gap-2">
-            <Label>Location</Label>
-            <SelectOrOther
-              value={location}
-              onChange={setLocation}
-              options={APPOINTMENT_LOCATION_OPTIONS}
-              placeholder="Select location"
-              className="h-10"
-              otherPlaceholder="Custom location"
-            />
-          </div>
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent size={dialogSize} className="p-0">
+        <DialogHeader className="bg-linear-to-b from-navy/4 to-transparent">
+          <DialogTitle>{dialogTitle}</DialogTitle>
+          <DialogDescription>{dialogDescription}</DialogDescription>
+        </DialogHeader>
 
-          <div className="grid gap-2">
-            <Label htmlFor="apt-notes">Notes</Label>
-            <Textarea
-              id="apt-notes"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-            />
-          </div>
+        <DialogBody className="space-y-4 bg-muted/20">
+          {isReschedule && appointment ? (
+            <FormSection
+              title="Current booking"
+              description="What you are moving — old slot frees after save"
+            >
+              <div className="grid gap-3 rounded-xl border border-border/60 bg-muted/30 p-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                <div>
+                  <p className="text-xs text-muted-foreground">Client</p>
+                  <p className="font-medium text-navy">
+                    {appointment.clientName ??
+                      appointment.clientUnitId ??
+                      "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Advocate</p>
+                  {originalAdvocate ? (
+                    <PersonChip
+                      name={
+                        originalAdvocate.displayName || originalAdvocate.name
+                      }
+                      photoUrl={originalAdvocate.photoUrl}
+                      mobile={originalAdvocate.mobile}
+                      unitId={originalAdvocate.unitId || undefined}
+                      className="mt-0.5"
+                    />
+                  ) : (
+                    <p className="font-medium text-navy">—</p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">When</p>
+                  <p className="font-medium text-navy">
+                    {formatWhen(appointment.scheduledAt)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Mode</p>
+                  <p className="font-medium text-navy">
+                    {modeLabel(appointment.mode)}
+                  </p>
+                </div>
+              </div>
+            </FormSection>
+          ) : null}
 
-          {error ? <p className="text-sm text-destructive">{error}</p> : null}
+          {isReschedule ? (
+            <FormSection
+              step={1}
+              title="Assign to"
+              description={
+                bookAny
+                  ? "Pick who should take this meeting"
+                  : "Your diary only"
+              }
+            >
+              {renderAdvocateSelect("Advocate")}
+            </FormSection>
+          ) : null}
+
+          {isCreate ? (
+            <FormSection
+              step={1}
+              title="Client & purpose"
+              description="Who called, and why"
+            >
+              <div className="grid gap-4 md:grid-cols-2">
+                <ClientPicker
+                  value={client}
+                  onChange={(c) => {
+                    setClient(c);
+                    setScheduledAt("");
+                  }}
+                  label="Client (recommended for call-ins)"
+                />
+                <div className="grid gap-2">
+                  <Label>Title / purpose</Label>
+                  <SelectOrOther
+                    value={title}
+                    onChange={setTitle}
+                    options={APPOINTMENT_TITLE_OPTIONS}
+                    placeholder="Select title"
+                    className="h-11"
+                    otherPlaceholder="Custom title"
+                  />
+                </div>
+              </div>
+            </FormSection>
+          ) : null}
+
+          {isCreate ? (
+            <FormSection
+              step={2}
+              title="Advocate"
+              description="Whose diary to book"
+            >
+              {renderAdvocateSelect("Advocate")}
+            </FormSection>
+          ) : null}
+
+          {isEditOnly ? (
+            <FormSection
+              title="Details"
+              description="Use Reschedule to change advocate or date/time"
+            >
+              <div className="grid gap-4 md:grid-cols-2">
+                <ClientPicker
+                  value={client}
+                  onChange={setClient}
+                  label="Client"
+                />
+                <div className="grid gap-2">
+                  <Label>Title / purpose</Label>
+                  <SelectOrOther
+                    value={title}
+                    onChange={setTitle}
+                    options={APPOINTMENT_TITLE_OPTIONS}
+                    placeholder="Select title"
+                    className="h-11"
+                    otherPlaceholder="Custom title"
+                  />
+                </div>
+                <div className="grid gap-2 md:col-span-2">
+                  <Label>Mode</Label>
+                  <ModePicker value={mode} onChange={setMode} />
+                </div>
+                <div className="grid gap-2">
+                  <Label>Duration</Label>
+                  <Select value={durationMin} onValueChange={setDurationMin}>
+                    <SelectTrigger className="h-11">
+                      <SelectValue placeholder="Duration" />
+                    </SelectTrigger>
+                    <SelectContent className="z-200">
+                      {APPOINTMENT_DURATION_OPTIONS.map((d) => (
+                        <SelectItem key={d.value} value={d.value}>
+                          {d.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2 md:col-span-2">
+                  <Label htmlFor="apt-notes-edit">Notes</Label>
+                  <Textarea
+                    id="apt-notes-edit"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={3}
+                    placeholder="Internal notes…"
+                  />
+                </div>
+              </div>
+              {appointment ? (
+                <p className="rounded-xl border border-border/70 bg-muted/30 px-3 py-2.5 text-xs text-muted-foreground">
+                  Current slot:{" "}
+                  <span className="font-medium text-navy">
+                    {formatWhen(appointment.scheduledAt)}
+                  </span>
+                  {appointment.advocateName
+                    ? ` · ${appointment.advocateName}`
+                    : ""}
+                  . Change via Reschedule.
+                </p>
+              ) : null}
+            </FormSection>
+          ) : null}
+
+          {(isCreate || isReschedule) && (
+            <FormSection
+              step={isCreate ? 3 : 2}
+              title="When & how"
+              description="Mode, length, and a free slot"
+            >
+              <div className="grid gap-4">
+                <div className="grid gap-2">
+                  <Label>Mode</Label>
+                  <ModePicker value={mode} onChange={setMode} />
+                </div>
+                <div className="grid gap-2 sm:max-w-xs">
+                  <Label>Duration</Label>
+                  <Select
+                    value={durationMin}
+                    onValueChange={(v) => {
+                      setDurationMin(v);
+                      setScheduledAt("");
+                    }}
+                  >
+                    <SelectTrigger className="h-11">
+                      <SelectValue placeholder="Duration" />
+                    </SelectTrigger>
+                    <SelectContent className="z-200">
+                      {APPOINTMENT_DURATION_OPTIONS.map((d) => (
+                        <SelectItem key={d.value} value={d.value}>
+                          {d.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="grid gap-2">
+                  <Label>
+                    {isReschedule ? "New date & time" : "Date & time"}{" "}
+                    <span className="text-destructive">*</span>
+                  </Label>
+                  <AvailabilitySlotPicker
+                    key={`${open}-${appointment?.unitId ?? "new"}-${effectiveAdvocateMobile}-${formMode}`}
+                    advocateMobile={effectiveAdvocateMobile}
+                    durationMin={Number(durationMin) || 30}
+                    clientUnitId={client?.unitId}
+                    excludeAppointmentUnitId={
+                      isReschedule ? appointment?.unitId : undefined
+                    }
+                    value={scheduledAt}
+                    onChange={setScheduledAt}
+                  />
+                </div>
+              </div>
+            </FormSection>
+          )}
+
+          {isReschedule ? (
+            <FormSection
+              step={3}
+              title="Details"
+              description="Kept from the original booking — edit if needed"
+            >
+              <div className="grid gap-4 md:grid-cols-2">
+                <ClientPicker
+                  value={client}
+                  onChange={(c) => {
+                    setClient(c);
+                    setScheduledAt("");
+                  }}
+                  label="Client"
+                />
+                <div className="grid gap-2">
+                  <Label>Title / purpose</Label>
+                  <SelectOrOther
+                    value={title}
+                    onChange={setTitle}
+                    options={APPOINTMENT_TITLE_OPTIONS}
+                    placeholder="Select title"
+                    className="h-11"
+                    otherPlaceholder="Custom title"
+                  />
+                </div>
+                <div className="grid gap-2 md:col-span-2">
+                  <Label htmlFor="apt-notes-rs">Notes</Label>
+                  <Textarea
+                    id="apt-notes-rs"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    rows={2}
+                    placeholder="Reason for reschedule / handoff…"
+                  />
+                </div>
+              </div>
+            </FormSection>
+          ) : null}
+
+          {isCreate ? (
+            <FormSection step={4} title="Notes">
+              <div className="grid gap-2">
+                <Label htmlFor="apt-notes">Notes</Label>
+                <Textarea
+                  id="apt-notes"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={3}
+                  placeholder="Call-in notes, papers to bring…"
+                />
+              </div>
+            </FormSection>
+          ) : null}
+
+          {error ? (
+            <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
         </DialogBody>
 
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={busy}
-          >
-            Cancel
-          </Button>
-          <Button type="button" onClick={handleSubmit} disabled={busy}>
-            {busy ? "Saving…" : isEdit ? "Save changes" : "Book appointment"}
-          </Button>
+        <DialogFooter className="gap-2 bg-white sm:justify-between">
+          <p className="hidden text-xs text-muted-foreground sm:block">
+            {isReschedule
+              ? "Old slot opens for others after you move."
+              : isCreate
+                ? "Only free slots are shown."
+                : "Time changes → Reschedule."}
+          </p>
+          <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11"
+              onClick={() => onOpenChange(false)}
+              disabled={busy}
+            >
+              Close
+            </Button>
+            <Button
+              type="button"
+              className="h-11 min-w-40"
+              onClick={handleSubmit}
+              disabled={busy}
+            >
+              {submitLabel}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

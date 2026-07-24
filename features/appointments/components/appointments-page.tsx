@@ -2,8 +2,19 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
+import {
+  CalendarPlus,
+  Check,
+  MoreHorizontal,
+  Pencil,
+  Phone,
+  RefreshCw,
+  Search,
+  Video,
+  Building2,
+  X,
+} from "lucide-react";
 import { PageHeader } from "@/shared/components/data/page-header";
-import { DataToolbar } from "@/shared/components/data/data-toolbar";
 import { PaginationBar } from "@/shared/components/data/pagination-bar";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { UnitIdBadge } from "@/shared/components/data/unit-id-badge";
@@ -18,23 +29,26 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { apiFetch, getErrorMessage } from "@/lib/api/client";
 import type { PublicUser } from "@/lib/auth/session";
 import type { AppointmentSummary } from "@/features/appointments/server/serialize";
-import { AppointmentFormDialog } from "@/features/appointments/components/appointment-form-dialog";
+import {
+  AppointmentFormDialog,
+  type AppointmentFormMode,
+} from "@/features/appointments/components/appointment-form-dialog";
 import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
 import { istDateKey, istDayBounds } from "@/lib/utils/ist";
 import { cn } from "@/lib/utils/cn";
 import { canBookForAnyAdvocate } from "@/lib/appointments/booking-rules";
 import { displayMobile } from "@/lib/auth/mobile";
 import { PersonChip } from "@/shared/components/user/person-chip";
+import { APPOINTMENT_MODE_OPTIONS } from "@/lib/validations/appointments.schema";
 
 type ListResponse = {
   data: AppointmentSummary[];
@@ -43,13 +57,52 @@ type ListResponse = {
 
 type AdvocateOption = { unitId: string; name: string; mobile: string };
 
-const STATUS_VARIANT: Record<string, "default" | "success" | "muted"> = {
+const STATUS_VARIANT: Record<
+  string,
+  "default" | "success" | "muted" | "warning"
+> = {
   scheduled: "default",
   completed: "success",
   cancelled: "muted",
 };
 
+const MODE_META: Record<
+  string,
+  { label: string; icon: typeof Building2 }
+> = {
+  office: { label: "Office visit", icon: Building2 },
+  call: { label: "Phone call", icon: Phone },
+  video: { label: "Video call", icon: Video },
+};
+
 type Range = "all" | "today" | "upcoming";
+
+function formatTime(iso: string): string {
+  return new Date(iso).toLocaleString("en-IN", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function formatWeekday(iso: string): string {
+  return new Date(iso).toLocaleString("en-IN", { weekday: "short" });
+}
+
+function formatDayMonth(iso: string): string {
+  return new Date(iso).toLocaleString("en-IN", {
+    day: "numeric",
+    month: "short",
+  });
+}
+
+function modeLabel(mode: string | null | undefined): string {
+  const key = mode ?? "office";
+  return (
+    MODE_META[key]?.label ??
+    APPOINTMENT_MODE_OPTIONS.find((m) => m.value === key)?.label ??
+    "Office visit"
+  );
+}
 
 export function AppointmentsPage({ user }: { user: PublicUser }) {
   const can = (action: string) =>
@@ -69,6 +122,8 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
   const [loading, setLoading] = useState(true);
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<AppointmentSummary | null>(null);
+  const [formMode, setFormMode] = useState<AppointmentFormMode>("create");
+  const [actionBusy, setActionBusy] = useState<string | null>(null);
 
   useEffect(() => {
     if (!bookAny) return;
@@ -141,6 +196,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
     queueMicrotask(() => {
       if (params.get("new") === "1" && canCreate) {
         setEditing(null);
+        setFormMode("create");
         setFormOpen(true);
       }
       if (params.get("hearing") === "today") {
@@ -149,26 +205,53 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
     });
   }, [canCreate]);
 
+  function openCreate() {
+    setEditing(null);
+    setFormMode("create");
+    setFormOpen(true);
+  }
+
+  function openEdit(a: AppointmentSummary) {
+    setEditing(a);
+    setFormMode("edit");
+    setFormOpen(true);
+  }
+
+  function openReschedule(a: AppointmentSummary) {
+    setEditing(a);
+    setFormMode("reschedule");
+    setFormOpen(true);
+  }
+
   async function handleCancel(unitId: string) {
+    const okConfirm = window.confirm(
+      "Cancel this booking? The slot will open for others."
+    );
+    if (!okConfirm) return;
+
+    setActionBusy(unitId);
     const { ok, data } = await apiFetch(`/api/v1/appointments/${unitId}`, {
       method: "PATCH",
       json: { status: "cancelled" },
     });
+    setActionBusy(null);
     if (!ok) {
       toast.error(
         getErrorMessage(data as Record<string, unknown>, "Failed to cancel")
       );
       return;
     }
-    toast.success("Appointment cancelled");
+    toast.success("Cancelled — that time is free for other bookings");
     void load();
   }
 
   async function handleComplete(unitId: string) {
+    setActionBusy(unitId);
     const { ok, data } = await apiFetch(`/api/v1/appointments/${unitId}`, {
       method: "PATCH",
       json: { status: "completed" },
     });
+    setActionBusy(null);
     if (!ok) {
       toast.error(
         getErrorMessage(data as Record<string, unknown>, "Failed to update")
@@ -179,71 +262,75 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
     void load();
   }
 
-  const chips: { id: Range; label: string }[] = [
-    { id: "today", label: "Today" },
-    { id: "upcoming", label: "Upcoming" },
-    { id: "all", label: "All" },
+  const chips: { id: Range; label: string; hint: string }[] = [
+    { id: "today", label: "Today", hint: "IST" },
+    { id: "upcoming", label: "Upcoming", hint: "Next" },
+    { id: "all", label: "All dates", hint: "Archive" },
   ];
 
   return (
-    <section>
+    <section className="space-y-5">
       <PageHeader
         title="Appointments"
         description={
           bookAny
-            ? "Book for any advocate by name. Filter the diary by advocate."
-            : "Your consultation diary — book appointments under your name."
+            ? "Office diary — book when a client calls, hand off if an advocate is busy."
+            : "Your consultation diary — book call-ins or move a slot if you cannot meet."
         }
         actions={
           can("create") ? (
-            <Button
-              type="button"
-              onClick={() => {
-                setEditing(null);
-                setFormOpen(true);
-              }}
-            >
+            <Button type="button" className="h-11 gap-2 px-4" onClick={openCreate}>
+              <CalendarPlus className="size-4" />
               Book appointment
             </Button>
           ) : undefined
         }
       />
 
-      <div className="mb-3 flex gap-2 overflow-x-auto pb-1 [-webkit-overflow-scrolling:touch]">
-        {chips.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            onClick={() => {
-              setPage(1);
-              setRange(c.id);
-            }}
-            className={cn(
-              "shrink-0 rounded-full px-3.5 py-2 text-sm font-medium transition-colors",
-              range === c.id
-                ? "bg-navy text-white"
-                : "bg-muted text-muted-foreground hover:text-navy"
-            )}
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
+      <div className="rounded-2xl border border-border/80 bg-white p-3 shadow-sm sm:p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex gap-1.5 overflow-x-auto pb-0.5 [-webkit-overflow-scrolling:touch]">
+            {chips.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => {
+                  setPage(1);
+                  setRange(c.id);
+                }}
+                className={cn(
+                  "shrink-0 rounded-xl px-3.5 py-2 text-left transition-colors",
+                  range === c.id
+                    ? "bg-navy text-white shadow-sm"
+                    : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-navy"
+                )}
+              >
+                <span className="block text-sm font-semibold">{c.label}</span>
+                <span
+                  className={cn(
+                    "block text-[11px]",
+                    range === c.id ? "text-white/70" : "text-muted-foreground"
+                  )}
+                >
+                  {c.hint}
+                </span>
+              </button>
+            ))}
+          </div>
 
-      <DataToolbar
-        search={
-          <Input
-            value={search}
-            onChange={(e) => {
-              setPage(1);
-              setSearch(e.target.value);
-            }}
-            placeholder="Search title…"
-            className="w-full"
-          />
-        }
-        filters={
-          <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="relative min-w-0 flex-1 sm:w-56">
+              <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(e) => {
+                  setPage(1);
+                  setSearch(e.target.value);
+                }}
+                placeholder="Search title…"
+                className="h-11 pl-9"
+              />
+            </div>
             {bookAny ? (
               <Select
                 value={advocateFilter}
@@ -252,7 +339,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                   setAdvocateFilter(v);
                 }}
               >
-                <SelectTrigger className="w-full sm:w-48">
+                <SelectTrigger className="h-11 w-full sm:w-48">
                   <SelectValue placeholder="Advocate" />
                 </SelectTrigger>
                 <SelectContent>
@@ -272,7 +359,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                 setStatus(v);
               }}
             >
-              <SelectTrigger className="w-full sm:w-40">
+              <SelectTrigger className="h-11 w-full sm:w-40">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -283,22 +370,28 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
               </SelectContent>
             </Select>
           </div>
-        }
-      />
+        </div>
+      </div>
 
-      {!loading && rows.length === 0 ? (
+      {loading ? (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => (
+            <div
+              key={i}
+              className="h-28 animate-pulse rounded-2xl border border-border/60 bg-muted/40"
+            />
+          ))}
+        </div>
+      ) : rows.length === 0 ? (
         <EmptyState
-          title={range === "today" ? "No appointments today" : "No appointments"}
-          description="Schedule a client visit or call."
+          title={
+            range === "today" ? "No appointments today" : "No appointments"
+          }
+          description="When a client calls, book a free slot for an advocate."
           action={
             can("create") ? (
-              <Button
-                type="button"
-                onClick={() => {
-                  setEditing(null);
-                  setFormOpen(true);
-                }}
-              >
+              <Button type="button" className="gap-2" onClick={openCreate}>
+                <CalendarPlus className="size-4" />
                 Book appointment
               </Button>
             ) : undefined
@@ -306,97 +399,158 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
         />
       ) : (
         <>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>ID</TableHead>
-                <TableHead>Title</TableHead>
-                <TableHead>Advocate</TableHead>
-                <TableHead>Client</TableHead>
-                <TableHead>When</TableHead>
-                <TableHead>Mode</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((a) => (
-                <TableRow key={a.unitId}>
-                  <TableCell>
-                    <UnitIdBadge value={a.unitId} />
-                  </TableCell>
-                  <TableCell className="font-medium text-navy">{a.title}</TableCell>
-                  <TableCell>
-                    {a.advocateName || a.advocateMobile ? (
-                      <PersonChip
-                        name={a.advocateName}
-                        photoUrl={a.advocatePhotoUrl}
-                        mobile={a.advocateMobile}
-                        unitId={a.advocateUnitId}
-                        subtitle={a.advocateMobile ? `+91 ${a.advocateMobile}` : undefined}
-                      />
-                    ) : (
-                      <span className="text-amber-700">Unassigned</span>
-                    )}
-                  </TableCell>
-                  <TableCell>{a.clientName ?? a.clientUnitId ?? "—"}</TableCell>
-                  <TableCell>
-                    {new Date(a.scheduledAt).toLocaleString("en-IN", {
-                      day: "numeric",
-                      month: "short",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
-                  </TableCell>
-                  <TableCell className="capitalize">{a.mode ?? "office"}</TableCell>
-                  <TableCell>
-                    <Badge variant={STATUS_VARIANT[a.status] ?? "outline"}>
-                      {a.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex flex-wrap justify-end gap-2">
-                      {can("edit") && a.status === "scheduled" ? (
+          <ul className="space-y-3">
+            {rows.map((a) => {
+              const mode = MODE_META[a.mode ?? "office"] ?? MODE_META.office;
+              const ModeIcon = mode.icon;
+              const scheduled = a.status === "scheduled";
+              const busy = actionBusy === a.unitId;
+
+              return (
+                <li
+                  key={a.unitId}
+                  className={cn(
+                    "rounded-2xl border border-border/80 bg-white p-4 shadow-sm transition-shadow hover:shadow-md sm:p-5",
+                    a.status === "cancelled" && "opacity-75"
+                  )}
+                >
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-stretch lg:justify-between">
+                    <div className="flex min-w-0 flex-1 gap-3 sm:gap-4">
+                      <div className="flex w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-navy/5 px-2 py-3 text-center sm:w-20">
+                        <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                          {formatWeekday(a.scheduledAt)}
+                        </span>
+                        <span className="mt-0.5 text-lg font-semibold tabular-nums text-navy sm:text-xl">
+                          {formatTime(a.scheduledAt)}
+                        </span>
+                        <span className="mt-1 text-[11px] text-muted-foreground">
+                          {formatDayMonth(a.scheduledAt)} · {a.durationMin}m
+                        </span>
+                      </div>
+
+                      <div className="min-w-0 flex-1 space-y-2.5">
+                        <div className="flex flex-wrap items-start gap-2">
+                          <h3 className="text-base font-semibold text-navy">
+                            {a.title}
+                          </h3>
+                          <Badge variant={STATUS_VARIANT[a.status] ?? "outline"}>
+                            {a.status}
+                          </Badge>
+                          <span className="inline-flex items-center gap-1 rounded-full border border-border/80 bg-muted/40 px-2 py-0.5 text-xs text-muted-foreground">
+                            <ModeIcon className="size-3" />
+                            {modeLabel(a.mode)}
+                          </span>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+                          <div className="min-w-0">
+                            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                              Advocate
+                            </p>
+                            {a.advocateName || a.advocateMobile ? (
+                              <PersonChip
+                                name={a.advocateName}
+                                photoUrl={a.advocatePhotoUrl}
+                                mobile={a.advocateMobile}
+                                unitId={a.advocateUnitId}
+                                className="mt-0.5"
+                              />
+                            ) : (
+                              <span className="text-amber-700">Unassigned</span>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                              Client
+                            </p>
+                            <p className="mt-0.5 font-medium text-foreground">
+                              {a.clientName ?? a.clientUnitId ?? "Walk-in / TBD"}
+                            </p>
+                          </div>
+                          <div className="hidden sm:block">
+                            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+                              Ref
+                            </p>
+                            <div className="mt-0.5">
+                              <UnitIdBadge value={a.unitId} />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 flex-wrap items-center gap-2 lg:flex-col lg:items-stretch xl:flex-row xl:items-center">
+                      {can("edit") && scheduled ? (
                         <>
                           <Button
                             type="button"
+                            className="h-10 flex-1 gap-2 lg:flex-none"
+                            disabled={busy}
+                            onClick={() => openReschedule(a)}
+                          >
+                            <RefreshCw className="size-3.5" />
+                            Reschedule
+                          </Button>
+                          <Button
+                            type="button"
                             variant="outline"
-                            size="sm"
+                            className="h-10 flex-1 gap-2 lg:flex-none"
+                            disabled={busy}
                             onClick={() => handleComplete(a.unitId)}
                           >
+                            <Check className="size-3.5" />
                             Done
                           </Button>
-                          {can("cancel") ? (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleCancel(a.unitId)}
-                            >
-                              Cancel
-                            </Button>
-                          ) : null}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                className="h-10 w-10 shrink-0"
+                                disabled={busy}
+                                aria-label="More actions"
+                              >
+                                <MoreHorizontal className="size-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48">
+                              <DropdownMenuItem onClick={() => openEdit(a)}>
+                                <Pencil className="size-4" />
+                                Edit details
+                              </DropdownMenuItem>
+                              {can("cancel") ? (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    variant="destructive"
+                                    onClick={() => handleCancel(a.unitId)}
+                                  >
+                                    <X className="size-4" />
+                                    Cancel booking
+                                  </DropdownMenuItem>
+                                </>
+                              ) : null}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </>
-                      ) : null}
-                      {can("edit") ? (
+                      ) : can("edit") ? (
                         <Button
                           type="button"
                           variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setEditing(a);
-                            setFormOpen(true);
-                          }}
+                          className="h-10 gap-2"
+                          onClick={() => openEdit(a)}
                         >
-                          Edit
+                          <Pencil className="size-3.5" />
+                          Edit details
                         </Button>
                       ) : null}
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
 
           <PaginationBar
             page={page}
@@ -409,8 +563,15 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
 
       <AppointmentFormDialog
         open={formOpen}
-        onOpenChange={setFormOpen}
+        onOpenChange={(open) => {
+          setFormOpen(open);
+          if (!open) {
+            setEditing(null);
+            setFormMode("create");
+          }
+        }}
         appointment={editing}
+        formMode={formMode}
         user={user}
         onSaved={load}
       />

@@ -98,6 +98,7 @@ export const APPOINTMENT_DURATION_OPTIONS: FormOption[] = [
   { value: "120", label: "2 hours" },
 ];
 
+/** @deprecated Booking uses mode only (office / call / video). Kept for legacy rows. */
 export const APPOINTMENT_LOCATION_OPTIONS: FormOption[] = [
   { value: "Office chamber", label: "Office chamber" },
   { value: "Gobichettipalayam chamber", label: "Gobichettipalayam chamber" },
