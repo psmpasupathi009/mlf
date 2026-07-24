@@ -53,7 +53,7 @@ function SelectContent({
     <SelectPrimitive.Portal>
       <SelectPrimitive.Content
         className={cn(
-          "relative z-[300] max-h-[min(20rem,50dvh)] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-md border border-border bg-white text-foreground shadow-lg",
+          "relative z-300 max-h-[min(20rem,50dvh)] min-w-(--radix-select-trigger-width) overflow-hidden rounded-md border border-border bg-white text-foreground shadow-lg",
           position === "popper" &&
             "data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1",
           className
@@ -65,7 +65,7 @@ function SelectContent({
           className={cn(
             "max-h-[min(18rem,45dvh)] w-full overflow-y-auto p-1",
             position === "popper" &&
-              "min-w-[var(--radix-select-trigger-width)]"
+              "min-w-(--radix-select-trigger-width)"
           )}
         >
           {children}

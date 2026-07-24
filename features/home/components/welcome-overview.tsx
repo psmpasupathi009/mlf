@@ -486,7 +486,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
       label: "Hearings this week",
       value: String(summary.cases.weekHearings),
       hint: `${todayHearings.length} today`,
-      href: "/cases?hearing=today",
+      href: "/diary",
       icon: CalendarDays,
     });
   }
@@ -775,8 +775,8 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
               ) : null}
               {moduleOn("cases") && can("cases.view") ? (
                 <Button asChild variant="ghost" size="sm">
-                  <Link href="/cases?hearing=today">
-                    Hearings
+                  <Link href="/diary">
+                    Diary
                     <ArrowRight className="size-4" />
                   </Link>
                 </Button>

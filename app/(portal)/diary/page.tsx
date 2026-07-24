@@ -10,5 +10,5 @@ export default async function DiaryRoutePage() {
     isModuleEnabled("cases") &&
     (user.permissions ?? []).includes("cases.view");
   if (!can) return <ForbiddenState />;
-  return <DiaryPage />;
+  return <DiaryPage user={user} />;
 }
