@@ -65,7 +65,7 @@ export function LocationCascade({ state, district, city, onChange }: Props) {
   );
 
   return (
-    <div className="grid min-w-0 gap-3 sm:grid-cols-2 md:grid-cols-3">
+    <div className="grid min-w-0 gap-3 sm:grid-cols-2">
       <div className="grid min-w-0 gap-2">
         <Label>State</Label>
         <SearchableSelect
@@ -77,7 +77,6 @@ export function LocationCascade({ state, district, city, onChange }: Props) {
           options={STATE_OPTIONS}
           placeholder="Select state"
           searchPlaceholder="Search state…"
-          className="h-11"
         />
       </div>
 
@@ -86,7 +85,6 @@ export function LocationCascade({ state, district, city, onChange }: Props) {
         {customDistrict ? (
           <>
             <Input
-              className="h-11"
               value={district}
               placeholder="Type district"
               onChange={(e) =>
@@ -110,7 +108,6 @@ export function LocationCascade({ state, district, city, onChange }: Props) {
             value={district || null}
             selectedLabel={district || null}
             disabled={!state}
-            className="h-11"
             placeholder={state ? "Select district" : "Pick state first"}
             searchPlaceholder="Search district…"
             fetchPage={fetchDistricts}
@@ -137,11 +134,10 @@ export function LocationCascade({ state, district, city, onChange }: Props) {
         )}
       </div>
 
-      <div className="grid min-w-0 gap-2 sm:col-span-2 md:col-span-1">
+      <div className="grid min-w-0 gap-2 sm:col-span-2">
         <Label htmlFor="loc-city">Town / city (residence)</Label>
         <Input
           id="loc-city"
-          className="h-11"
           value={city}
           placeholder="Type town / city / village"
           onChange={(e) =>

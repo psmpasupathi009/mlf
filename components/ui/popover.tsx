@@ -12,7 +12,7 @@ function PopoverContent({
   className,
   align = "start",
   sideOffset = 4,
-  collisionPadding = 8,
+  collisionPadding = 12,
   ...props
 }: React.ComponentProps<typeof PopoverPrimitive.Content>) {
   return (
@@ -24,7 +24,8 @@ function PopoverContent({
         collisionPadding={collisionPadding}
         avoidCollisions
         className={cn(
-          "z-300 min-w-[var(--radix-popover-trigger-width)] w-[var(--radix-popover-trigger-width)] max-w-[min(100vw-1rem,28rem)] origin-(--radix-popover-content-transform-origin) rounded-md border border-border bg-white p-0 text-foreground shadow-md outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
+          // z-[300] beats dialog (z-50); width follows trigger but never too narrow on phones
+          "z-[300] w-[var(--radix-popover-trigger-width)] min-w-[min(100vw-1.5rem,16rem)] max-w-[min(100vw-1rem,28rem)] origin-(--radix-popover-content-transform-origin) rounded-md border border-border bg-white p-0 text-foreground shadow-lg outline-none data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
           className
         )}
         {...props}

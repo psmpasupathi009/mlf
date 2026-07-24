@@ -76,7 +76,7 @@ export function SearchableSelect({
     : selected?.label ?? placeholder;
 
   const trigger = (
-    <Popover modal open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -84,7 +84,7 @@ export function SearchableSelect({
           aria-expanded={open}
           aria-haspopup="listbox"
           className={cn(
-            "flex w-full min-w-0 items-center justify-between gap-2 rounded-md border border-input bg-white px-3 py-2 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+            "flex h-11 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-input bg-white px-3 py-2 text-base text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
             className,
             !selected && !custom && "text-muted-foreground"
           )}
@@ -101,7 +101,7 @@ export function SearchableSelect({
       <PopoverContent className="p-0" align="start">
         <Command>
           <CommandInput placeholder={searchPlaceholder} />
-          <CommandList className="max-h-60">
+          <CommandList className="max-h-[min(15rem,40dvh)]">
             <CommandEmpty>{emptyText}</CommandEmpty>
             {groups
               ? groups.map(([heading, opts]) => (

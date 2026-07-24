@@ -105,7 +105,7 @@ export function AsyncSearchSelect<T>({
   const showEmpty = hasFetched && !searching && items.length === 0;
 
   return (
-    <Popover modal open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -113,7 +113,7 @@ export function AsyncSearchSelect<T>({
           aria-expanded={open}
           aria-haspopup="listbox"
           className={cn(
-            "flex w-full min-w-0 items-center justify-between gap-2 rounded-md border border-input bg-white px-3 py-2 text-sm text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+            "flex h-11 w-full min-w-0 items-center justify-between gap-2 rounded-md border border-input bg-white px-3 py-2 text-base text-foreground shadow-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 md:text-sm",
             className,
             !display && "text-muted-foreground"
           )}
@@ -143,7 +143,7 @@ export function AsyncSearchSelect<T>({
           <CommandList
             ref={listRef}
             onScroll={onListScroll}
-            className="max-h-60"
+            className="max-h-[min(15rem,40dvh)]"
           >
             {showEmpty ? (
               <div className="px-3 py-6 text-center text-sm text-muted-foreground">

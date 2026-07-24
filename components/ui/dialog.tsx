@@ -52,18 +52,21 @@ function DialogOverlay({
  */
 function DialogContent({
   className,
+  overlayClassName,
   children,
   size = "sm",
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   size?: DialogContentSize;
+  /** Raise overlay with content when nesting dialogs (e.g. client intake from a form). */
+  overlayClassName?: string;
 }) {
   return (
     <DialogPortal>
-      <DialogOverlay />
+      <DialogOverlay className={overlayClassName} />
       <DialogPrimitive.Content
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 flex min-h-0 max-w-[calc(100dvw-1rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-0 overflow-hidden rounded-xl border border-border bg-white p-0 shadow-lg",
+          "fixed top-1/2 left-1/2 z-50 flex min-h-0 w-full max-w-[calc(100dvw-1rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-0 overflow-hidden rounded-xl border border-border bg-white p-0 shadow-lg",
           DIALOG_SIZE_CLASSES[size],
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
           className
@@ -97,7 +100,7 @@ function DialogBody({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       className={cn(
-        "min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-4 py-4 sm:px-5",
+        "min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain px-3 py-3 sm:px-5 sm:py-4",
         className
       )}
       {...props}

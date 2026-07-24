@@ -7,13 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Dialog,
   DialogBody,
   DialogContent,
@@ -25,6 +18,18 @@ import {
 import { apiFetch, getErrorMessage } from "@/lib/api/client";
 import { ClientPicker } from "@/features/clients/components/client-picker";
 import { DatePicker } from "@/shared/components/forms/date-picker";
+import { SearchableSelect } from "@/shared/components/forms/searchable-select";
+
+const PAYMENT_TYPE_OPTIONS = [
+  { value: "advance", label: "Advance" },
+  { value: "partial", label: "Partial" },
+  { value: "full", label: "Full" },
+];
+
+const PAYMENT_STATUS_OPTIONS = [
+  { value: "pending", label: "Pending" },
+  { value: "paid", label: "Paid" },
+];
 
 export function PaymentFormDialog({
   open,
@@ -107,55 +112,62 @@ export function PaymentFormDialog({
           <DialogDescription>Advance, partial or full payment from a client.</DialogDescription>
         </DialogHeader>
 
-        <DialogBody className="grid gap-4">
+        <DialogBody className="grid min-w-0 gap-4">
           <ClientPicker value={client} onChange={setClient} />
 
-          <div className="grid gap-2">
+          <div className="grid min-w-0 gap-2">
             <Label htmlFor="pay-case">Case ID (optional)</Label>
-            <Input id="pay-case" value={caseUnitId} onChange={(e) => setCaseUnitId(e.target.value)} placeholder="CSE-00001" />
+            <Input
+              id="pay-case"
+              value={caseUnitId}
+              onChange={(e) => setCaseUnitId(e.target.value)}
+              placeholder="CSE-00001"
+            />
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div className="grid gap-2">
+          <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="grid min-w-0 gap-2">
               <Label>Type</Label>
-              <Select value={type} onValueChange={setType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="z-200">
-                  <SelectItem value="advance">Advance</SelectItem>
-                  <SelectItem value="partial">Partial</SelectItem>
-                  <SelectItem value="full">Full</SelectItem>
-                </SelectContent>
-              </Select>
+              <SearchableSelect
+                value={type}
+                onChange={setType}
+                options={PAYMENT_TYPE_OPTIONS}
+                placeholder="Type"
+              />
             </div>
-            <div className="grid gap-2">
+            <div className="grid min-w-0 gap-2">
               <Label htmlFor="pay-amount">Amount (₹)</Label>
-              <Input id="pay-amount" type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
+              <Input
+                id="pay-amount"
+                type="number"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
             </div>
           </div>
 
-          <div className="grid gap-2">
+          <div className="grid min-w-0 gap-2">
             <Label>Status</Label>
-            <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent className="z-200">
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
-              </SelectContent>
-            </Select>
+            <SearchableSelect
+              value={status}
+              onChange={setStatus}
+              options={PAYMENT_STATUS_OPTIONS}
+              placeholder="Status"
+            />
           </div>
 
-          <div className="grid gap-2">
+          <div className="grid min-w-0 gap-2">
             <Label>Paid on</Label>
             <DatePicker value={paidOn} onChange={setPaidOn} />
           </div>
 
-          <div className="grid gap-2">
+          <div className="grid min-w-0 gap-2">
             <Label htmlFor="pay-notes">Notes</Label>
-            <Textarea id="pay-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <Textarea
+              id="pay-notes"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
           </div>
 
           {error ? <p className="text-sm text-destructive">{error}</p> : null}

@@ -62,7 +62,7 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <div className="space-y-3 rounded-xl border border-border/80 bg-muted/20 p-4">
+    <div className="min-w-0 space-y-3 rounded-xl border border-border/80 bg-muted/20 p-3 sm:p-4">
       <div>
         <h3 className="text-sm font-semibold text-navy">{title}</h3>
         {description ? (

@@ -375,8 +375,9 @@ export function CaseFormDialog({
             <Section
               title="4. Case numbers"
               description="Fill when court allots — all optional for now"
+              className="md:col-span-2"
             >
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="grid gap-2">
                   <Label htmlFor="cs-number">Court case number</Label>
                   <Input
@@ -536,31 +537,29 @@ export function CaseFormDialog({
               description="Optional"
               className="md:col-span-2"
             >
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="grid gap-2 sm:col-span-2">
+              <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+                <div className="grid min-w-0 gap-2">
                   <Label>Filing date</Label>
                   <DatePicker value={filingDate} onChange={setFilingDate} />
                 </div>
-                <div className="grid gap-2 sm:col-span-2">
+                <div className="grid min-w-0 gap-2">
                   <Label>Next hearing</Label>
                   <DatePicker value={nextHearingAt} onChange={setNextHearingAt} />
                 </div>
-                <div className="grid gap-2">
+                <div className="grid min-w-0 gap-2">
                   <Label htmlFor="cs-fee">Agreed fee (₹)</Label>
                   <Input
                     id="cs-fee"
-                    className="h-11"
                     type="number"
                     min={0}
                     value={agreedFee}
                     onChange={(e) => setAgreedFee(e.target.value)}
                   />
                 </div>
-                <div className="grid gap-2 sm:col-span-2 lg:col-span-1">
+                <div className="grid min-w-0 gap-2">
                   <Label htmlFor="cs-notes">Notes</Label>
                   <Input
                     id="cs-notes"
-                    className="h-11"
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
                     placeholder="Brief facts"

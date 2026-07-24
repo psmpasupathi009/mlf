@@ -126,7 +126,7 @@ function ModePicker({
   onChange: (v: string) => void;
 }) {
   return (
-    <div className="grid grid-cols-3 gap-2">
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
       {APPOINTMENT_MODE_OPTIONS.map((m) => {
         const active = value === m.value;
         return (

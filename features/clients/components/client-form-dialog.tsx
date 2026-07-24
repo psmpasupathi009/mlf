@@ -7,13 +7,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -34,7 +27,9 @@ import {
   RELATION_PREFIX_OPTIONS,
 } from "@/config/company/form-options";
 import { SelectOrOther } from "@/shared/components/forms/select-or-other";
+import { SearchableSelect } from "@/shared/components/forms/searchable-select";
 import { LocationCascade } from "@/shared/components/pickers/location-cascade";
+import { cn } from "@/lib/utils/cn";
 
 type Props = {
   open: boolean;
@@ -47,13 +42,20 @@ function Section({
   title,
   description,
   children,
+  className,
 }: {
   title: string;
   description?: string;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <div className="space-y-3 rounded-xl border border-border/80 bg-muted/20 p-4">
+    <div
+      className={cn(
+        "min-w-0 space-y-3 rounded-xl border border-border/80 bg-muted/20 p-3 sm:p-4",
+        className
+      )}
+    >
       <div>
         <h3 className="text-sm font-semibold text-navy">{title}</h3>
         {description ? (
@@ -187,7 +189,11 @@ export function ClientFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="lg" className="p-0">
+      <DialogContent
+        size="lg"
+        className="z-[70] p-0"
+        overlayClassName="z-[70]"
+      >
         <DialogHeader className="shrink-0 border-b border-border/80 px-3 py-3 pr-11 sm:px-5 sm:py-4 md:px-6">
           <DialogTitle>
             {isEdit ? "Edit client intake" : "Client intake"}
@@ -205,75 +211,56 @@ export function ClientFormDialog({
               title="1. Identity"
               description="As on petition / vakalat — name and parent or spouse"
             >
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="grid gap-2 sm:col-span-2">
+              <div className="grid min-w-0 gap-3 sm:grid-cols-2 sm:gap-4">
+                <div className="grid min-w-0 gap-2 sm:col-span-2">
                   <Label htmlFor="cl-name">
                     Full name <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     id="cl-name"
-                    className="h-10"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="As in petition / ID"
                   />
                 </div>
-                <div className="grid gap-2">
+                <div className="grid min-w-0 gap-2">
                   <Label>Relation</Label>
-                  <Select
-                    value={relationPrefix || undefined}
-                    onValueChange={setRelationPrefix}
-                  >
-                    <SelectTrigger className="h-10">
-                      <SelectValue placeholder="S/o · W/o…" />
-                    </SelectTrigger>
-                    <SelectContent className="z-200">
-                      {RELATION_PREFIX_OPTIONS.map((p) => (
-                        <SelectItem key={p.value} value={p.value}>
-                          {p.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={relationPrefix}
+                    onChange={setRelationPrefix}
+                    options={RELATION_PREFIX_OPTIONS}
+                    placeholder="S/o · W/o…"
+                    searchPlaceholder="Search relation…"
+                  />
                 </div>
-                <div className="grid gap-2">
+                <div className="grid min-w-0 gap-2">
                   <Label htmlFor="cl-father">
                     Father / spouse / guardian name
                   </Label>
                   <Input
                     id="cl-father"
-                    className="h-10"
                     value={relationName}
                     onChange={(e) => setRelationName(e.target.value)}
                     placeholder="Name"
                   />
                 </div>
-                <div className="grid gap-2">
+                <div className="grid min-w-0 gap-2">
                   <Label>Gender</Label>
-                  <Select
-                    value={gender || undefined}
-                    onValueChange={setGender}
-                  >
-                    <SelectTrigger className="h-10">
-                      <SelectValue placeholder="Optional" />
-                    </SelectTrigger>
-                    <SelectContent className="z-200">
-                      {CLIENT_GENDER_OPTIONS.map((g) => (
-                        <SelectItem key={g.value} value={g.value}>
-                          {g.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    value={gender}
+                    onChange={setGender}
+                    options={[...CLIENT_GENDER_OPTIONS]}
+                    placeholder="Optional"
+                    searchPlaceholder="Search…"
+                  />
                 </div>
-                <div className="grid gap-2">
+                <div className="grid min-w-0 gap-2">
                   <Label>Occupation</Label>
                   <SelectOrOther
                     value={occupation}
                     onChange={setOccupation}
                     options={OCCUPATION_OPTIONS}
                     placeholder="Select occupation"
-                    className="h-10"
                   />
                 </div>
               </div>
@@ -283,34 +270,31 @@ export function ClientFormDialog({
               title="2. Contact"
               description="Primary mobile is used for hearing SMS"
             >
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="grid gap-2">
+              <div className="grid min-w-0 gap-3 sm:grid-cols-2 sm:gap-4">
+                <div className="grid min-w-0 gap-2">
                   <Label htmlFor="cl-mobile">
                     Mobile <span className="text-destructive">*</span>
                   </Label>
                   <Input
                     id="cl-mobile"
-                    className="h-10"
                     value={mobile}
                     onChange={(e) => setMobile(e.target.value)}
                     placeholder="10-digit mobile"
                     inputMode="numeric"
                   />
                 </div>
-                <div className="grid gap-2">
+                <div className="grid min-w-0 gap-2">
                   <Label htmlFor="cl-alt-mobile">Alt mobile</Label>
                   <Input
                     id="cl-alt-mobile"
-                    className="h-10"
                     value={altMobile}
                     onChange={(e) => setAltMobile(e.target.value)}
                   />
                 </div>
-                <div className="grid gap-2 sm:col-span-2">
+                <div className="grid min-w-0 gap-2 sm:col-span-2">
                   <Label htmlFor="cl-email">Email</Label>
                   <Input
                     id="cl-email"
-                    className="h-10"
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
@@ -332,11 +316,12 @@ export function ClientFormDialog({
             </Section>
 
             <Section
+              className="md:col-span-2"
               title="3. Address"
               description="For notices and vakalat — select state and district; type town / city"
             >
-              <div className="grid gap-4">
-                <div className="grid gap-2">
+              <div className="grid min-w-0 gap-4">
+                <div className="grid min-w-0 gap-2">
                   <Label htmlFor="cl-address">Door / street / area</Label>
                   <Textarea
                     id="cl-address"
@@ -357,11 +342,12 @@ export function ClientFormDialog({
             </Section>
 
             <Section
+              className="md:col-span-2"
               title="4. Matter at intake"
               description="Short facts before case register — opposite party goes on the case form"
             >
-              <div className="grid gap-4">
-                <div className="grid gap-2">
+              <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+                <div className="grid min-w-0 gap-2 sm:col-span-2">
                   <Label htmlFor="cl-matter">Matter brief</Label>
                   <Textarea
                     id="cl-matter"
@@ -371,18 +357,17 @@ export function ClientFormDialog({
                     placeholder="What happened, relief sought, urgency, papers brought…"
                   />
                 </div>
-                <div className="grid gap-2">
+                <div className="grid min-w-0 gap-2">
                   <Label>Referred by</Label>
                   <SelectOrOther
                     value={referredBy}
                     onChange={setReferredBy}
                     options={REFERRED_BY_OPTIONS}
                     placeholder="How they found us"
-                    className="h-10"
                     otherPlaceholder="Name / source"
                   />
                 </div>
-                <div className="grid gap-2">
+                <div className="grid min-w-0 gap-2">
                   <Label htmlFor="cl-notes">Internal notes</Label>
                   <Textarea
                     id="cl-notes"
