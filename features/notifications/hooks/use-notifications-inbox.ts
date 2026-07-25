@@ -1,32 +1,54 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
 import { apiFetch } from "@/lib/api/client";
 import type { NotificationPayload } from "@/lib/notifications/sse-hub";
+import {
+  categoryForType,
+  type NotificationCategory,
+} from "@/features/notifications/lib/notification-meta";
 import {
   emitNotificationsChanged,
   onNotificationsChanged,
 } from "@/features/notifications/lib/notifications-sync";
 
+export type InboxFilter = "all" | "unread" | NotificationCategory;
+
 type ListEnvelope = {
   data?: NotificationPayload[];
-  meta?: { total?: number };
+  meta?: { page?: number; pageSize?: number; total?: number };
 };
 
 type UnreadEnvelope = { unread?: number };
 
-const POLL_MS = 20_000;
-const LIST_LIMIT = 20;
+const PAGE_SIZE = 20;
 
-export function useNotifications() {
+function buildListUrl(page: number, filter: InboxFilter): string {
+  const params = new URLSearchParams({
+    page: String(page),
+    pageSize: String(PAGE_SIZE),
+  });
+  if (filter === "unread") {
+    params.set("unread", "1");
+  } else if (filter !== "all") {
+    params.set("category", filter);
+  }
+  return `/api/v1/notifications?${params.toString()}`;
+}
+
+export function useNotificationsInbox(filter: InboxFilter, page: number) {
   const [items, setItems] = useState<NotificationPayload[]>([]);
+  const [total, setTotal] = useState(0);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(true);
   const seenLive = useRef(new Set<string>());
   const knownIds = useRef(new Set<string>());
   const marking = useRef(new Set<string>());
+  const filterRef = useRef(filter);
+  const pageRef = useRef(page);
   const skipNextSync = useRef(false);
+  filterRef.current = filter;
+  pageRef.current = page;
 
   const refreshUnread = useCallback(async () => {
     const countRes = await apiFetch<UnreadEnvelope>(
@@ -38,10 +60,9 @@ export function useNotifications() {
   }, []);
 
   const refetch = useCallback(async () => {
+    setLoading(true);
     const [listRes, countRes] = await Promise.all([
-      apiFetch<ListEnvelope>(
-        `/api/v1/notifications?page=1&pageSize=${LIST_LIMIT}`
-      ),
+      apiFetch<ListEnvelope>(buildListUrl(pageRef.current, filterRef.current)),
       apiFetch<UnreadEnvelope>("/api/v1/notifications/unread-count"),
     ]);
 
@@ -49,6 +70,9 @@ export function useNotifications() {
       const rows = Array.isArray(listRes.data.data) ? listRes.data.data : [];
       knownIds.current = new Set(rows.map((r) => r.unitId));
       setItems(rows);
+      setTotal(
+        typeof listRes.data.meta?.total === "number" ? listRes.data.meta.total : 0
+      );
     }
 
     if (countRes.ok && typeof countRes.data?.unread === "number") {
@@ -66,14 +90,25 @@ export function useNotifications() {
           method: "PATCH",
         });
         if (!ok) return false;
-        setItems((prev) =>
-          prev.map((n) =>
-            n.unitId === unitId && !n.readAt
+
+        setItems((prev) => {
+          const target = prev.find((n) => n.unitId === unitId);
+          if (!target || target.readAt) return prev;
+          const next = prev.map((n) =>
+            n.unitId === unitId
               ? { ...n, readAt: new Date().toISOString() }
               : n
-          )
-        );
+          );
+          if (filterRef.current === "unread") {
+            return next.filter((n) => !n.readAt);
+          }
+          return next;
+        });
+        if (filterRef.current === "unread") {
+          setTotal((t) => Math.max(0, t - 1));
+        }
         void refreshUnread();
+
         skipNextSync.current = true;
         emitNotificationsChanged();
         return true;
@@ -89,11 +124,16 @@ export function useNotifications() {
       method: "POST",
     });
     if (!ok) return false;
-    setItems((prev) =>
-      prev.map((n) =>
-        n.readAt ? n : { ...n, readAt: new Date().toISOString() }
-      )
-    );
+    if (filterRef.current === "unread") {
+      setItems([]);
+      setTotal(0);
+    } else {
+      setItems((prev) =>
+        prev.map((n) =>
+          n.readAt ? n : { ...n, readAt: new Date().toISOString() }
+        )
+      );
+    }
     setUnread(0);
     skipNextSync.current = true;
     emitNotificationsChanged();
@@ -105,22 +145,30 @@ export function useNotifications() {
       if (seenLive.current.has(payload.unitId)) return;
       seenLive.current.add(payload.unitId);
 
-      if (!knownIds.current.has(payload.unitId)) {
+      const f = filterRef.current;
+      const matchesFilter =
+        f === "all" ||
+        (f === "unread" ? !payload.readAt : categoryForType(payload.type) === f);
+
+      if (
+        pageRef.current === 1 &&
+        matchesFilter &&
+        !knownIds.current.has(payload.unitId)
+      ) {
         knownIds.current.add(payload.unitId);
-        setItems((prev) => [payload, ...prev].slice(0, LIST_LIMIT));
+        setItems((prev) => [payload, ...prev].slice(0, PAGE_SIZE));
+        setTotal((t) => t + 1);
       }
 
+      // Server count avoids SSE-vs-refetch double increments
       void refreshUnread();
-      if (!payload.readAt) {
-        toast.message(payload.title);
-      }
     },
     [refreshUnread]
   );
 
   useEffect(() => {
     void refetch();
-  }, [refetch]);
+  }, [refetch, filter, page]);
 
   useEffect(() => {
     return onNotificationsChanged(() => {
@@ -130,22 +178,6 @@ export function useNotifications() {
       }
       void refetch();
     });
-  }, [refetch]);
-
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      if (document.visibilityState === "visible") void refetch();
-    }, POLL_MS);
-
-    const onVis = () => {
-      if (document.visibilityState === "visible") void refetch();
-    };
-    document.addEventListener("visibilitychange", onVis);
-
-    return () => {
-      window.clearInterval(id);
-      document.removeEventListener("visibilitychange", onVis);
-    };
   }, [refetch]);
 
   useEffect(() => {
@@ -190,8 +222,10 @@ export function useNotifications() {
 
   return {
     items,
+    total,
     unread,
     loading,
+    pageSize: PAGE_SIZE,
     refetch,
     markRead,
     markAllRead,

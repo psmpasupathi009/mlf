@@ -1,107 +1,19 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Bell } from "lucide-react";
+import { Bell, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useNotifications } from "@/shared/hooks/use-notifications";
-import { cn } from "@/lib/utils/cn";
+import { NotificationItem } from "@/features/notifications/components/notification-item";
 import type { NotificationPayload } from "@/lib/notifications/sse-hub";
-
-function formatWhen(iso: string) {
-  try {
-    return new Intl.DateTimeFormat("en-IN", {
-      day: "2-digit",
-      month: "short",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    }).format(new Date(iso));
-  } catch {
-    return "";
-  }
-}
-
-function urgencyTone(
-  type: string
-): "danger" | "warning" | "info" | null {
-  if (type === "batta_due" || type === "filing_defect") return "danger";
-  if (type === "hearing_tomorrow" || type === "task_assigned") return "warning";
-  if (type === "leave_request") return "info";
-  return null;
-}
-
-function NotificationRow({
-  item,
-  onOpen,
-}: {
-  item: NotificationPayload;
-  onOpen: (item: NotificationPayload) => void;
-}) {
-  const unread = !item.readAt;
-  const urgency = urgencyTone(item.type);
-  return (
-    <DropdownMenuItem
-      className={cn(
-        "flex cursor-pointer flex-col items-start gap-0.5 rounded-md px-2.5 py-2",
-        unread && "bg-muted/60",
-        urgency === "danger" && unread && "border-l-2 border-l-destructive",
-        urgency === "warning" && unread && "border-l-2 border-l-amber-500",
-        urgency === "info" && unread && "border-l-2 border-l-sky-500"
-      )}
-      onSelect={(e) => {
-        e.preventDefault();
-        onOpen(item);
-      }}
-    >
-      <div className="flex w-full items-start justify-between gap-2">
-        <span
-          className={cn(
-            "line-clamp-2 text-sm leading-snug",
-            unread ? "font-medium text-foreground" : "text-foreground/90"
-          )}
-        >
-          {item.title}
-        </span>
-        <div className="flex shrink-0 items-center gap-1.5">
-          {urgency && unread ? (
-            <Badge
-              variant={
-                urgency === "danger"
-                  ? "destructive"
-                  : urgency === "warning"
-                    ? "warning"
-                    : "default"
-              }
-              className="h-5 px-1.5 text-[10px] capitalize"
-            >
-              {item.type.replace(/_/g, " ")}
-            </Badge>
-          ) : null}
-          {unread ? (
-            <span className="mt-1 size-1.5 shrink-0 rounded-full bg-brand" />
-          ) : null}
-        </div>
-      </div>
-      {item.body ? (
-        <span className="line-clamp-2 text-xs text-muted-foreground">
-          {item.body}
-        </span>
-      ) : null}
-      <span className="text-[11px] text-muted-foreground/80">
-        {formatWhen(item.createdAt)}
-      </span>
-    </DropdownMenuItem>
-  );
-}
 
 export function NotificationBell() {
   const router = useRouter();
@@ -110,6 +22,10 @@ export function NotificationBell() {
   async function openItem(item: NotificationPayload) {
     if (!item.readAt) await markRead(item.unitId);
     if (item.href) router.push(item.href);
+  }
+
+  function goToInbox() {
+    router.push("/notifications");
   }
 
   return (
@@ -137,17 +53,31 @@ export function NotificationBell() {
           ) : null}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80 p-0 sm:w-96">
-        <div className="flex items-center justify-between gap-2 px-3 py-2.5">
-          <DropdownMenuLabel className="p-0 text-sm font-semibold normal-case">
-            Notifications
-          </DropdownMenuLabel>
+      <DropdownMenuContent
+        align="end"
+        className="w-[min(100vw-1.5rem,22rem)] overflow-hidden p-0 sm:w-96"
+      >
+        <div className="flex items-center justify-between gap-2 px-3.5 py-3">
+          <button
+            type="button"
+            className="flex items-center gap-2 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            onClick={goToInbox}
+          >
+            <DropdownMenuLabel className="cursor-pointer p-0 text-sm font-semibold normal-case tracking-tight text-navy hover:text-brand">
+              Notifications
+            </DropdownMenuLabel>
+            {unread > 0 ? (
+              <Badge variant="default" className="h-5 px-1.5 text-[10px] tabular-nums">
+                {unread}
+              </Badge>
+            ) : null}
+          </button>
           {unread > 0 ? (
             <Button
               type="button"
               variant="ghost"
               size="sm"
-              className="h-7 px-2 text-xs text-muted-foreground"
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-navy"
               onClick={() => void markAllRead()}
             >
               Mark all read
@@ -155,24 +85,53 @@ export function NotificationBell() {
           ) : null}
         </div>
         <DropdownMenuSeparator className="m-0" />
-        <div className="max-h-80 overflow-y-auto p-1">
+        <div className="max-h-[min(24rem,55vh)] overflow-y-auto p-1.5">
           {loading && items.length === 0 ? (
-            <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-              Loading…
-            </p>
+            <div className="space-y-1 px-1 py-1">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="flex animate-pulse items-start gap-3 rounded-lg px-2 py-2.5"
+                >
+                  <div className="size-9 shrink-0 rounded-xl bg-muted" />
+                  <div className="min-w-0 flex-1 space-y-2 pt-1">
+                    <div className="h-3 w-3/4 rounded bg-muted" />
+                    <div className="h-2.5 w-1/2 rounded bg-muted/70" />
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : items.length === 0 ? (
-            <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-              No notifications yet
-            </p>
+            <div className="flex flex-col items-center px-4 py-8 text-center">
+              <span className="mb-3 flex size-10 items-center justify-center rounded-xl bg-muted text-muted-foreground">
+                <Bell className="size-4" strokeWidth={1.75} />
+              </span>
+              <p className="text-sm font-medium text-navy">All clear</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                No notifications yet
+              </p>
+            </div>
           ) : (
             items.map((item) => (
-              <NotificationRow
+              <NotificationItem
                 key={item.unitId}
                 item={item}
                 onOpen={openItem}
+                compact
               />
             ))
           )}
+        </div>
+        <DropdownMenuSeparator className="m-0" />
+        <div className="bg-muted/30 p-1.5">
+          <button
+            type="button"
+            onClick={goToInbox}
+            className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-sm font-medium text-navy transition-colors hover:bg-background"
+          >
+            View all notifications
+            <ChevronRight className="size-4 text-muted-foreground" />
+          </button>
         </div>
       </DropdownMenuContent>
     </DropdownMenu>

@@ -42,9 +42,13 @@ function resolveClient(): PrismaClient {
   const existing = globalForPrisma.prisma;
   if (existing && clientHasRequiredModels(existing)) return existing;
   if (existing) {
+    globalForPrisma.prisma = undefined;
     void existing.$disconnect().catch(() => undefined);
   }
   const next = createClient();
+  // Eager connect so the first query after HMR/recreate does not race
+  // "Engine is not yet connected".
+  void next.$connect().catch(() => undefined);
   if (process.env.NODE_ENV !== "production") {
     globalForPrisma.prisma = next;
   }
