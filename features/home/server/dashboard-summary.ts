@@ -624,7 +624,7 @@ export async function buildDashboardSummary(
     attention.push({
       label: "Appointments without advocate",
       value: String(unassignedAppointments),
-      href: "/appointments?hearing=today",
+      href: "/appointments?hearing=today&unassigned=1&status=all",
       cta: "Assign",
       tone: "warning",
     });

@@ -45,3 +45,15 @@ export function istAddCalendarDays(dateKey: string, days: number): string {
   base.setTime(base.getTime() + days * 24 * 60 * 60 * 1000);
   return istDateKey(base);
 }
+
+/** Parse a date or YYYY-MM-DD (IST calendar day → start of that day). */
+export function parseIstDateInput(value: string | Date): Date | null {
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? null : value;
+  }
+  const s = value.trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return istDayBounds(s).start;
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : d;
+}

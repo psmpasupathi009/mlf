@@ -132,6 +132,33 @@ export function ReportsPage({ user }: ReportsPageProps) {
           </Card>
         ) : null}
 
+        {can("appointments.view") && isModuleEnabled("appointments") ? (
+          <Card>
+            <CardContent className="flex h-full flex-col gap-4 p-5">
+              <div className="flex items-start gap-3">
+                <CalendarDays className="mt-0.5 size-5 text-navy" />
+                <div>
+                  <h2 className="font-semibold text-navy">Appointments</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Full booking diary export. Filtered sheets stay on
+                    Appointments.
+                  </p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-auto w-full"
+                disabled={busy === "appointments"}
+                onClick={() => void download("appointments", "appointments.xlsx")}
+              >
+                <Download className="size-4" />
+                {busy === "appointments" ? "Preparing…" : "Download Excel"}
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
+
         {can("tasks.view") && isModuleEnabled("tasks") ? (
           <Card>
             <CardContent className="flex h-full flex-col gap-4 p-5">

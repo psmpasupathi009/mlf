@@ -349,6 +349,86 @@ export const GET = apiHandler(async (request) => {
           : "",
       });
     }
+  } else if (type === "appointments") {
+    const { user, response } = await requirePerm(request, "appointments", "view");
+    if (!user) return response;
+    const q = url.searchParams.get("q")?.trim() ?? "";
+    const status = url.searchParams.get("status")?.trim();
+    const from = url.searchParams.get("from")?.trim();
+    const to = url.searchParams.get("to")?.trim();
+    const advocateMobile = url.searchParams.get("advocateMobile")?.trim();
+    const unassigned = url.searchParams.get("unassigned") === "1";
+    const and: Prisma.AppointmentWhereInput[] = [];
+    if (q) {
+      and.push({
+        OR: [
+          { title: containsInsensitive(q) },
+          { unitId: containsInsensitive(q) },
+          { clientUnitId: containsInsensitive(q) },
+          { caseUnitId: containsInsensitive(q) },
+          { notes: containsInsensitive(q) },
+          { location: containsInsensitive(q) },
+          { advocateMobile: containsInsensitive(q) },
+        ],
+      });
+    }
+    if (advocateMobile) {
+      and.push({
+        OR: [
+          { advocateMobile },
+          { advocateMobile: `91${advocateMobile.replace(/\D/g, "").slice(-10)}` },
+          { advocateMobile: advocateMobile.replace(/\D/g, "").slice(-10) },
+        ],
+      });
+    } else if (unassigned) {
+      and.push({ OR: [{ advocateMobile: null }, { advocateMobile: "" }] });
+    }
+    if (from || to) {
+      and.push({
+        scheduledAt: {
+          ...(from ? { gte: new Date(from) } : {}),
+          ...(to ? { lte: new Date(to) } : {}),
+        },
+      });
+    }
+    const where: Prisma.AppointmentWhereInput = {
+      ...(status ? { status: status as never } : {}),
+      ...(and.length ? { AND: and } : {}),
+    };
+    const rows = await prisma.appointment.findMany({
+      where,
+      orderBy: { scheduledAt: "asc" },
+      take: 5000,
+    });
+    const sheet = workbook.addWorksheet("Appointments");
+    sheet.columns = [
+      { header: "unitId", key: "unitId", width: 14 },
+      { header: "title", key: "title", width: 28 },
+      { header: "scheduledAt", key: "scheduledAt", width: 22 },
+      { header: "durationMin", key: "durationMin", width: 12 },
+      { header: "mode", key: "mode", width: 10 },
+      { header: "status", key: "status", width: 12 },
+      { header: "advocateMobile", key: "advocateMobile", width: 14 },
+      { header: "clientUnitId", key: "clientUnitId", width: 14 },
+      { header: "caseUnitId", key: "caseUnitId", width: 14 },
+      { header: "location", key: "location", width: 20 },
+      { header: "notes", key: "notes", width: 28 },
+    ];
+    for (const r of rows) {
+      sheet.addRow({
+        unitId: r.unitId,
+        title: r.title,
+        scheduledAt: r.scheduledAt.toISOString(),
+        durationMin: r.durationMin,
+        mode: r.mode,
+        status: r.status,
+        advocateMobile: r.advocateMobile ? displayMobile(r.advocateMobile) : "",
+        clientUnitId: r.clientUnitId ?? "",
+        caseUnitId: r.caseUnitId ?? "",
+        location: r.location ?? "",
+        notes: r.notes ?? "",
+      });
+    }
   } else if (type === "fees-outstanding") {
     const { user, response } = await requirePerm(request, "accounts", "view");
     if (!user) return response;

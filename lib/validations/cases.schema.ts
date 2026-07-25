@@ -4,6 +4,7 @@ import {
   CASE_PIPELINE_STATUSES,
   type FilingChecklistState,
 } from "@/config/company/case-pipeline";
+import { parseIstDateInput } from "@/lib/utils/ist";
 
 export const caseStatusEnum = z.enum(CASE_PIPELINE_STATUSES);
 
@@ -27,8 +28,8 @@ export const OUR_SIDE_OPTIONS = [
 
 const dateStringOrDate = z
   .union([z.string(), z.date()])
-  .transform((v) => new Date(v))
-  .refine((d) => !Number.isNaN(d.getTime()), "Invalid date");
+  .transform((v) => parseIstDateInput(v))
+  .refine((d): d is Date => d != null, "Invalid date");
 
 const optionalCnr = z
   .union([z.string(), z.undefined()])

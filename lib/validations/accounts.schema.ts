@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { PAYMENT_PURPOSES } from "@/features/accounts/lib/payment-purposes";
+import { parseIstDateInput } from "@/lib/utils/ist";
 
 export const paymentTypeEnum = z.enum(PAYMENT_PURPOSES);
 export const paymentStatusEnum = z.enum(["pending", "paid", "void"]);
@@ -8,8 +9,8 @@ export const writablePaymentStatusEnum = z.enum(["pending", "paid"]);
 
 const dateStringOrDate = z
   .union([z.string(), z.date()])
-  .transform((v) => new Date(v))
-  .refine((d) => !Number.isNaN(d.getTime()), "Invalid date");
+  .transform((v) => parseIstDateInput(v))
+  .refine((d): d is Date => d != null, "Invalid date");
 
 /** Allow clearing paidOn with null or "". */
 const paidOnField = z

@@ -8,6 +8,7 @@ import {
   Briefcase,
   CalendarPlus,
   Check,
+  Download,
   MoreHorizontal,
   Pencil,
   Phone,
@@ -39,7 +40,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { apiFetch, getErrorMessage } from "@/lib/api/client";
+import { apiFetch, apiDownload, getErrorMessage } from "@/lib/api/client";
 import type { PublicUser } from "@/lib/auth/session";
 import type { AppointmentSummary } from "@/features/appointments/server/serialize";
 import type { CaseSummary } from "@/features/cases/server/serialize";
@@ -120,6 +121,8 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
   const bookAny = canBookForAnyAdvocate(user.roles);
 
   const initialQ = searchParams.get("q") ?? "";
+  const initialUnassigned = searchParams.get("unassigned") === "1";
+  const initialStatus = searchParams.get("status");
 
   const [rows, setRows] = useState<AppointmentSummary[]>([]);
   const [total, setTotal] = useState(0);
@@ -127,8 +130,18 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
   const pageSize = 20;
   const [search, setSearch] = useState(initialQ);
   const debouncedSearch = useDebouncedValue(search, 300);
-  const [status, setStatus] = useState(initialQ ? "all" : "scheduled");
+  const [status, setStatus] = useState(
+    initialStatus === "all" ||
+      initialStatus === "scheduled" ||
+      initialStatus === "completed" ||
+      initialStatus === "cancelled"
+      ? initialStatus
+      : initialQ || initialUnassigned
+        ? "all"
+        : "scheduled"
+  );
   const [range, setRange] = useState<Range>(initialQ ? "all" : "today");
+  const [unassignedOnly, setUnassignedOnly] = useState(initialUnassigned);
   const [advocateFilter, setAdvocateFilter] = useState("all");
   const [advocateFilterLabel, setAdvocateFilterLabel] = useState<string | null>(
     null
@@ -150,6 +163,8 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
     if (status !== "all") params.set("status", status);
     if (bookAny && advocateFilter !== "all") {
       params.set("advocateMobile", advocateFilter);
+    } else if (bookAny && unassignedOnly) {
+      params.set("unassigned", "1");
     }
 
     if (range === "today") {
@@ -175,7 +190,15 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
     }
     setRows((data as unknown as ListResponse).data ?? []);
     setTotal((data as unknown as ListResponse).meta?.total ?? 0);
-  }, [page, debouncedSearch, status, range, bookAny, advocateFilter]);
+  }, [
+    page,
+    debouncedSearch,
+    status,
+    range,
+    bookAny,
+    advocateFilter,
+    unassignedOnly,
+  ]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -197,11 +220,18 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
       if (params.get("hearing") === "today") {
         setRange("today");
       }
+      if (params.get("unassigned") === "1") {
+        setUnassignedOnly(true);
+        setStatus(params.get("status") === "scheduled" ? "scheduled" : "all");
+        setRange("today");
+        setAdvocateFilter("all");
+      }
       const q = params.get("q");
       if (q) {
         setSearch(q);
         setStatus("all");
         setRange("all");
+        setUnassignedOnly(false);
       }
     });
   }, [canCreate]);
@@ -308,6 +338,36 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
         }
         actions={
           <>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 gap-2 px-4"
+              onClick={async () => {
+                const params = new URLSearchParams({ type: "appointments" });
+                if (debouncedSearch) params.set("q", debouncedSearch);
+                if (status !== "all") params.set("status", status);
+                if (bookAny && advocateFilter !== "all") {
+                  params.set("advocateMobile", advocateFilter);
+                } else if (bookAny && unassignedOnly) {
+                  params.set("unassigned", "1");
+                }
+                if (range === "today") {
+                  const { start, end } = istDayBounds(istDateKey());
+                  params.set("from", start.toISOString());
+                  params.set("to", end.toISOString());
+                } else if (range === "upcoming") {
+                  params.set("from", new Date().toISOString());
+                }
+                const result = await apiDownload(
+                  `/api/v1/exports?${params.toString()}`,
+                  "appointments.xlsx"
+                );
+                if (!result.ok) toast.error(result.error ?? "Export failed");
+              }}
+            >
+              <Download className="size-4" />
+              Export Excel
+            </Button>
             {can("create") ? (
               <Button
                 type="button"
@@ -369,10 +429,35 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                   setPage(1);
                   setSearch(e.target.value);
                 }}
-                placeholder="Search title…"
+                placeholder="Search title, APT id, client…"
                 className="h-11 pl-9"
               />
             </div>
+            {bookAny ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setPage(1);
+                  setUnassignedOnly((v) => {
+                    const next = !v;
+                    if (next) {
+                      setAdvocateFilter("all");
+                      setAdvocateFilterLabel(null);
+                    }
+                    return next;
+                  });
+                }}
+                className={cn(
+                  "h-11 shrink-0 rounded-xl px-3.5 text-sm font-semibold transition-colors",
+                  unassignedOnly
+                    ? "bg-amber-600 text-white shadow-sm"
+                    : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-navy"
+                )}
+                aria-pressed={unassignedOnly}
+              >
+                Unassigned
+              </button>
+            ) : null}
             {bookAny ? (
               <AdvocatePicker
                 className="h-11 w-full sm:w-48"
@@ -382,6 +467,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                 }
                 onChange={(a) => {
                   setPage(1);
+                  setUnassignedOnly(false);
                   if (!a) {
                     setAdvocateFilter("all");
                     setAdvocateFilterLabel(null);

@@ -1,5 +1,6 @@
 import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
+import { hasPermission } from "@/lib/rbac";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
 import { writeAudit } from "@/lib/audit";
@@ -18,6 +19,7 @@ type RowResult = {
 export const POST = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "employees", "create");
   if (!user) return response;
+  const canEdit = await hasPermission(user.id, "employees", "edit");
 
   const raw = await request.json();
   const parsed = importEmployeesSchema.safeParse(raw);
@@ -34,7 +36,7 @@ export const POST = apiHandler(async (request) => {
   const seenMobiles = new Set<string>();
 
   for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
+    const row = rows[i]!;
     const rowNum = i + 2; // header is row 1
 
     const mobile = normalizeMobile(row.mobile);
@@ -83,6 +85,16 @@ export const POST = apiHandler(async (request) => {
           unitId: row.unitId,
           status: "error",
           message: "Employee unitId not found (remove unitId to create a new employee)",
+        });
+        continue;
+      }
+
+      if (existingByUnitId && !canEdit) {
+        results.push({
+          row: rowNum,
+          unitId: existingByUnitId.unitId,
+          status: "error",
+          message: "Updating existing employees requires employees.edit",
         });
         continue;
       }

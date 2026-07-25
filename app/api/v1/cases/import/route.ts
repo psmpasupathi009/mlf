@@ -1,5 +1,6 @@
 import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
+import { hasPermission } from "@/lib/rbac";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
 import { writeAudit } from "@/lib/audit";
@@ -32,6 +33,7 @@ function parseDay(value: string | undefined | null) {
 export const POST = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "cases", "create");
   if (!user) return response;
+  const canEdit = await hasPermission(user.id, "cases", "edit");
 
   const raw = await request.json();
   const parsed = importCasesSchema.safeParse(raw);
@@ -92,6 +94,16 @@ export const POST = apiHandler(async (request) => {
           unitId: row.unitId,
           status: "error",
           message: "Case unitId not found (remove unitId to create a new case)",
+        });
+        continue;
+      }
+
+      if (existingByUnitId && !canEdit) {
+        results.push({
+          row: rowNum,
+          unitId: existingByUnitId.unitId,
+          status: "error",
+          message: "Updating existing cases requires cases.edit",
         });
         continue;
       }

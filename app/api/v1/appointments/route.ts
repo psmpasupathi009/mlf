@@ -37,30 +37,52 @@ export const GET = apiHandler(async (request) => {
     ? user.mobile
     : advocateMobile || undefined;
 
+  const and: Prisma.AppointmentWhereInput[] = [];
+
+  if (q) {
+    and.push({
+      OR: [
+        { title: containsInsensitive(q) },
+        { unitId: containsInsensitive(q) },
+        { clientUnitId: containsInsensitive(q) },
+        { caseUnitId: containsInsensitive(q) },
+        { notes: containsInsensitive(q) },
+        { location: containsInsensitive(q) },
+        { advocateMobile: containsInsensitive(q) },
+      ],
+    });
+  }
+
+  if (scopedMobile) {
+    and.push({
+      OR: [
+        { advocateMobile: scopedMobile },
+        {
+          advocateMobile: `91${scopedMobile.replace(/\D/g, "").slice(-10)}`,
+        },
+        {
+          advocateMobile: scopedMobile.replace(/\D/g, "").slice(-10),
+        },
+      ],
+    });
+  } else if (searchParams.get("unassigned") === "1") {
+    and.push({
+      OR: [{ advocateMobile: null }, { advocateMobile: "" }],
+    });
+  }
+
+  if (from || to) {
+    and.push({
+      scheduledAt: {
+        ...(from ? { gte: new Date(from) } : {}),
+        ...(to ? { lte: new Date(to) } : {}),
+      },
+    });
+  }
+
   const where: Prisma.AppointmentWhereInput = {
     ...(status ? { status: status as never } : {}),
-    ...(q ? { title: containsInsensitive(q) } : {}),
-    ...(scopedMobile
-      ? {
-          OR: [
-            { advocateMobile: scopedMobile },
-            {
-              advocateMobile: `91${scopedMobile.replace(/\D/g, "").slice(-10)}`,
-            },
-            {
-              advocateMobile: scopedMobile.replace(/\D/g, "").slice(-10),
-            },
-          ],
-        }
-      : {}),
-    ...(from || to
-      ? {
-          scheduledAt: {
-            ...(from ? { gte: new Date(from) } : {}),
-            ...(to ? { lte: new Date(to) } : {}),
-          },
-        }
-      : {}),
+    ...(and.length ? { AND: and } : {}),
   };
 
   const [rows, total] = await Promise.all([

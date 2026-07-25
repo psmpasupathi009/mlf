@@ -1,5 +1,6 @@
 import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
+import { hasPermission } from "@/lib/rbac";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
 import { writeAudit } from "@/lib/audit";
@@ -12,6 +13,7 @@ type RowResult = { row: number; unitId: string | null; status: "ok" | "error"; m
 export const POST = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "clients", "create");
   if (!user) return response;
+  const canEdit = await hasPermission(user.id, "clients", "edit");
 
   const raw = await request.json();
   const parsed = importClientsSchema.safeParse(raw);
@@ -27,7 +29,7 @@ export const POST = apiHandler(async (request) => {
   const results: RowResult[] = [];
 
   for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
+    const row = rows[i]!;
     const rowNum = i + 2;
 
     const mobile = normalizeMobile(row.mobile);
@@ -47,6 +49,16 @@ export const POST = apiHandler(async (request) => {
           unitId: row.unitId,
           status: "error",
           message: "Client unitId not found (remove unitId to create a new client)",
+        });
+        continue;
+      }
+
+      if (existingByUnitId && !canEdit) {
+        results.push({
+          row: rowNum,
+          unitId: existingByUnitId.unitId,
+          status: "error",
+          message: "Updating existing clients requires clients.edit",
         });
         continue;
       }
