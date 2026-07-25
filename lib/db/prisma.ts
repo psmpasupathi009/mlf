@@ -49,9 +49,8 @@ function resolveClient(): PrismaClient {
   // Eager connect so the first query after HMR/recreate does not race
   // "Engine is not yet connected".
   void next.$connect().catch(() => undefined);
-  if (process.env.NODE_ENV !== "production") {
-    globalForPrisma.prisma = next;
-  }
+  // Always reuse across hot reloads and serverless isolates in the same process.
+  globalForPrisma.prisma = next;
   return next;
 }
 

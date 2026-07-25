@@ -7,6 +7,7 @@ import {
   Gavel,
   Scale,
   ScrollText,
+  Trash2,
   Upload,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -19,7 +20,7 @@ import {
   DOCUMENT_TYPES,
   type DocumentTypeValue,
 } from "@/lib/validations/documents.schema";
-import { apiDownload } from "@/lib/api/client";
+import { apiDownload, apiFetch } from "@/lib/api/client";
 import { cn } from "@/lib/utils/cn";
 
 const TYPE_ICON: Record<
@@ -68,15 +69,40 @@ function fileKind(mime: string) {
 type CaseDocumentsPanelProps = {
   documents: DocumentSummary[];
   canUpload: boolean;
+  canDelete?: boolean;
   onUploadClick: (docType?: DocumentTypeValue) => void;
+  onDeleted?: (unitId: string) => void;
 };
 
 export function CaseDocumentsPanel({
   documents,
   canUpload,
+  canDelete = false,
   onUploadClick,
+  onDeleted,
 }: CaseDocumentsPanelProps) {
   const [filter, setFilter] = useState<"all" | DocumentTypeValue>("all");
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  async function handleDelete(d: DocumentSummary) {
+    if (!canDelete || deleting) return;
+    const ok = window.confirm(`Delete “${d.title}”? This cannot be undone.`);
+    if (!ok) return;
+    setDeleting(d.unitId);
+    try {
+      const res = await apiFetch(`/api/v1/documents/${d.unitId}`, {
+        method: "DELETE",
+      });
+      if (!res.ok) {
+        toast.error("Couldn’t delete document");
+        return;
+      }
+      toast.success("Document deleted");
+      onDeleted?.(d.unitId);
+    } finally {
+      setDeleting(null);
+    }
+  }
 
   const counts = useMemo(() => {
     const map: Record<string, number> = { all: documents.length };
@@ -211,27 +237,41 @@ export function CaseDocumentsPanel({
                       ) : null}
                     </div>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={async () => {
-                      const filename =
-                        d.originalName?.trim() ||
-                        d.title?.trim() ||
-                        `${d.unitId}.bin`;
-                      const result = await apiDownload(
-                        `/api/v1/documents/${d.unitId}/download`,
-                        filename
-                      );
-                      if (!result.ok) {
-                        toast.error(result.error ?? "Download failed");
-                      }
-                    }}
-                  >
-                    <Download className="size-4" />
-                    Download
-                  </Button>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        const filename =
+                          d.originalName?.trim() ||
+                          d.title?.trim() ||
+                          `${d.unitId}.bin`;
+                        const result = await apiDownload(
+                          `/api/v1/documents/${d.unitId}/download`,
+                          filename
+                        );
+                        if (!result.ok) {
+                          toast.error(result.error ?? "Download failed");
+                        }
+                      }}
+                    >
+                      <Download className="size-4" />
+                      Download
+                    </Button>
+                    {canDelete ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={deleting === d.unitId}
+                        onClick={() => void handleDelete(d)}
+                      >
+                        <Trash2 className="size-4" />
+                        Delete
+                      </Button>
+                    ) : null}
+                  </div>
                 </li>
               );
             })}

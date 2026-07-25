@@ -46,3 +46,7 @@ next-env.d.ts
 # local file storage (lib/storage local driver)
 /uploads
 !.gitkeep
+
+# local audit output (may include unit ids; never commit PIN)
+scripts/.audit-results.json
+scripts/.audit-compact.json

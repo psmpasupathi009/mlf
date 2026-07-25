@@ -7,6 +7,8 @@ import { writeAudit } from "@/lib/audit";
 import { storage } from "@/lib/storage";
 import { documentUploadMetaSchema } from "@/lib/validations/documents.schema";
 import { toDocumentSummary } from "@/features/documents/server/serialize";
+import { rateLimit } from "@/lib/rate-limit";
+import { clientRateKey } from "@/lib/rate-limit/client-key";
 
 export const GET = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "cases", "view");
@@ -34,6 +36,19 @@ export const POST = apiHandler(async (request) => {
   const { user, response } = await requireUser(request);
   if (!user) return response;
 
+  const limited = await rateLimit(
+    clientRateKey(request, "upload", user.unitId),
+    30,
+    15 * 60 * 1000
+  );
+  if (!limited.allowed) {
+    return jsonFail(
+      "RATE_LIMITED",
+      "Too many uploads. Try again in a few minutes.",
+      429
+    );
+  }
+
   const form = await request.formData();
   const file = form.get("file");
   if (!(file instanceof File)) {
@@ -52,11 +67,12 @@ export const POST = apiHandler(async (request) => {
   }
   const input = parsed.data;
 
-  // Case docs need cases.upload; fee receipts also allowed with accounts.edit.
+  // Case docs need cases.upload; fee receipts also allowed with accounts.edit/upload.
   const canCasesUpload = await hasPermission(user.id, "cases", "upload");
   const canAccountsReceipt =
     input.docType === "receipt" &&
-    (await hasPermission(user.id, "accounts", "edit"));
+    ((await hasPermission(user.id, "accounts", "edit")) ||
+      (await hasPermission(user.id, "accounts", "upload")));
   if (!canCasesUpload && !canAccountsReceipt) {
     return jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403);
   }

@@ -7,6 +7,9 @@ import {
   scheduleNotify,
 } from "@/lib/notifications/notify";
 
+/** Vercel Hobby/Pro: allow longer cron runs for SMS batches. */
+export const maxDuration = 300;
+
 function secretsEqual(provided: string, expected: string): boolean {
   const a = Buffer.from(provided);
   const b = Buffer.from(expected);
@@ -23,9 +26,7 @@ function authorizeCron(request: Request): Response | null {
     request.headers.get("x-cron-secret") ??
     request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") ??
     "";
-  const urlSecret = new URL(request.url).searchParams.get("secret") ?? "";
-  const provided = header || urlSecret;
-  if (!provided || !secretsEqual(provided, secret)) {
+  if (!header || !secretsEqual(header, secret)) {
     return jsonFail("UNAUTHORIZED", "Unauthorized", 401);
   }
   return null;
@@ -33,8 +34,10 @@ function authorizeCron(request: Request): Response | null {
 
 /**
  * Day-before hearing SMS reminders (IST).
- * Vercel Cron: GET /api/v1/cron/hearing-sms (secret via x-cron-secret or ?secret=)
- * Manual / external: POST with header x-cron-secret: <CRON_SECRET>
+ * Vercel Cron: GET /api/v1/cron/hearing-sms
+ *   (Authorization: Bearer <CRON_SECRET> or x-cron-secret)
+ * Manual / external: POST with the same header.
+ * Query-string secrets are rejected (log / Referer leak risk).
  */
 async function handleCron(request: Request) {
   const denied = authorizeCron(request);
@@ -44,7 +47,8 @@ async function handleCron(request: Request) {
   scheduleNotify(async () => {
     const admins = await findUsersByRoles(["admin", "sub_admin"]);
     const title = `Hearing SMS: ${result.sent} sent for ${result.date}`;
-    const body = `Total ${result.total} · failed ${result.failed} · skipped ${result.skipped}`;
+    const more = result.hasMore ? " · more pending" : "";
+    const body = `Total ${result.total} · failed ${result.failed} · skipped ${result.skipped}${more}`;
     await notifyUsers(
       admins.map((u) => ({
         userId: u.id,
@@ -59,6 +63,7 @@ async function handleCron(request: Request) {
           failed: result.failed,
           skipped: result.skipped,
           total: result.total,
+          hasMore: result.hasMore,
           source: "cron",
         },
       }))

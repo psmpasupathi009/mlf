@@ -3,6 +3,7 @@ import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
 import { writeAudit } from "@/lib/audit";
 import { revokeAllRefreshTokens } from "@/lib/auth/session";
+import { requireAdminToManageAdmin } from "@/lib/rbac/employee-guards";
 import { toEmployeeSummary } from "@/features/employees/server/serialize";
 
 /** Clears the PIN + revokes sessions — employee must set up a new PIN via OTP. */
@@ -11,8 +12,13 @@ export const POST = apiHandler(async (request, context) => {
   if (!user) return response;
 
   const { unitId } = (await context.params) ?? {};
-  const target = unitId ? await prisma.user.findUnique({ where: { unitId } }) : null;
+  const target = unitId
+    ? await prisma.user.findUnique({ where: { unitId } })
+    : null;
   if (!target) return jsonFail("NOT_FOUND", "Employee not found", 404);
+
+  const manageMsg = requireAdminToManageAdmin(user, target);
+  if (manageMsg) return jsonFail("FORBIDDEN", manageMsg, 403);
 
   const updated = await prisma.user.update({
     where: { id: target.id },

@@ -269,6 +269,7 @@ model Case {
   @@index([caseNumber])
   @@index([nextHearingAt])
   @@index([primaryAdvocateMobile])
+  @@index([battaDue])
 }
 
 model Hearing {
@@ -316,6 +317,8 @@ model CashPayment {
   @@index([caseId])
   @@index([caseUnitId])
   @@index([status])
+  @@index([createdAt])
+  @@index([paidOn])
 }
 
 model Document {
@@ -341,6 +344,7 @@ model Document {
   @@index([clientId])
   @@index([clientUnitId])
   @@index([docType])
+  @@index([createdAt])
 }
 
 model Appointment {

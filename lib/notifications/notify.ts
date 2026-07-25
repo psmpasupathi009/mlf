@@ -1,4 +1,5 @@
 import type { Prisma, UserRole } from "@prisma/client";
+import { after } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
 import {
@@ -72,15 +73,18 @@ export async function notifyUsers(inputs: NotifyInput[]) {
   return results;
 }
 
-/** Fire-and-forget: never let notification failures break the main request. */
+/**
+ * Schedule notification side-effects after the response is sent (`after`),
+ * so work still completes on serverless. Failures never break the main flow.
+ */
 export function scheduleNotify(fn: () => Promise<unknown>) {
-  void (async () => {
+  after(async () => {
     try {
       await fn();
     } catch {
       /* ignore */
     }
-  })();
+  });
 }
 
 export function mergeUserRefs(...groups: NotifyUserRef[][]): NotifyUserRef[] {

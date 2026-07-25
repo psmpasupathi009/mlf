@@ -9,6 +9,7 @@ import {
   importDakSchema,
 } from "@/lib/validations/dak.schema";
 import { istDayBounds } from "@/lib/utils/ist";
+import { assertImportRateLimit } from "@/lib/rate-limit/guards";
 
 type RowResult = {
   row: number;
@@ -27,6 +28,9 @@ function parseDay(value: string) {
 export const POST = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "dak", "create");
   if (!user) return response;
+
+  const limited = await assertImportRateLimit(request, user.unitId);
+  if (limited) return limited;
 
   const raw = await request.json();
   const parsed = importDakSchema.safeParse(raw);

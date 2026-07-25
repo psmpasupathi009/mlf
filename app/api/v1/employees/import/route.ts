@@ -8,6 +8,7 @@ import { normalizeMobile } from "@/lib/auth/mobile";
 import { designationDefaultRoles, normalizeDesignation } from "@/config/company/designations";
 import { importEmployeesSchema } from "@/lib/validations/employees.schema";
 import { compliance } from "@/config/company/compliance";
+import { assertImportRateLimit } from "@/lib/rate-limit/guards";
 
 type RowResult = {
   row: number;
@@ -19,6 +20,9 @@ type RowResult = {
 export const POST = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "employees", "create");
   if (!user) return response;
+
+  const limited = await assertImportRateLimit(request, user.unitId);
+  if (limited) return limited;
   const canEdit = await hasPermission(user.id, "employees", "edit");
 
   const raw = await request.json();

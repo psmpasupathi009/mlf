@@ -3,7 +3,7 @@ import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
 import { writeAudit } from "@/lib/audit";
 import { revokeAllRefreshTokens } from "@/lib/auth/session";
-import { wouldRemoveLastAdmin } from "@/lib/rbac/employee-guards";
+import { wouldRemoveLastAdmin, requireAdminToManageAdmin } from "@/lib/rbac/employee-guards";
 import { toEmployeeSummary } from "@/features/employees/server/serialize";
 
 export const POST = apiHandler(async (request, context) => {
@@ -17,6 +17,9 @@ export const POST = apiHandler(async (request, context) => {
   if (target.id === user.id) {
     return jsonFail("FORBIDDEN", "You can’t deactivate your own account", 403);
   }
+
+  const manageMsg = requireAdminToManageAdmin(user, target);
+  if (manageMsg) return jsonFail("FORBIDDEN", manageMsg, 403);
 
   if (await wouldRemoveLastAdmin(target, false, target.roles)) {
     return jsonFail("CONFLICT", "This is the last active admin — assign another admin first", 409);

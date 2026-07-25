@@ -84,18 +84,22 @@ export async function POST(request: Request) {
 
     const ok = await verifyPin(parsed.data.pin, user.pinHash);
     if (!ok) {
-      const attempts = user.failedPinAttempts + 1;
-      if (attempts >= PIN_MAX_ATTEMPTS) {
-        await prisma.user.update({
-          where: { id: user.id },
-          data: {
-            failedPinAttempts: 0,
-            pinLockedUntil: new Date(
-              Date.now() + PIN_LOCK_MINUTES * 60 * 1000
-            ),
-          },
-        });
+      const lockUntil = new Date(Date.now() + PIN_LOCK_MINUTES * 60 * 1000);
 
+      // Atomic lock: only one concurrent failure can trip the lock threshold.
+      const locked = await prisma.user.updateMany({
+        where: {
+          id: user.id,
+          failedPinAttempts: { gte: PIN_MAX_ATTEMPTS - 1 },
+          OR: [{ pinLockedUntil: null }, { pinLockedUntil: { lte: new Date() } }],
+        },
+        data: {
+          failedPinAttempts: 0,
+          pinLockedUntil: lockUntil,
+        },
+      });
+
+      if (locked.count > 0) {
         return applyCorsHeaders(
           request,
           jsonFail(
@@ -107,12 +111,19 @@ export async function POST(request: Request) {
         );
       }
 
-      await prisma.user.update({
-        where: { id: user.id },
-        data: { failedPinAttempts: attempts },
+      const bumped = await prisma.user.updateMany({
+        where: {
+          id: user.id,
+          failedPinAttempts: { lt: PIN_MAX_ATTEMPTS - 1 },
+          OR: [{ pinLockedUntil: null }, { pinLockedUntil: { lte: new Date() } }],
+        },
+        data: { failedPinAttempts: { increment: 1 } },
       });
 
-      const remaining = PIN_MAX_ATTEMPTS - attempts;
+      const attempts =
+        bumped.count > 0 ? user.failedPinAttempts + 1 : user.failedPinAttempts;
+      const remaining = Math.max(0, PIN_MAX_ATTEMPTS - attempts);
+
       return applyCorsHeaders(
         request,
         jsonFail(

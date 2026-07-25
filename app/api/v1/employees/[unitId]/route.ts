@@ -5,6 +5,7 @@ import { writeAudit } from "@/lib/audit";
 import { updateEmployeeSchema } from "@/lib/validations/employees.schema";
 import {
   requireAdminToAssignAdmin,
+  requireAdminToManageAdmin,
   wouldRemoveLastAdmin,
 } from "@/lib/rbac/employee-guards";
 import { toEmployeeSummary } from "@/features/employees/server/serialize";
@@ -41,6 +42,9 @@ export const PATCH = apiHandler(async (request, context) => {
 
   const nextRoles = input.roles ?? target.roles;
   const nextIsActive = input.isActive ?? target.isActive;
+
+  const manageMsg = requireAdminToManageAdmin(user, target);
+  if (manageMsg) return jsonFail("FORBIDDEN", manageMsg, 403);
 
   const guardMsg = requireAdminToAssignAdmin(user, nextRoles);
   if (guardMsg) return jsonFail("FORBIDDEN", guardMsg, 403);

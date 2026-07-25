@@ -23,6 +23,20 @@ export function requireAdminToAssignAdmin(
   return null;
 }
 
+/**
+ * Only an admin may manage (edit / demote / deactivate / force-reset) a user
+ * who currently holds the admin role.
+ */
+export function requireAdminToManageAdmin(
+  actor: Pick<User, "roles">,
+  target: Pick<User, "roles">
+): string | null {
+  if (target.roles.includes("admin") && !actor.roles.includes("admin")) {
+    return "Only an admin can manage another admin";
+  }
+  return null;
+}
+
 /** Would this change leave the office with zero active admins? */
 export async function wouldRemoveLastAdmin(
   target: Pick<User, "id" | "roles" | "isActive">,

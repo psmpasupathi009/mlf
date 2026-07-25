@@ -287,7 +287,11 @@ export function CaseDetailPage({
       <CaseDocumentsPanel
         documents={documents}
         canUpload={can("cases", "upload")}
+        canDelete={can("cases", "upload")}
         onUploadClick={openUpload}
+        onDeleted={() => {
+          void load();
+        }}
       />
 
       <Card className="overflow-hidden">

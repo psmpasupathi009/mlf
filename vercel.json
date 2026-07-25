@@ -4,5 +4,10 @@
       "path": "/api/v1/cron/hearing-sms",
       "schedule": "30 11 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "app/api/v1/cron/hearing-sms/route.ts": {
+      "maxDuration": 300
+    }
+  }
 }

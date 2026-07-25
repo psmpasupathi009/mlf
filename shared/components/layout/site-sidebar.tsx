@@ -6,7 +6,11 @@ import { usePathname } from "next/navigation";
 import {
   BookOpen,
   Briefcase,
+  ClipboardCheck,
+  FileBarChart,
+  FileInput,
   Home,
+  ListTodo,
   Scale,
   Shield,
   Users,
@@ -50,6 +54,12 @@ const ICONS: Partial<
   accounts: Wallet,
   appointments: CalendarDays,
   hrms: ClipboardList,
+  tasks: ListTodo,
+  dak: FileInput,
+  reports: FileBarChart,
+  diary: BookOpen,
+  availability: Clock3,
+  checklist: ClipboardCheck,
 };
 
 function iconForHref(href: string, module: AppModule) {

@@ -23,18 +23,53 @@ export type HearingSmsJobResult = {
   sent: number;
   failed: number;
   skipped: number;
+  /** True when more due hearings remain (batch capped for serverless time). */
+  hasMore: boolean;
   details: HearingSmsDetail[];
 };
 
 const CLOSED_CASE_STATUSES = new Set(["disposed", "withdrawn", "transferred", "archived"]);
+/** Cap per invocation so Vercel cron stays within maxDuration. */
+const BATCH_SIZE = 80;
+const SEND_CONCURRENCY = 5;
+
+async function mapPool<T, R>(
+  items: T[],
+  concurrency: number,
+  fn: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      results[i] = await fn(items[i]!);
+    }
+  }
+  const workers = Array.from(
+    { length: Math.min(concurrency, items.length) },
+    () => worker()
+  );
+  await Promise.all(workers);
+  return results;
+}
 
 /**
  * Day-before hearing SMS to clients only (2Factor transactional).
  * Skips adjourned, already-sent, opted-out, and closed cases.
+ * Processes up to BATCH_SIZE hearings per run (concurrent sends).
  */
 export async function runHearingSmsJob(): Promise<HearingSmsJobResult> {
   const tomorrowKey = istAddCalendarDays(istDateKey(), 1);
   const { start, end } = istDayBounds(tomorrowKey);
+
+  const dueTotal = await prisma.hearing.count({
+    where: {
+      smsSentAt: null,
+      isAdjourned: false,
+      hearingDate: { gte: start, lte: end },
+    },
+  });
 
   const dueHearings = await prisma.hearing.findMany({
     where: {
@@ -43,19 +78,20 @@ export async function runHearingSmsJob(): Promise<HearingSmsJobResult> {
       hearingDate: { gte: start, lte: end },
     },
     orderBy: { hearingDate: "asc" },
-    take: 500,
+    take: BATCH_SIZE,
   });
 
   let sent = 0;
   let failed = 0;
   let skipped = 0;
   const details: HearingSmsDetail[] = [];
+  const hasMore = dueTotal > dueHearings.length;
 
   if (dueHearings.length === 0) {
     await writeAudit({
       action: "cron.hearing_sms",
       entity: "Hearing",
-      meta: { tomorrowKey, total: 0, sent: 0, failed: 0, skipped: 0 },
+      meta: { tomorrowKey, total: 0, sent: 0, failed: 0, skipped: 0, hasMore: false },
     });
     return {
       date: tomorrowKey,
@@ -63,110 +99,175 @@ export async function runHearingSmsJob(): Promise<HearingSmsJobResult> {
       sent: 0,
       failed: 0,
       skipped: 0,
+      hasMore: false,
       details: [],
     };
   }
 
   const caseIds = Array.from(new Set(dueHearings.map((h) => h.caseId)));
-  const cases = await prisma.case.findMany({ where: { id: { in: caseIds } } });
+  const cases = await prisma.case.findMany({
+    where: { id: { in: caseIds } },
+    select: {
+      id: true,
+      unitId: true,
+      clientId: true,
+      status: true,
+      caseNumber: true,
+      courtName: true,
+    },
+  });
   const caseById = new Map(cases.map((c) => [c.id, c]));
 
   const clientIds = Array.from(new Set(cases.map((c) => c.clientId)));
   const clients = await prisma.client.findMany({
     where: { id: { in: clientIds } },
+    select: {
+      id: true,
+      name: true,
+      mobile: true,
+      smsConsent: true,
+    },
   });
   const clientById = new Map(clients.map((c) => [c.id, c]));
 
-  for (const hearing of dueHearings) {
-    try {
-      const caseItem = caseById.get(hearing.caseId);
-      if (!caseItem) {
-        failed++;
-        details.push({
-          hearingUnitId: hearing.unitId,
-          caseUnitId: hearing.caseUnitId,
-          ok: false,
-          message: "Case not found",
+  type RowResult = {
+    sent: number;
+    failed: number;
+    skipped: number;
+    detail: HearingSmsDetail;
+  };
+
+  const rowResults = await mapPool(
+    dueHearings,
+    SEND_CONCURRENCY,
+    async (hearing): Promise<RowResult> => {
+      try {
+        const caseItem = caseById.get(hearing.caseId);
+        if (!caseItem) {
+          return {
+            sent: 0,
+            failed: 1,
+            skipped: 0,
+            detail: {
+              hearingUnitId: hearing.unitId,
+              caseUnitId: hearing.caseUnitId,
+              ok: false,
+              message: "Case not found",
+            },
+          };
+        }
+
+        if (CLOSED_CASE_STATUSES.has(caseItem.status)) {
+          await prisma.hearing.update({
+            where: { id: hearing.id },
+            data: { smsSentAt: new Date() },
+          });
+          return {
+            sent: 0,
+            failed: 0,
+            skipped: 1,
+            detail: {
+              hearingUnitId: hearing.unitId,
+              caseUnitId: hearing.caseUnitId,
+              ok: true,
+              message: `Skipped — case ${caseItem.status}`,
+            },
+          };
+        }
+
+        const client = clientById.get(caseItem.clientId);
+        if (!client) {
+          return {
+            sent: 0,
+            failed: 1,
+            skipped: 0,
+            detail: {
+              hearingUnitId: hearing.unitId,
+              caseUnitId: hearing.caseUnitId,
+              ok: false,
+              message: "Client not found",
+            },
+          };
+        }
+
+        if (client.smsConsent === false) {
+          await prisma.hearing.update({
+            where: { id: hearing.id },
+            data: { smsSentAt: new Date() },
+          });
+          return {
+            sent: 0,
+            failed: 0,
+            skipped: 1,
+            detail: {
+              hearingUnitId: hearing.unitId,
+              caseUnitId: hearing.caseUnitId,
+              ok: true,
+              message: "Skipped — client opted out of SMS",
+            },
+          };
+        }
+
+        const mobile = normalizeMobile(client.mobile) ?? client.mobile;
+        const message = smsTemplates.hearingReminder({
+          clientName: client.name,
+          caseLabel: caseItem.caseNumber ?? caseItem.unitId,
+          hearingDateIst: istDisplayDate(hearing.hearingDate),
+          courtName: caseItem.courtName ?? "the court",
         });
-        continue;
+
+        const result = await sendTransactionalSms(mobile, message);
+
+        if (result.ok) {
+          await prisma.hearing.update({
+            where: { id: hearing.id },
+            data: { smsSentAt: new Date() },
+          });
+          return {
+            sent: 1,
+            failed: 0,
+            skipped: 0,
+            detail: {
+              hearingUnitId: hearing.unitId,
+              caseUnitId: hearing.caseUnitId,
+              ok: true,
+              message: result.details,
+            },
+          };
+        }
+
+        return {
+          sent: 0,
+          failed: 1,
+          skipped: 0,
+          detail: {
+            hearingUnitId: hearing.unitId,
+            caseUnitId: hearing.caseUnitId,
+            ok: false,
+            message: result.details,
+          },
+        };
+      } catch (error) {
+        return {
+          sent: 0,
+          failed: 1,
+          skipped: 0,
+          detail: {
+            hearingUnitId: hearing.unitId,
+            caseUnitId: hearing.caseUnitId,
+            ok: false,
+            message: error instanceof Error ? error.message : "Unknown error",
+          },
+        };
       }
-
-      if (CLOSED_CASE_STATUSES.has(caseItem.status)) {
-        skipped++;
-        await prisma.hearing.update({
-          where: { id: hearing.id },
-          data: { smsSentAt: new Date() },
-        });
-        details.push({
-          hearingUnitId: hearing.unitId,
-          caseUnitId: hearing.caseUnitId,
-          ok: true,
-          message: `Skipped — case ${caseItem.status}`,
-        });
-        continue;
-      }
-
-      const client = clientById.get(caseItem.clientId);
-      if (!client) {
-        failed++;
-        details.push({
-          hearingUnitId: hearing.unitId,
-          caseUnitId: hearing.caseUnitId,
-          ok: false,
-          message: "Client not found",
-        });
-        continue;
-      }
-
-      if (client.smsConsent === false) {
-        skipped++;
-        await prisma.hearing.update({
-          where: { id: hearing.id },
-          data: { smsSentAt: new Date() },
-        });
-        details.push({
-          hearingUnitId: hearing.unitId,
-          caseUnitId: hearing.caseUnitId,
-          ok: true,
-          message: "Skipped — client opted out of SMS",
-        });
-        continue;
-      }
-
-      const mobile = normalizeMobile(client.mobile) ?? client.mobile;
-      const message = smsTemplates.hearingReminder({
-        clientName: client.name,
-        caseLabel: caseItem.caseNumber ?? caseItem.unitId,
-        hearingDateIst: istDisplayDate(hearing.hearingDate),
-        courtName: caseItem.courtName ?? "the court",
-      });
-
-      const result = await sendTransactionalSms(mobile, message);
-
-      if (result.ok) {
-        await prisma.hearing.update({
-          where: { id: hearing.id },
-          data: { smsSentAt: new Date() },
-        });
-        sent++;
-      } else {
-        failed++;
-      }
-      details.push({
-        hearingUnitId: hearing.unitId,
-        caseUnitId: hearing.caseUnitId,
-        ok: result.ok,
-        message: result.details,
-      });
-    } catch (error) {
-      failed++;
-      details.push({
-        hearingUnitId: hearing.unitId,
-        caseUnitId: hearing.caseUnitId,
-        ok: false,
-        message: error instanceof Error ? error.message : "Unknown error",
-      });
     }
+  );
+
+  for (const r of rowResults) {
+    sent += r.sent;
+    failed += r.failed;
+    skipped += r.skipped;
+    details.push(r.detail);
   }
 
   await writeAudit({
@@ -175,9 +276,11 @@ export async function runHearingSmsJob(): Promise<HearingSmsJobResult> {
     meta: {
       tomorrowKey,
       total: dueHearings.length,
+      dueTotal,
       sent,
       failed,
       skipped,
+      hasMore,
     },
   });
 
@@ -187,6 +290,7 @@ export async function runHearingSmsJob(): Promise<HearingSmsJobResult> {
     sent,
     failed,
     skipped,
+    hasMore,
     details,
   };
 }

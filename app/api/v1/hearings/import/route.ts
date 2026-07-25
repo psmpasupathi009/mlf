@@ -5,6 +5,7 @@ import { nextUnitId } from "@/lib/ids";
 import { writeAudit } from "@/lib/audit";
 import { importHearingsSchema } from "@/lib/validations/cases.schema";
 import { compliance } from "@/config/company/compliance";
+import { assertImportRateLimit } from "@/lib/rate-limit/guards";
 
 type RowResult = {
   row: number;
@@ -16,6 +17,9 @@ type RowResult = {
 export const POST = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "cases", "edit");
   if (!user) return response;
+
+  const limited = await assertImportRateLimit(request, user.unitId);
+  if (limited) return limited;
 
   const raw = await request.json();
   const parsed = importHearingsSchema.safeParse(raw);

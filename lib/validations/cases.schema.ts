@@ -44,8 +44,9 @@ export const createCaseSchema = z.object({
   clientUnitId: z.string().trim().min(1, "Client is required"),
   caseNumber: z.string().trim().max(120).optional().or(z.literal("")),
   filingNumber: z.string().trim().max(120).optional().or(z.literal("")),
-  caseYear: optionalYear,
-  cnr: optionalCnr,
+  // `.optional()` required: Zod omits missing keys; union+undefined alone is not enough
+  caseYear: optionalYear.optional(),
+  cnr: optionalCnr.optional(),
   state: z.string().trim().min(1, "Select state").max(80),
   district: z.string().trim().min(1, "Select district").max(80),
   city: z.string().trim().min(1, "Select city / town").max(80),

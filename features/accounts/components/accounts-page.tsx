@@ -50,7 +50,8 @@ export function AccountsPage({ user }: { user: PublicUser }) {
   const canImport = can("upload") || user.roles.includes("admin");
   const canUploadReceipt =
     user.permissions.includes("cases.upload") ||
-    user.permissions.includes("accounts.edit");
+    user.permissions.includes("accounts.edit") ||
+    user.permissions.includes("accounts.upload");
   const searchParams = useSearchParams();
   const router = useRouter();
   const caseUnitId = searchParams.get("caseUnitId") ?? "";

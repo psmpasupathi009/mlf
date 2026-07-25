@@ -34,10 +34,15 @@ export const GET = apiHandler(async (request, context) => {
 
   const [client, hearings, documents] = await Promise.all([
     prisma.client.findUnique({ where: { id: item.clientId } }),
-    prisma.hearing.findMany({ where: { caseId: item.id }, orderBy: { hearingDate: "desc" } }),
+    prisma.hearing.findMany({
+      where: { caseId: item.id },
+      orderBy: { hearingDate: "desc" },
+      take: 100,
+    }),
     prisma.document.findMany({
       where: { caseId: item.id },
       orderBy: { createdAt: "desc" },
+      take: 100,
     }),
   ]);
 

@@ -8,6 +8,7 @@ import { importPaymentsSchema } from "@/lib/validations/accounts.schema";
 import { compliance } from "@/config/company/compliance";
 import { isPaymentPurpose } from "@/features/accounts/lib/payment-purposes";
 import type { PaymentStatus, PaymentType } from "@prisma/client";
+import { assertImportRateLimit } from "@/lib/rate-limit/guards";
 
 type RowResult = {
   row: number;
@@ -22,6 +23,9 @@ const VALID_STATUS = new Set<PaymentStatus>(["pending", "paid"]);
 export const POST = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "accounts", "upload");
   if (!user) return response;
+
+  const limited = await assertImportRateLimit(request, user.unitId);
+  if (limited) return limited;
 
   const raw = await request.json();
   const parsed = importPaymentsSchema.safeParse(raw);

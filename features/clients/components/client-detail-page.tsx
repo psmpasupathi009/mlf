@@ -416,7 +416,11 @@ export function ClientDetailPage({
         <CaseDocumentsPanel
           documents={documents}
           canUpload={can("cases", "upload")}
+          canDelete={can("cases", "upload")}
           onUploadClick={openUpload}
+          onDeleted={() => {
+            void load();
+          }}
         />
       ) : null}
 

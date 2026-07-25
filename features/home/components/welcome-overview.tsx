@@ -39,6 +39,7 @@ type WelcomeOverviewProps = {
 export function WelcomeOverview({ user }: WelcomeOverviewProps) {
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [advocateFilter, setAdvocateFilter] = useState<string>("all");
   const [dayFilter, setDayFilter] = useState<DayKindFilter>("all");
   const perms = useMemo(
@@ -61,12 +62,21 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
     let cancelled = false;
     (async () => {
       setLoading(true);
-      const { ok, data } = await apiFetch<{ summary: DashboardSummary }>(
+      setLoadError(null);
+      const res = await apiFetch<{ summary: DashboardSummary } & { error?: string; message?: string }>(
         "/api/v1/dashboard/summary"
       );
       if (!cancelled) {
-        if (ok && data && typeof data === "object" && "summary" in data) {
-          setSummary((data as { summary: DashboardSummary }).summary);
+        if (res.ok && res.data && typeof res.data === "object" && "summary" in res.data) {
+          setSummary((res.data as { summary: DashboardSummary }).summary);
+        } else {
+          setSummary(null);
+          const payload = res.data as { error?: string; message?: string } | null;
+          setLoadError(
+            (typeof payload?.error === "string" && payload.error) ||
+              (typeof payload?.message === "string" && payload.message) ||
+              "Couldn’t load dashboard. Try again."
+          );
         }
         setLoading(false);
       }
@@ -381,6 +391,51 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
         canRegisterCase={moduleOn("cases") && can("cases.create")}
         canAddPayment={moduleOn("accounts") && can("accounts.create")}
       />
+
+      {loadError ? (
+        <div
+          role="alert"
+          className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-navy"
+        >
+          <p className="font-medium">Dashboard couldn’t load</p>
+          <p className="mt-1 text-muted-foreground">{loadError}</p>
+          <button
+            type="button"
+            className="mt-2 text-sm font-medium text-brand underline-offset-2 hover:underline"
+            onClick={() => {
+              setLoading(true);
+              setLoadError(null);
+              void (async () => {
+                const res = await apiFetch<{ summary: DashboardSummary }>(
+                  "/api/v1/dashboard/summary"
+                );
+                if (
+                  res.ok &&
+                  res.data &&
+                  typeof res.data === "object" &&
+                  "summary" in res.data
+                ) {
+                  setSummary(
+                    (res.data as { summary: DashboardSummary }).summary
+                  );
+                } else {
+                  const payload = res.data as {
+                    error?: string;
+                    message?: string;
+                  } | null;
+                  setLoadError(
+                    (typeof payload?.error === "string" && payload.error) ||
+                      "Couldn’t load dashboard. Try again."
+                  );
+                }
+                setLoading(false);
+              })();
+            }}
+          >
+            Retry
+          </button>
+        </div>
+      ) : null}
 
       <WelcomeStatsSection
         loading={loading}

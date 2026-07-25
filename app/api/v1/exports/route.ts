@@ -5,6 +5,8 @@ import { apiHandler, jsonFail } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import { hasPermission } from "@/lib/rbac";
 import { prisma } from "@/lib/db/prisma";
+import { rateLimit } from "@/lib/rate-limit";
+import { clientRateKey } from "@/lib/rate-limit/client-key";
 import {
   buildAccountsWhere,
   parseAccountsFilters,
@@ -22,6 +24,19 @@ import { containsInsensitive } from "@/lib/db/search";
 export const GET = apiHandler(async (request) => {
   const url = new URL(request.url);
   const type = url.searchParams.get("type") ?? "cases";
+
+  const limited = await rateLimit(
+    clientRateKey(request, "export"),
+    10,
+    15 * 60 * 1000
+  );
+  if (!limited.allowed) {
+    return jsonFail(
+      "RATE_LIMITED",
+      "Too many exports. Try again in a few minutes.",
+      429
+    );
+  }
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "MLF";

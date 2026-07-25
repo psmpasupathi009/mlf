@@ -149,6 +149,10 @@ export function useNotifications() {
   }, [refetch]);
 
   useEffect(() => {
+    // Poll-only: in-memory SSE does not work across serverless isolates.
+    // Opt-in local live push with NEXT_PUBLIC_ENABLE_SSE=1.
+    if (process.env.NEXT_PUBLIC_ENABLE_SSE !== "1") return;
+
     let es: EventSource | null = null;
     let closed = false;
     let retryTimer: ReturnType<typeof setTimeout> | null = null;

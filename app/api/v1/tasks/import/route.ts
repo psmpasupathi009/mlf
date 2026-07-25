@@ -7,6 +7,7 @@ import { compliance } from "@/config/company/compliance";
 import { importTasksSchema, officeTaskKindEnum } from "@/lib/validations/tasks.schema";
 import { istDayBounds } from "@/lib/utils/ist";
 import { notifyUser, scheduleNotify } from "@/lib/notifications/notify";
+import { assertImportRateLimit } from "@/lib/rate-limit/guards";
 
 type RowResult = {
   row: number;
@@ -26,6 +27,9 @@ function parseDay(value: string | undefined | null) {
 export const POST = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "tasks", "create");
   if (!user) return response;
+
+  const limited = await assertImportRateLimit(request, user.unitId);
+  if (limited) return limited;
 
   const raw = await request.json();
   const parsed = importTasksSchema.safeParse(raw);

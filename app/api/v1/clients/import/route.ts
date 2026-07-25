@@ -7,12 +7,16 @@ import { writeAudit } from "@/lib/audit";
 import { normalizeMobile } from "@/lib/auth/mobile";
 import { importClientsSchema } from "@/lib/validations/clients.schema";
 import { compliance } from "@/config/company/compliance";
+import { assertImportRateLimit } from "@/lib/rate-limit/guards";
 
 type RowResult = { row: number; unitId: string | null; status: "ok" | "error"; message: string };
 
 export const POST = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "clients", "create");
   if (!user) return response;
+
+  const limited = await assertImportRateLimit(request, user.unitId);
+  if (limited) return limited;
   const canEdit = await hasPermission(user.id, "clients", "edit");
 
   const raw = await request.json();

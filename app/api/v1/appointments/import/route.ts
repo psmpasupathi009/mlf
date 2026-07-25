@@ -13,6 +13,7 @@ import {
   canBookForAnyAdvocate,
   resolveBookingAdvocateMobile,
 } from "@/lib/appointments/booking-rules";
+import { assertImportRateLimit } from "@/lib/rate-limit/guards";
 
 type RowResult = {
   row: number;
@@ -24,6 +25,9 @@ type RowResult = {
 export const POST = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "appointments", "create");
   if (!user) return response;
+
+  const limited = await assertImportRateLimit(request, user.unitId);
+  if (limited) return limited;
 
   const raw = await request.json();
   const parsed = importAppointmentsSchema.safeParse(raw);

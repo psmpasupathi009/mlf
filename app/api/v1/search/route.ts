@@ -3,10 +3,25 @@ import { requireUser } from "@/lib/api/guard";
 import { hasPermission } from "@/lib/rbac";
 import { prisma } from "@/lib/db/prisma";
 import { containsInsensitive } from "@/lib/db/search";
+import { rateLimit } from "@/lib/rate-limit";
+import { clientRateKey } from "@/lib/rate-limit/client-key";
 
 export const GET = apiHandler(async (request) => {
   const { user, response } = await requireUser(request);
   if (!user) return response;
+
+  const limited = await rateLimit(
+    clientRateKey(request, "search", user.unitId),
+    60,
+    60 * 1000
+  );
+  if (!limited.allowed) {
+    return jsonFail(
+      "RATE_LIMITED",
+      "Too many searches. Slow down a moment.",
+      429
+    );
+  }
 
   const url = new URL(request.url);
   const q = (url.searchParams.get("q") ?? "").trim();
