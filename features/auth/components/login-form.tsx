@@ -308,7 +308,7 @@ export function LoginForm() {
 
   return (
     <div className="w-full text-foreground">
-      <header className="mb-9">
+      <header className="mb-6 sm:mb-9">
         <Lock
           aria-hidden
           className="mb-3 size-5 text-navy sm:size-6"

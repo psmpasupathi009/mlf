@@ -190,7 +190,7 @@ export function DakPage({ user }: { user: PublicUser }) {
           />
         }
         filters={
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex w-full flex-col gap-3 lg:flex-row lg:items-center">
             <FilterChipGroup
               aria-label="Direction"
               value={direction}
@@ -204,10 +204,10 @@ export function DakPage({ user }: { user: PublicUser }) {
                 { id: "out", label: "Out" },
               ]}
             />
-            <div className="flex items-center gap-2">
+            <div className="flex w-full flex-wrap items-center gap-2">
               {dateFilter ? (
                 <>
-                  <div className="min-w-0 flex-1 sm:w-44">
+                  <div className="min-w-0 w-full flex-1 sm:w-44 sm:flex-none">
                     <DatePicker
                       value={dateFilter}
                       onChange={(v) => {
@@ -219,7 +219,7 @@ export function DakPage({ user }: { user: PublicUser }) {
                   <Button
                     type="button"
                     variant="ghost"
-                    className="h-11 shrink-0"
+                    className="h-11 w-full shrink-0 sm:w-auto"
                     onClick={() => {
                       setPage(1);
                       setDateFilter("");
@@ -233,7 +233,7 @@ export function DakPage({ user }: { user: PublicUser }) {
                   <Button
                     type="button"
                     variant="outline"
-                    className="h-11 shrink-0"
+                    className="h-11 w-full shrink-0 sm:w-auto"
                     onClick={() => {
                       setPage(1);
                       setDateFilter(istDateKey());
@@ -244,7 +244,7 @@ export function DakPage({ user }: { user: PublicUser }) {
                   <Button
                     type="button"
                     variant="ghost"
-                    className="h-11 shrink-0"
+                    className="h-11 w-full shrink-0 sm:w-auto"
                     onClick={() => {
                       setPage(1);
                       setDateFilter(istDateKey());

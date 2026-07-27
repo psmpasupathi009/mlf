@@ -165,7 +165,7 @@ export function AccountsFiltersSection({
             </div>
 
             {fee && caseUnitId ? (
-              <div className="grid gap-3 border-t border-border/70 pt-4 sm:grid-cols-3">
+              <div className="grid gap-3 border-t border-border/70 pt-4 md:grid-cols-3">
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Agreed fee

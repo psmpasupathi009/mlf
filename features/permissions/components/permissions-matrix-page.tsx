@@ -241,12 +241,12 @@ export function PermissionsMatrixPage({ user }: { user: PublicUser }) {
       ) : (
         <div className="space-y-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-            <div className="flex flex-wrap gap-2">
+            <div className="flex gap-2 overflow-x-auto pb-0.5 [-webkit-overflow-scrolling:touch]">
               <button
                 type="button"
                 onClick={() => setFocusRole("all")}
                 className={cn(
-                  "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+                  "shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
                   focusRole === "all"
                     ? "bg-brand text-brand-foreground"
                     : "bg-muted text-muted-foreground hover:text-navy"
@@ -260,7 +260,7 @@ export function PermissionsMatrixPage({ user }: { user: PublicUser }) {
                   type="button"
                   onClick={() => setFocusRole(role)}
                   className={cn(
-                    "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+                    "shrink-0 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
                     focusRole === role
                       ? "bg-brand text-brand-foreground"
                       : "bg-muted text-muted-foreground hover:text-navy"
@@ -291,7 +291,7 @@ export function PermissionsMatrixPage({ user }: { user: PublicUser }) {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
               {roles.map((role) => (
                 <Card key={role}>
                   <CardContent className="p-4">

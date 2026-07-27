@@ -153,23 +153,23 @@ export function PinStep({
         </Button>
       ) : null}
 
-      <div className="flex items-center justify-between gap-3 text-sm">
+      <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         {onBack ? (
           <button
             type="button"
-            className="text-muted-foreground transition-colors hover:text-navy"
+            className="text-left text-muted-foreground transition-colors hover:text-navy"
             onClick={onBack}
             disabled={loading}
           >
             Back
           </button>
         ) : (
-          <span />
+          <span className="hidden sm:block" />
         )}
         {showForgot && onForgot && !locked ? (
           <button
             type="button"
-            className="font-medium text-navy underline-offset-4 transition-colors hover:underline disabled:opacity-50"
+            className="text-left font-medium text-navy underline-offset-4 transition-colors hover:underline disabled:opacity-50 sm:text-right"
             onClick={onForgot}
             disabled={loading}
           >

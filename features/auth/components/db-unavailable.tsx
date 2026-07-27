@@ -12,7 +12,7 @@ export function DbUnavailable({
   detail?: string;
 }) {
   return (
-    <div className="flex flex-1 flex-col items-center justify-center gap-4 p-8 text-center">
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 p-4 text-center sm:p-8">
       <div className="max-w-md space-y-2">
         <p className="text-sm font-medium text-foreground">{title}</p>
         <p className="text-sm text-muted-foreground">{detail}</p>

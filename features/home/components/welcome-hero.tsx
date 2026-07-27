@@ -48,13 +48,13 @@ export function WelcomeHero({
             </p>
           </div>
 
-          <div className="flex w-full shrink-0 flex-row flex-wrap items-center gap-2 lg:w-auto lg:justify-end">
+          <div className="flex w-full shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:w-auto lg:justify-end">
             {canBookAppointment ? (
               <Button
                 asChild
                 size="sm"
                 variant="on-brand-solid"
-                className="shrink-0"
+                className="w-full shrink-0 sm:w-auto"
               >
                 <Link href="/appointments?new=1">
                   <Plus className="size-4" />
@@ -67,7 +67,7 @@ export function WelcomeHero({
                 asChild
                 size="sm"
                 variant="on-brand-solid"
-                className="shrink-0"
+                className="w-full shrink-0 sm:w-auto"
               >
                 <Link href="/clients?new=1">
                   <Plus className="size-4" />
@@ -80,7 +80,7 @@ export function WelcomeHero({
                 asChild
                 size="sm"
                 variant="on-brand-solid"
-                className="shrink-0"
+                className="w-full shrink-0 sm:w-auto"
               >
                 <Link href="/cases?new=1">
                   <Plus className="size-4" />
@@ -93,7 +93,7 @@ export function WelcomeHero({
                 asChild
                 size="sm"
                 variant="on-brand-solid"
-                className="shrink-0"
+                className="w-full shrink-0 sm:w-auto"
               >
                 <Link href="/accounts?new=1">
                   <Plus className="size-4" />

@@ -23,7 +23,7 @@ export function calendarClassNames(compact = false) {
     week: "mt-0.5 flex w-full",
     day: "relative w-[14.28%] p-0.5 text-center",
     day_button: cn(
-      "mx-auto flex size-9 items-center justify-center rounded-full text-sm transition-colors",
+      "mx-auto flex size-8 items-center justify-center rounded-full text-sm transition-colors sm:size-9",
       "hover:bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-navy/30"
     ),
     selected:

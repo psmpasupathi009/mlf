@@ -295,7 +295,7 @@ export function CaseDetailPage({
       />
 
       <Card className="overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-border/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 border-b border-border/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
           <div>
             <h2 className="text-base font-semibold text-navy">Hearings</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
@@ -384,7 +384,7 @@ export function CaseDetailPage({
               </Button>
             </div>
             {fee ? (
-              <div className="grid gap-3 sm:grid-cols-3">
+              <div className="grid gap-3 md:grid-cols-3">
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Agreed fee

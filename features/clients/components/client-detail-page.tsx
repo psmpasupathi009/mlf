@@ -279,7 +279,7 @@ export function ClientDetailPage({
       )}
 
       <Card className="overflow-hidden">
-        <div className="flex flex-col gap-3 border-b border-border/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 border-b border-border/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
           <div>
             <h2 className="text-base font-semibold text-navy">Cases</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
@@ -357,7 +357,7 @@ export function ClientDetailPage({
 
       {can("accounts", "view") ? (
         <Card className="overflow-hidden">
-          <div className="flex flex-col gap-3 border-b border-border/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 border-b border-border/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
             <div>
               <h2 className="flex items-center gap-2 text-base font-semibold text-navy">
                 <Wallet className="size-4" />

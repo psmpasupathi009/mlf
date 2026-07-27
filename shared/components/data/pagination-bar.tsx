@@ -24,23 +24,25 @@ export function PaginationBar({
       <p className="text-center text-sm text-muted-foreground sm:text-left">
         {total === 0 ? "No results" : `${from}–${to} of ${total}`}
       </p>
-      <div className="flex items-center justify-center gap-2">
+      <div className="flex items-center justify-center gap-1.5 sm:gap-2">
         <Button
           type="button"
           variant="outline"
           size="sm"
+          className="flex-1 sm:flex-none"
           disabled={page <= 1}
           onClick={() => onPageChange(page - 1)}
         >
           Previous
         </Button>
-        <span className="text-sm text-muted-foreground">
+        <span className="shrink-0 text-xs text-muted-foreground sm:text-sm">
           Page {page} / {totalPages}
         </span>
         <Button
           type="button"
           variant="outline"
           size="sm"
+          className="flex-1 sm:flex-none"
           disabled={page >= totalPages}
           onClick={() => onPageChange(page + 1)}
         >

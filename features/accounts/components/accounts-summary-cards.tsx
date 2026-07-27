@@ -23,7 +23,7 @@ export function AccountsSummaryCards({
   onStatusChange,
 }: AccountsSummaryCardsProps) {
   return (
-    <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-4">
+    <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 sm:gap-3 lg:grid-cols-4">
       {(
         [
           {
@@ -69,7 +69,7 @@ export function AccountsSummaryCards({
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {kpi.label}
             </p>
-            <p className="mt-1.5 text-base font-semibold text-navy sm:mt-2 sm:text-xl">
+            <p className="mt-1.5 break-all text-base font-semibold tabular-nums text-navy sm:mt-2 sm:truncate sm:text-xl">
               {rupee(kpi.value)}
             </p>
             <p className="mt-1 hidden text-xs text-muted-foreground sm:block">

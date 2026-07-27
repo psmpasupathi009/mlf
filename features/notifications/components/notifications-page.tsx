@@ -95,9 +95,9 @@ export function NotificationsPage() {
             : "You're all caught up. New updates will land here."
         }
         actions={
-          <div className="flex items-center gap-2">
+          <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
             {unread > 0 ? (
-              <Badge variant="default" className="h-6 px-2.5 tabular-nums">
+              <Badge variant="default" className="h-6 w-fit px-2.5 tabular-nums">
                 {unread} unread
               </Badge>
             ) : null}
@@ -106,7 +106,7 @@ export function NotificationsPage() {
                 type="button"
                 variant="outline"
                 size="sm"
-                className="gap-1.5"
+                className="w-full gap-1.5 sm:w-auto"
                 onClick={() => void markAllRead()}
               >
                 <CheckCheck className="size-3.5" />

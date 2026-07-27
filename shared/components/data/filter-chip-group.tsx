@@ -29,7 +29,7 @@ export function FilterChipGroup<T extends string = string>({
       role="group"
       aria-label={ariaLabel}
       className={cn(
-        "-mx-1 flex gap-2 overflow-x-auto px-1 pb-0.5 [-webkit-overflow-scrolling:touch]",
+        "flex gap-2 overflow-x-auto pb-0.5 [-webkit-overflow-scrolling:touch]",
         className
       )}
     >
@@ -42,7 +42,7 @@ export function FilterChipGroup<T extends string = string>({
             aria-pressed={selected}
             onClick={() => onChange(c.id)}
             className={cn(
-              "shrink-0 rounded-full font-medium transition-colors",
+              "shrink-0 whitespace-nowrap rounded-full font-medium transition-colors",
               size === "md" ? "px-3.5 py-2 text-sm" : "px-3.5 py-1.5 text-xs",
               selected
                 ? "bg-brand text-brand-foreground"

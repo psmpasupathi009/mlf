@@ -12,7 +12,7 @@ export function DataToolbar({ search, filters, actions }: DataToolbarProps) {
           <div className="w-full min-w-0 md:max-w-sm md:flex-1">{search}</div>
         ) : null}
         {filters ? (
-          <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center md:w-auto **:data-[slot=select-trigger]:w-full sm:**:data-[slot=select-trigger]:w-auto">
+          <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center md:w-auto *:min-w-0 *:w-full sm:*:w-auto **:data-[slot=select-trigger]:w-full sm:**:data-[slot=select-trigger]:w-auto [&_button]:w-full sm:[&_button]:w-auto">
             {filters}
           </div>
         ) : null}

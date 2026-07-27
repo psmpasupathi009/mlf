@@ -118,7 +118,7 @@ export function CaseDocumentsPanel({
 
   return (
     <Card className="overflow-hidden">
-      <div className="flex flex-col gap-4 border-b border-border/80 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-4 border-b border-border/80 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4">
         <div>
           <h2 className="text-base font-semibold text-navy">Case documents</h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
@@ -145,7 +145,7 @@ export function CaseDocumentsPanel({
         ) : null}
       </div>
 
-      <div className="flex flex-wrap gap-1.5 border-b border-border/80 px-5 py-3">
+      <div className="flex flex-wrap gap-1.5 border-b border-border/80 px-4 py-3 sm:px-5">
         {(
           [
             ["all", "All"],
@@ -176,7 +176,7 @@ export function CaseDocumentsPanel({
 
       <CardContent className="p-0">
         {documents.length === 0 ? (
-          <div className="px-5 py-14 text-center">
+          <div className="px-4 py-14 text-center sm:px-5">
             <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-muted">
               <FileText className="size-5 text-muted-foreground" />
             </div>
@@ -199,7 +199,7 @@ export function CaseDocumentsPanel({
             ) : null}
           </div>
         ) : rows.length === 0 ? (
-          <p className="px-5 py-10 text-center text-sm text-muted-foreground">
+          <p className="px-4 py-10 text-center text-sm text-muted-foreground sm:px-5">
             No {filter === "all" ? "" : DOCUMENT_TYPE_LABELS[filter].toLowerCase() + " "}
             documents in this filter.
           </p>
@@ -210,7 +210,7 @@ export function CaseDocumentsPanel({
               return (
                 <li
                   key={d.unitId}
-                  className="flex flex-col gap-3 px-5 py-4 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-4"
                 >
                   <div className="flex min-w-0 items-start gap-3">
                     <span className="mt-0.5 flex size-10 shrink-0 items-center justify-center rounded-xl bg-secondary text-navy">

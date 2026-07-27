@@ -536,7 +536,7 @@ export function HrmsPage({ user }: { user: PublicUser }) {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <div className="rounded-xl border border-border/80 bg-card p-4 shadow-sm shadow-black/5 dark:shadow-md dark:shadow-black/40">
           <p className="text-xs font-medium text-muted-foreground">Your status</p>
           <div className="mt-2 flex items-center gap-2">

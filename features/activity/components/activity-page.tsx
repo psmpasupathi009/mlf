@@ -361,7 +361,7 @@ function ActivityItem({
           <div className="flex items-start gap-3 px-3 py-3 sm:px-3.5">
             <div className="min-w-0 flex-1 space-y-1.5">
               <div className="flex items-start justify-between gap-3">
-                <p className="text-[15px] font-semibold tracking-tight text-navy">
+                <p className="min-w-0 flex-1 truncate text-[15px] font-semibold tracking-tight text-navy">
                   {actionLabel(row.action)}
                 </p>
                 <span className="flex shrink-0 items-center gap-1.5 pt-0.5">

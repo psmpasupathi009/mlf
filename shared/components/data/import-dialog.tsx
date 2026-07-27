@@ -171,11 +171,11 @@ export function ImportDialog({
                 {result.dryRun ? " (dry-run)" : ""}
               </p>
               {result.results.map((r) => (
-                <div key={r.row} className="flex items-start gap-2 text-xs">
+                <div key={r.row} className="flex min-w-0 items-start gap-2 text-xs">
                   <Badge variant={r.status === "ok" ? "success" : "destructive"}>
                     row {r.row}
                   </Badge>
-                  <span className="text-muted-foreground">
+                  <span className="min-w-0 flex-1 break-words text-muted-foreground">
                     {r.unitId ? `${r.unitId} · ` : ""}
                     {r.message}
                   </span>

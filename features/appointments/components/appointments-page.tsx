@@ -400,7 +400,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                   setRange(c.id);
                 }}
                 className={cn(
-                  "shrink-0 rounded-xl px-3.5 py-2 text-left transition-colors",
+                  "shrink-0 whitespace-nowrap rounded-xl px-3.5 py-2 text-left transition-colors",
                   range === c.id
                     ? "bg-brand text-brand-foreground shadow-sm"
                     : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-navy"
@@ -420,8 +420,8 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
             ))}
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="relative min-w-0 flex-1 sm:w-56">
+          <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
+            <div className="relative min-w-0 w-full md:w-56">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={search}
@@ -448,7 +448,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                   });
                 }}
                 className={cn(
-                  "h-11 shrink-0 rounded-xl px-3.5 text-sm font-semibold transition-colors",
+                  "h-11 w-full shrink-0 rounded-xl px-3.5 text-sm font-semibold transition-colors md:w-auto",
                   unassignedOnly
                     ? "bg-amber-600 text-white shadow-sm"
                     : "bg-muted/70 text-muted-foreground hover:bg-muted hover:text-navy"
@@ -460,7 +460,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
             ) : null}
             {bookAny ? (
               <AdvocatePicker
-                className="h-11 w-full sm:w-48"
+                className="h-11 w-full md:w-48"
                 value={advocateFilter === "all" ? null : advocateFilter}
                 selectedLabel={
                   advocateFilter === "all" ? null : advocateFilterLabel
@@ -489,7 +489,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                 setStatus(v);
               }}
             >
-              <SelectTrigger className="h-11 w-full sm:w-40">
+              <SelectTrigger className="h-11 w-full md:w-40">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -622,12 +622,12 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                       </div>
                     </div>
 
-                    <div className="flex shrink-0 flex-wrap items-center gap-2 lg:flex-col lg:items-stretch xl:flex-row xl:items-center">
+                    <div className="flex w-full shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:w-auto lg:flex-col lg:items-stretch xl:flex-row xl:items-center">
                       {canOpenCase && a.clientUnitId && !a.caseUnitId ? (
                         <Button
                           type="button"
                           variant="outline"
-                          className="h-10 flex-1 gap-2 lg:flex-none"
+                          className="h-10 w-full gap-2 sm:flex-1 lg:w-auto lg:flex-none"
                           disabled={busy}
                           onClick={() => void handleOpenCase(a)}
                         >
@@ -639,7 +639,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                         <>
                           <Button
                             type="button"
-                            className="h-10 flex-1 gap-2 lg:flex-none"
+                            className="h-10 w-full gap-2 sm:flex-1 lg:w-auto lg:flex-none"
                             disabled={busy}
                             onClick={() => openReschedule(a)}
                           >
@@ -649,7 +649,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                           <Button
                             type="button"
                             variant="outline"
-                            className="h-10 flex-1 gap-2 lg:flex-none"
+                            className="h-10 w-full gap-2 sm:flex-1 lg:w-auto lg:flex-none"
                             disabled={busy}
                             onClick={() => handleComplete(a.unitId)}
                           >

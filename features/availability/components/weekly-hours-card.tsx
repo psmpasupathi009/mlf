@@ -119,7 +119,7 @@ export function WeeklyHoursCard({
                   Same every open day
                 </span>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
                 <div className="space-y-1.5">
                   <Label
                     htmlFor="workStart"
@@ -205,7 +205,7 @@ export function WeeklyHoursCard({
                 </button>
               </div>
               {hasBreak ? (
-                <div className="mt-3 grid grid-cols-2 gap-3">
+                <div className="mt-3 grid grid-cols-1 gap-3 min-[380px]:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label
                       htmlFor="breakStart"

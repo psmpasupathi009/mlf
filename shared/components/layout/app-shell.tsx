@@ -19,7 +19,7 @@ export function AppShell({ user, children }: AppShellProps) {
           brandName={brand.name}
           className="print:hidden"
         />
-        <main className="min-w-0 flex-1 overflow-x-clip print:overflow-visible">
+        <main className="min-w-0 flex-1 overflow-x-auto print:overflow-visible">
           <div className="mx-auto w-full max-w-[1600px] px-3 py-4 sm:px-5 sm:py-5 md:px-6 md:py-6 lg:px-8 lg:py-8 print:max-w-none print:px-0 print:py-0">
             {children}
           </div>

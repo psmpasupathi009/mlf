@@ -48,7 +48,7 @@ export function SessionRefreshGate() {
 
   if (state === "failed") {
     return (
-      <div className="flex flex-1 items-center justify-center p-8 text-sm text-muted-foreground">
+      <div className="flex flex-1 items-center justify-center p-4 text-sm text-muted-foreground sm:p-8">
         Session expired. Redirecting to sign in…
       </div>
     );
@@ -61,7 +61,7 @@ export function SessionRefreshGate() {
   }
 
   return (
-    <div className="flex flex-1 items-center justify-center p-8 text-sm text-muted-foreground">
+    <div className="flex flex-1 items-center justify-center p-4 text-sm text-muted-foreground sm:p-8">
       Restoring session…
     </div>
   );

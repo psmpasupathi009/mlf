@@ -438,11 +438,11 @@ export function DiaryPage({ user }: { user: PublicUser }) {
                 {tomorrowNotify.summary.smsPending} SMS not yet sent
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap">
               {canEdit ? (
                 <Button
                   type="button"
-                  className="h-10 gap-2"
+                  className="h-10 w-full gap-2 sm:w-auto"
                   disabled={smsSending || tomorrowNotify.summary.smsPending === 0}
                   onClick={() => void sendTomorrowSms()}
                 >
@@ -453,7 +453,7 @@ export function DiaryPage({ user }: { user: PublicUser }) {
               <Button
                 type="button"
                 variant="outline"
-                className="h-10"
+                className="h-10 w-full sm:w-auto"
                 onClick={() => setDate(tomorrowKey)}
               >
                 Open tomorrow’s list
@@ -461,7 +461,7 @@ export function DiaryPage({ user }: { user: PublicUser }) {
               <Button
                 type="button"
                 variant="secondary"
-                className="h-10"
+                className="h-10 w-full sm:w-auto"
                 onClick={() => setPreviewOpen((v) => !v)}
               >
                 {previewOpen ? "Hide SMS list" : "Preview tomorrow SMS list"}
@@ -568,8 +568,8 @@ export function DiaryPage({ user }: { user: PublicUser }) {
             </div>
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="relative min-w-0 flex-1 sm:w-56">
+          <div className="flex flex-col gap-2 md:flex-row md:items-center">
+            <div className="relative min-w-0 w-full md:w-56">
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={search}
@@ -580,7 +580,7 @@ export function DiaryPage({ user }: { user: PublicUser }) {
             </div>
             {bookAny ? (
               <AdvocatePicker
-                className="h-11 w-full sm:w-52"
+                className="h-11 w-full md:w-52"
                 value={advocateFilter}
                 selectedLabel={advocateFilterLabel}
                 onChange={(a) => {

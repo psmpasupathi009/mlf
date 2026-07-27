@@ -89,10 +89,10 @@ export function OtpStep({
             : "Verify OTP"}
       </Button>
 
-      <div className="flex items-center justify-between gap-3 text-sm">
+      <div className="flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <button
           type="button"
-          className="text-muted-foreground transition-colors hover:text-navy disabled:opacity-50"
+          className="text-left text-muted-foreground transition-colors hover:text-navy disabled:opacity-50"
           onClick={onBack}
           disabled={loading}
         >
@@ -100,7 +100,7 @@ export function OtpStep({
         </button>
         <button
           type="button"
-          className="font-medium text-navy underline-offset-4 transition-colors hover:underline disabled:text-muted-foreground disabled:no-underline"
+          className="text-left font-medium text-navy underline-offset-4 transition-colors hover:underline disabled:text-muted-foreground disabled:no-underline sm:text-right"
           onClick={onResend}
           disabled={resendActive || loading}
         >

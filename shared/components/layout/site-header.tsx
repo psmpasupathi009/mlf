@@ -21,7 +21,7 @@ export function SiteHeader({ brandName, className }: SiteHeaderProps) {
       )}
     >
       <div className="flex h-12 items-center gap-2 px-3 sm:h-14 sm:px-5 md:px-6 lg:px-8">
-        <div className="flex w-10 shrink-0 items-center justify-start">
+        <div className="flex w-[6.75rem] shrink-0 items-center justify-start sm:w-28">
           <SidebarTrigger className="-ml-1" />
         </div>
 
@@ -33,7 +33,7 @@ export function SiteHeader({ brandName, className }: SiteHeaderProps) {
           {brandName}
         </Link>
 
-        <div className="flex shrink-0 items-center justify-end gap-0.5">
+        <div className="flex w-[6.75rem] shrink-0 items-center justify-end gap-0.5 sm:w-28">
           <GlobalSearch />
           <NotificationBell />
           <ThemeToggle />

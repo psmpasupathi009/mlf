@@ -57,7 +57,7 @@ export function NotificationBell() {
         align="end"
         className="w-[min(100vw-1.5rem,22rem)] overflow-hidden p-0 sm:w-96"
       >
-        <div className="flex items-center justify-between gap-2 px-3.5 py-3">
+        <div className="flex flex-col gap-2 px-3.5 py-3 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
           <button
             type="button"
             className="flex items-center gap-2 rounded-sm text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -77,7 +77,7 @@ export function NotificationBell() {
               type="button"
               variant="ghost"
               size="sm"
-              className="h-7 px-2 text-xs text-muted-foreground hover:text-navy"
+              className="h-7 self-start px-2 text-xs text-muted-foreground hover:text-navy sm:self-auto"
               onClick={() => void markAllRead()}
             >
               Mark all read

@@ -55,7 +55,7 @@ export function ReportsPage({ user }: ReportsPageProps) {
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {can("cases.view") && isModuleEnabled("cases") ? (
           <Card>
-            <CardContent className="flex h-full flex-col gap-4 p-5">
+            <CardContent className="flex h-full flex-col gap-4 p-4 sm:p-5">
               <div className="flex items-start gap-3">
                 <FileSpreadsheet className="mt-0.5 size-5 text-navy" />
                 <div>
@@ -82,7 +82,7 @@ export function ReportsPage({ user }: ReportsPageProps) {
 
         {can("clients.view") && isModuleEnabled("clients") ? (
           <Card>
-            <CardContent className="flex h-full flex-col gap-4 p-5">
+            <CardContent className="flex h-full flex-col gap-4 p-4 sm:p-5">
               <div className="flex items-start gap-3">
                 <Briefcase className="mt-0.5 size-5 text-navy" />
                 <div>
@@ -108,7 +108,7 @@ export function ReportsPage({ user }: ReportsPageProps) {
 
         {can("employees.view") && isModuleEnabled("employees") ? (
           <Card>
-            <CardContent className="flex h-full flex-col gap-4 p-5">
+            <CardContent className="flex h-full flex-col gap-4 p-4 sm:p-5">
               <div className="flex items-start gap-3">
                 <Users className="mt-0.5 size-5 text-navy" />
                 <div>
@@ -134,7 +134,7 @@ export function ReportsPage({ user }: ReportsPageProps) {
 
         {can("appointments.view") && isModuleEnabled("appointments") ? (
           <Card>
-            <CardContent className="flex h-full flex-col gap-4 p-5">
+            <CardContent className="flex h-full flex-col gap-4 p-4 sm:p-5">
               <div className="flex items-start gap-3">
                 <CalendarDays className="mt-0.5 size-5 text-navy" />
                 <div>
@@ -161,7 +161,7 @@ export function ReportsPage({ user }: ReportsPageProps) {
 
         {can("tasks.view") && isModuleEnabled("tasks") ? (
           <Card>
-            <CardContent className="flex h-full flex-col gap-4 p-5">
+            <CardContent className="flex h-full flex-col gap-4 p-4 sm:p-5">
               <div className="flex items-start gap-3">
                 <CheckSquare className="mt-0.5 size-5 text-navy" />
                 <div>
@@ -194,7 +194,7 @@ export function ReportsPage({ user }: ReportsPageProps) {
 
         {can("dak.view") && isModuleEnabled("dak") ? (
           <Card>
-            <CardContent className="flex h-full flex-col gap-4 p-5">
+            <CardContent className="flex h-full flex-col gap-4 p-4 sm:p-5">
               <div className="flex items-start gap-3">
                 <Mail className="mt-0.5 size-5 text-navy" />
                 <div>
@@ -220,7 +220,7 @@ export function ReportsPage({ user }: ReportsPageProps) {
 
         {can("accounts.view") && isModuleEnabled("accounts") ? (
           <Card>
-            <CardContent className="flex h-full flex-col gap-4 p-5">
+            <CardContent className="flex h-full flex-col gap-4 p-4 sm:p-5">
               <div className="flex items-start gap-3">
                 <CircleDollarSign className="mt-0.5 size-5 text-navy" />
                 <div>
@@ -247,7 +247,7 @@ export function ReportsPage({ user }: ReportsPageProps) {
 
         {can("accounts.view") && can("reports.view") ? (
           <Card>
-            <CardContent className="flex h-full flex-col gap-4 p-5">
+            <CardContent className="flex h-full flex-col gap-4 p-4 sm:p-5">
               <div className="flex items-start gap-3">
                 <CircleDollarSign className="mt-0.5 size-5 text-navy" />
                 <div>
@@ -275,7 +275,7 @@ export function ReportsPage({ user }: ReportsPageProps) {
 
         {isModuleEnabled("cases") && can("cases.view") ? (
           <Card>
-            <CardContent className="flex h-full flex-col gap-4 p-5">
+            <CardContent className="flex h-full flex-col gap-4 p-4 sm:p-5">
               <div className="flex items-start gap-3">
                 <Printer className="mt-0.5 size-5 text-navy" />
                 <div>
@@ -297,7 +297,7 @@ export function ReportsPage({ user }: ReportsPageProps) {
 
         {isModuleEnabled("hrms") && can("hrms.view") ? (
           <Card>
-            <CardContent className="flex h-full flex-col gap-4 p-5">
+            <CardContent className="flex h-full flex-col gap-4 p-4 sm:p-5">
               <div className="flex items-start gap-3">
                 <Users className="mt-0.5 size-5 text-navy" />
                 <div>
