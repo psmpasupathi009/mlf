@@ -8,10 +8,20 @@ import { writeFileSync } from "node:fs";
 import { PrismaClient } from "@prisma/client";
 import { ACCESS_COOKIE, REFRESH_COOKIE } from "../lib/auth/cookie-names";
 import { normalizeMobile } from "../lib/auth/mobile";
+import { buildMongoDatabaseUrl } from "../lib/db/prisma";
 
 const BASE = process.env.SMOKE_BASE_URL ?? "http://127.0.0.1:3000";
-const PIN = process.env.SMOKE_PIN ?? "";
-const prisma = new PrismaClient();
+/** Prefer SMOKE_PIN; fall back to SEED_PIN (same default as prisma/seed.ts). */
+const PIN = process.env.SMOKE_PIN || process.env.SEED_PIN || "123456";
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL
+        ? buildMongoDatabaseUrl(process.env.DATABASE_URL)
+        : undefined,
+    },
+  },
+});
 
 type Status = "PASS" | "FAIL" | "SKIP" | "WARN";
 type Row = {
@@ -428,11 +438,9 @@ async function main() {
   await testApi(
     jar,
     "Diary",
-    "POST",
+    "GET",
     "/api/v1/diary/tomorrow-notify",
-    "Notify staff about tomorrow’s board",
-    {},
-    (s) => s >= 200 && s < 500
+    "Tomorrow’s board for client call / SMS prep"
   );
   push({
     module: "Diary",
@@ -551,6 +559,34 @@ async function main() {
 
   // ── APPOINTMENTS / AVAILABILITY ──
   await testApi(jar, "Appointments", "GET", "/api/v1/appointments", "List appointments");
+
+  // Prefer a real advocate from the office list (admin-only users are not bookable).
+  const advocatesRes = await req(jar, "GET", "/api/v1/advocates?pageSize=5");
+  const advocateRows =
+    (
+      advocatesRes.json as {
+        data?: { mobile?: string }[];
+      }
+    )?.data ?? [];
+  const advocateMobile =
+    advocateRows.find((a) => a.mobile && a.mobile.replace(/\D/g, "").length >= 10)
+      ?.mobile?.replace(/\D/g, "")
+      .slice(-10) ?? "";
+
+  push({
+    module: "Advocates",
+    method: "GET",
+    path: "/api/v1/advocates",
+    purpose: "List bookable advocates for appointment form",
+    status: advocatesRes.res.ok && advocateMobile ? "PASS" : advocatesRes.res.ok ? "WARN" : "FAIL",
+    detail: advocatesRes.res.ok
+      ? advocateMobile
+        ? `HTTP 200 — advocate …${advocateMobile.slice(-4)}`
+        : "HTTP 200 — no advocates seeded"
+      : `HTTP ${advocatesRes.res.status}`,
+    kind: "api",
+  });
+
   const appt = await testApi(
     jar,
     "Appointments",
@@ -558,7 +594,7 @@ async function main() {
     "/api/v1/appointments",
     "Book consultation appointment",
     {
-      advocateMobile: user.mobile.replace(/\D/g, "").slice(-10),
+      advocateMobile: advocateMobile || user.mobile.replace(/\D/g, "").slice(-10),
       title: `Audit consult ${stamp}`,
       scheduledAt: `${ymd}T10:30:00+05:30`,
       durationMin: 30,
@@ -566,7 +602,7 @@ async function main() {
       notes: "Audit appointment",
       clientUnitId: clientUnitId ?? "",
     },
-    (s, j) => accept(s, j) || s === 400 || s === 409
+    (s, j) => accept(s, j) || (advocateMobile ? false : s === 400 || s === 409)
   );
   const apptUnitId = pick(appt.json, "appointment");
   if (apptUnitId) {
@@ -591,8 +627,13 @@ async function main() {
     jar,
     "Appointments",
     "GET",
-    `/api/v1/appointments/availability?date=${ymd}`,
-    "Slot availability for a day"
+    advocateMobile
+      ? `/api/v1/appointments/availability?date=${ymd}&advocateMobile=${advocateMobile}`
+      : `/api/v1/appointments/availability?date=${ymd}`,
+    "Slot availability for a day",
+    undefined,
+    (s, j) =>
+      accept(s, j) || (!advocateMobile && s === 400)
   );
   await testApi(
     jar,
@@ -813,8 +854,11 @@ async function main() {
     "PATCH",
     "/api/v1/profile",
     "Update own profile fields",
-    {},
-    (s) => s >= 200 && s < 500
+    {
+      name: user.name?.trim() || "Audit Admin",
+      email: user.email ?? "",
+      address: user.address ?? "",
+    }
   );
   await testApi(
     jar,

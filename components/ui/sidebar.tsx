@@ -72,8 +72,10 @@ function SidebarProvider({
     const match = document.cookie.match(
       new RegExp(`(?:^|; )${SIDEBAR_COOKIE_NAME}=([^;]*)`)
     );
-    if (match?.[1] === "true") _setOpen(true);
-    else if (match?.[1] === "false") _setOpen(false);
+    const next =
+      match?.[1] === "true" ? true : match?.[1] === "false" ? false : null;
+    if (next === null) return;
+    queueMicrotask(() => _setOpen(next));
   }, [openProp]);
 
   const setOpen = React.useCallback(

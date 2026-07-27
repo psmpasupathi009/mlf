@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ZodError, type ZodType } from "zod";
+import { isDbUnreachableError } from "@/lib/db/prisma";
 
 export type ApiErrorCode =
   | "UNAUTHORIZED"
@@ -9,6 +10,7 @@ export type ApiErrorCode =
   | "CONFLICT"
   | "RATE_LIMITED"
   | "SERVER_ERROR"
+  | "DB_UNAVAILABLE"
   | "PIN_LOCKED"
   | "INVALID_CREDENTIALS"
   | string;
@@ -127,6 +129,13 @@ export function apiHandler(handler: RouteHandler): RouteHandler {
       return await handler(request, context);
     } catch (error) {
       console.error("apiHandler error", error);
+      if (isDbUnreachableError(error)) {
+        return jsonFail(
+          "DB_UNAVAILABLE",
+          "Database unreachable. If local: start Mongo (`npx tsx scripts/mongo-local.ts start`). If Atlas: Network Access must allow your IP (or 0.0.0.0/0).",
+          503
+        );
+      }
       return jsonFail("SERVER_ERROR", "Something went wrong", 500);
     }
   };

@@ -65,7 +65,7 @@ export const POST = apiHandler(async (request) => {
       });
       continue;
     }
-    const roles = designationDefaultRoles[designation];
+    const baseRoles = designationDefaultRoles[designation];
 
     try {
       const existingByMobile = await prisma.user.findUnique({ where: { mobile } });
@@ -102,6 +102,12 @@ export const POST = apiHandler(async (request) => {
         });
         continue;
       }
+
+      // Never strip admin/sub_admin via CSV designation remap.
+      const preserved = (existingByUnitId?.roles ?? []).filter(
+        (r) => r === "admin" || r === "sub_admin"
+      );
+      const roles = Array.from(new Set([...preserved, ...baseRoles]));
 
       if (dryRun) {
         results.push({

@@ -110,11 +110,11 @@ export async function POST(request: Request) {
     return applyCorsHeaders(
       request,
       jsonFail(
-        "SERVER_ERROR",
+        isDbUnreachableError(error) ? "DB_UNAVAILABLE" : "SERVER_ERROR",
         isDbUnreachableError(error)
-          ? "Database unreachable. Check MongoDB Atlas Network Access (allow 0.0.0.0/0 for Vercel)."
+          ? "Database unreachable. Check MongoDB Atlas Network Access (allow your IP or 0.0.0.0/0), or use local Mongo."
           : "Could not verify this number. Please try again.",
-        500
+        isDbUnreachableError(error) ? 503 : 500
       )
     );
   }

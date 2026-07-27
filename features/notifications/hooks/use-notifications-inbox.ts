@@ -47,8 +47,11 @@ export function useNotificationsInbox(filter: InboxFilter, page: number) {
   const filterRef = useRef(filter);
   const pageRef = useRef(page);
   const skipNextSync = useRef(false);
-  filterRef.current = filter;
-  pageRef.current = page;
+
+  useEffect(() => {
+    filterRef.current = filter;
+    pageRef.current = page;
+  }, [filter, page]);
 
   const refreshUnread = useCallback(async () => {
     const countRes = await apiFetch<UnreadEnvelope>(

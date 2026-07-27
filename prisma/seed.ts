@@ -19,8 +19,17 @@ import { normalizeMobile } from "../lib/auth/mobile";
 import { hashPin } from "../lib/auth/pin";
 import { parseCsv } from "../lib/utils/csv";
 import { nextUnitId } from "../lib/ids";
+import { buildMongoDatabaseUrl } from "../lib/db/prisma";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({
+  datasources: {
+    db: {
+      url: process.env.DATABASE_URL
+        ? buildMongoDatabaseUrl(process.env.DATABASE_URL)
+        : undefined,
+    },
+  },
+});
 const DATA = join(process.cwd(), "prisma", "data");
 
 /** Dev/test PIN for seeded users (override with SEED_PIN). */
@@ -172,11 +181,22 @@ async function seedAdmin() {
   const pinHash = await hashPin(SEED_PIN);
   const existing = await prisma.user.findUnique({ where: { mobile: adminMobile } });
 
+  // Merge admin into existing roles — never wipe advocate/staff from a matched employee.
+  // Bootstrap / Managing Partner also gets advocate so they appear in booking lists.
+  const existingRoles = existing?.roles ?? [];
+  const managingPartnerDefaults =
+    !existing?.designation || existing.designation === "Managing Partner"
+      ? designationDefaultRoles["Managing Partner"]
+      : [];
+  const mergedRoles = Array.from(
+    new Set<UserRole>([...existingRoles, ...managingPartnerDefaults, "admin"])
+  );
+
   if (existing) {
     const updated = await prisma.user.update({
       where: { id: existing.id },
       data: {
-        roles: ["admin"],
+        roles: mergedRoles,
         designation: existing.designation ?? "Managing Partner",
         name: existing.name ?? "Bootstrap Admin",
         pinHash,
@@ -194,7 +214,7 @@ async function seedAdmin() {
     data: {
       unitId,
       mobile: adminMobile,
-      roles: ["admin"],
+      roles: designationDefaultRoles["Managing Partner"],
       designation: "Managing Partner",
       name: "Bootstrap Admin",
       pinHash,
@@ -207,6 +227,9 @@ async function seedAdmin() {
 
 async function seedEmployees(pinHash: string) {
   const rows = loadCsv("employees.sample.csv");
+  const adminMobile = normalizeMobile(
+    process.env.ADMIN_MOBILE ?? process.env.ADMIN_MOBILE_1 ?? ""
+  );
   let created = 0;
   let updated = 0;
 
@@ -216,9 +239,18 @@ async function seedEmployees(pinHash: string) {
 
     const designation =
       normalizeDesignation(row.designation) ?? ("Advocate" as const);
-    const roles = designationDefaultRoles[designation];
+    const baseRoles = designationDefaultRoles[designation];
 
     const existing = await prisma.user.findUnique({ where: { mobile } });
+    // Keep elevated roles if bootstrap admin matches this employee (or already set).
+    const preserved = (existing?.roles ?? []).filter(
+      (r) => r === "admin" || r === "sub_admin"
+    );
+    if (adminMobile && mobile === adminMobile && !preserved.includes("admin")) {
+      preserved.push("admin");
+    }
+    const roles = Array.from(new Set<UserRole>([...preserved, ...baseRoles]));
+
     if (existing) {
       await prisma.user.update({
         where: { id: existing.id },

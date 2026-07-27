@@ -50,6 +50,14 @@ describe("isDbUnreachableError", () => {
     expect(
       isDbUnreachableError(new Error("MongoServerSelectionError: timed out"))
     ).toBe(true);
+    expect(
+      isDbUnreachableError(
+        new Error("I/O error: received fatal alert: InternalError")
+      )
+    ).toBe(true);
+    expect(
+      isDbUnreachableError(new Error("tlsv1 alert internal error"))
+    ).toBe(true);
   });
 
   it("ignores normal application errors", () => {

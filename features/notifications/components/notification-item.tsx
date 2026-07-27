@@ -1,5 +1,6 @@
 "use client";
 
+import { createElement } from "react";
 import { ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 import type { NotificationPayload } from "@/lib/notifications/sse-hub";
@@ -27,7 +28,6 @@ export function NotificationItem({
   const unread = !item.readAt;
   const urgency = urgencyTone(item.type);
   const category = categoryForType(item.type);
-  const Icon = typeIcon(item.type);
   const hasLink = Boolean(item.href);
 
   return (
@@ -72,7 +72,10 @@ export function NotificationItem({
         )}
         aria-hidden
       >
-        <Icon className={compact ? "size-4" : "size-4.5"} strokeWidth={1.75} />
+        {createElement(typeIcon(item.type), {
+          className: compact ? "size-4" : "size-4.5",
+          strokeWidth: 1.75,
+        })}
       </span>
 
       <span className="min-w-0 flex-1">

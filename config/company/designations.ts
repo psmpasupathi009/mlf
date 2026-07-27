@@ -155,7 +155,8 @@ export const LEGACY_DESIGNATION_ALIASES: Record<string, Designation> = {
 
 /** Designation → default roles prefills on employee create / import. */
 export const designationDefaultRoles: Record<Designation, UserRole[]> = {
-  "Managing Partner": ["admin"],
+  // Admin + advocate so chamber head can appear in booking / case assignment lists.
+  "Managing Partner": ["admin", "advocate"],
   Partner: ["sub_admin", "advocate"],
   "Senior Advocate": ["advocate"],
   "Advocate on Record": ["advocate"],

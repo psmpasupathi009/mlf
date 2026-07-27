@@ -152,7 +152,9 @@ export function AvailabilityPage({ user }: { user: PublicUser }) {
   ]);
 
   const dirtyRef = useRef(dirty);
-  dirtyRef.current = dirty;
+  useEffect(() => {
+    dirtyRef.current = dirty;
+  }, [dirty]);
 
   const applyInferred = useCallback(
     (inferred: ReturnType<typeof inferSchedule>) => {

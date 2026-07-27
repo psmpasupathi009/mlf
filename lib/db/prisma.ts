@@ -78,7 +78,7 @@ export const prisma = resolveClient();
 
 // Prefer specific connection failures — avoid bare "timeout" (e.g. OTP messages).
 const UNREACHABLE_RE =
-  /server selection|serverselection|econnrefused|econnreset|enotfound|etimedout|(?:connection|socket|server|operation|network)\s+timed?\s*out|timed\s+out|connect(?:ion)? (?:refused|reset|failed|closed)|noprimary|no primary|replicasetnoprimary|replica set|mongodb.*(connect|network)|engine is not yet connected|prisma.?client.?initialization|can't reach database|could not connect/i;
+  /server selection|serverselection|econnrefused|econnreset|enotfound|etimedout|(?:connection|socket|server|operation|network)\s+timed?\s*out|timed\s+out|connect(?:ion)? (?:refused|reset|failed|closed)|noprimary|no primary|replicasetnoprimary|replica set|mongodb.*(connect|network)|engine is not yet connected|prisma.?client.?initialization|can't reach database|could not connect|tlsv1 alert internal error|fatal alert:\s*internalerror|internalerror/i;
 
 /** True when Mongo/Atlas is unreachable or the engine is not ready yet. */
 export function isDbUnreachableError(error: unknown): boolean {

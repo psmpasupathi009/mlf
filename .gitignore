@@ -50,3 +50,7 @@ next-env.d.ts
 # local audit output (may include unit ids; never commit PIN)
 scripts/.audit-results.json
 scripts/.audit-compact.json
+
+# local MongoDB binary + data (dev fallback when Atlas IP blocked)
+.tools/
+.data/

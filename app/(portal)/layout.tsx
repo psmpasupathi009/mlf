@@ -7,37 +7,46 @@ import {
   hasRefreshCookie,
 } from "@/lib/auth/session-user";
 import { isDbUnreachableError } from "@/lib/db/prisma";
+import type { PublicUser } from "@/lib/auth/session";
 
 export default async function PortalLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  let user: PublicUser | null = null;
+  let dbUnreachable = false;
+
   try {
-    const user = await getSessionUser();
-
-    if (!user) {
-      if (await hasRefreshCookie()) {
-        return (
-          <div className="flex min-h-full flex-1 flex-col bg-muted/30">
-            <SessionRefreshGate />
-          </div>
-        );
-      }
-      // Clears leftover access JWT (e.g. deactivated user) then → /login
-      redirect("/api/v1/auth/session-expired");
-    }
-
-    return <AppShell user={user}>{children}</AppShell>;
+    user = await getSessionUser();
   } catch (error) {
     // Valid JWT + Atlas down must not look like logout (refresh loop / cookie clear).
     if (isDbUnreachableError(error)) {
+      dbUnreachable = true;
+    } else {
+      throw error;
+    }
+  }
+
+  if (dbUnreachable) {
+    return (
+      <div className="flex min-h-full flex-1 flex-col bg-muted/30">
+        <DbUnavailable />
+      </div>
+    );
+  }
+
+  if (!user) {
+    if (await hasRefreshCookie()) {
       return (
         <div className="flex min-h-full flex-1 flex-col bg-muted/30">
-          <DbUnavailable />
+          <SessionRefreshGate />
         </div>
       );
     }
-    throw error;
+    // Clears leftover access JWT (e.g. deactivated user) then → /login
+    redirect("/api/v1/auth/session-expired");
   }
+
+  return <AppShell user={user}>{children}</AppShell>;
 }

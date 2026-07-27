@@ -58,14 +58,6 @@ function pack(
   return courts.map((courtName) => ({ state, district, city, courtName }));
 }
 
-function hq(
-  state: string,
-  district: string,
-  courts: readonly string[] = STANDARD
-): CourtSeed[] {
-  return pack(state, district, district, courts);
-}
-
 function cityCourts(
   state: string,
   district: string,
