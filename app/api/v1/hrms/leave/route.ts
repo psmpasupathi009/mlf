@@ -2,7 +2,7 @@ import { apiHandler, jsonFail, jsonOk, jsonOkList, parsePagination } from "@/lib
 import { requirePerm, requireUser } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, pickAuditFields } from "@/lib/audit";
 import { hasPermission, requireModuleEnabled } from "@/lib/rbac";
 import { applyLeaveSchema } from "@/lib/validations/hrms.schema";
 import { toLeaveSummary } from "@/features/hrms/server/serialize";
@@ -131,6 +131,15 @@ export const POST = apiHandler(async (request) => {
     action: "leave.apply",
     entity: "LeaveRequest",
     entityUnitId: created.unitId,
+    meta: {
+      after: pickAuditFields(created as Record<string, unknown>, [
+        "fromDate",
+        "toDate",
+        "reason",
+        "status",
+        "userUnitId",
+      ] as const),
+    },
   });
 
   scheduleNotify(async () => {

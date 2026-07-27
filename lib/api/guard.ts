@@ -13,6 +13,7 @@ const APP_MODULES = new Set<string>([
   "dashboard",
   "employees",
   "permissions",
+  "activity",
   "clients",
   "appointments",
   "cases",

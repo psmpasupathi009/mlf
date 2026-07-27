@@ -2,13 +2,23 @@ import { apiHandler, jsonFail, jsonOk, jsonOkList, parsePagination } from "@/lib
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, pickAuditFields } from "@/lib/audit";
 import { normalizeMobile } from "@/lib/auth/mobile";
 import { createEmployeeSchema } from "@/lib/validations/employees.schema";
 import { requireAdminToAssignAdmin } from "@/lib/rbac/employee-guards";
 import { toEmployeeSummary } from "@/features/employees/server/serialize";
 import { Prisma } from "@prisma/client";
 import { containsInsensitive } from "@/lib/db/search";
+
+const EMPLOYEE_AUDIT_KEYS = [
+  "name",
+  "designation",
+  "roles",
+  "email",
+  "address",
+  "mobile",
+  "isActive",
+] as const;
 
 export const GET = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "employees", "view");
@@ -98,7 +108,9 @@ export const POST = apiHandler(async (request) => {
     action: "employee.create",
     entity: "User",
     entityUnitId: created.unitId,
-    meta: { roles: input.roles, designation: input.designation ?? null },
+    meta: {
+      after: pickAuditFields(created as Record<string, unknown>, EMPLOYEE_AUDIT_KEYS),
+    },
   });
 
   return jsonOk({ employee: toEmployeeSummary(created) }, 201);

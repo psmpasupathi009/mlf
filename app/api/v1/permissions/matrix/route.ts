@@ -2,7 +2,7 @@ import type { UserRole } from "@prisma/client";
 import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, type AuditChangeMap } from "@/lib/audit";
 import { ensureDefaultPermissions } from "@/lib/rbac";
 import { PERMISSION_CATALOG } from "@/config/company/permissions-defaults";
 import { permissionsMatrixPutSchema } from "@/lib/validations/employees.schema";
@@ -58,6 +58,28 @@ export const PUT = apiHandler(async (request) => {
     return jsonFail("VALIDATION", "The admin role must keep full access to every module", 400);
   }
 
+  const existing = await prisma.rolePermission.findMany({
+    where: {
+      OR: parsed.data.rows.map((row) => ({
+        role: row.role,
+        module: row.module,
+        action: row.action,
+      })),
+    },
+  });
+  const existingMap = new Map(
+    existing.map((r) => [`${r.role}.${r.module}.${r.action}`, r.allowed])
+  );
+  const cellChanges: AuditChangeMap = {};
+  for (const row of parsed.data.rows) {
+    const key = `${row.role}.${row.module}.${row.action}`;
+    const prev = existingMap.get(key);
+    const from = prev === undefined ? null : prev;
+    if (from !== row.allowed) {
+      cellChanges[key] = { from, to: row.allowed };
+    }
+  }
+
   for (const row of parsed.data.rows) {
     await prisma.rolePermission.upsert({
       where: {
@@ -72,7 +94,10 @@ export const PUT = apiHandler(async (request) => {
     actorUnitId: user.unitId,
     action: "permissions.matrix_update",
     entity: "RolePermission",
-    meta: { rowsChanged: parsed.data.rows.length },
+    meta: {
+      rowsChanged: parsed.data.rows.length,
+      changes: cellChanges,
+    },
   });
 
   return jsonOk({ updated: parsed.data.rows.length });

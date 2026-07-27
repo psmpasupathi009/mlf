@@ -2,7 +2,6 @@ import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
-import { writeAudit } from "@/lib/audit";
 import {
   CLOSED_WEEK_SENTINEL,
   loadWeeklyHours,
@@ -115,23 +114,17 @@ export const PUT = apiHandler(async (request) => {
     { timeout: 15_000 }
   );
 
-  await writeAudit({
-    actorUnitId: user.unitId,
-    action: "advocate.hours_update",
-    entity: "AdvocateWeeklyHours",
-    entityUnitId: target.user.unitId,
-    meta: { ranges: flat.length },
-  });
-
   const { rows, usingDefaults } = await loadWeeklyHours(target.user.id);
+  const days = Array.from({ length: 7 }, (_, weekday) => ({
+    weekday,
+    ranges: rows
+      .filter((r) => r.weekday === weekday)
+      .map((r) => ({ startTime: r.startTime, endTime: r.endTime })),
+  }));
+
   return jsonOk({
     userUnitId: target.user.unitId,
     usingDefaults,
-    days: Array.from({ length: 7 }, (_, weekday) => ({
-      weekday,
-      ranges: rows
-        .filter((r) => r.weekday === weekday)
-        .map((r) => ({ startTime: r.startTime, endTime: r.endTime })),
-    })),
+    days,
   });
 });

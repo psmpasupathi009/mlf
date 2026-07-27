@@ -47,6 +47,7 @@ import {
 } from "@/features/hrms/lib/period";
 import { leaveCoversDate } from "@/features/hrms/lib/status";
 import { dateIsOfficeHoliday } from "@/features/hrms/lib/office-holiday";
+import { getAttendanceLocation } from "@/features/hrms/lib/get-attendance-location";
 import { istAddCalendarDays, istDateKey } from "@/lib/utils/ist";
 import { cn } from "@/lib/utils/cn";
 
@@ -343,38 +344,66 @@ export function HrmsPage({ user }: { user: PublicUser }) {
 
   async function submitCheckIn() {
     setCheckBusy(true);
-    const { ok, data } = await apiFetch("/api/v1/hrms/attendance/check-in", {
-      method: "POST",
-      json: { notes: checkInNotes.trim() || undefined },
-    });
-    setCheckBusy(false);
-    if (!ok) {
+    try {
+      const loc = await getAttendanceLocation();
+      const { ok, data } = await apiFetch("/api/v1/hrms/attendance/check-in", {
+        method: "POST",
+        json: {
+          notes: checkInNotes.trim() || undefined,
+          latitude: loc.latitude,
+          longitude: loc.longitude,
+          accuracy: loc.accuracy,
+        },
+      });
+      if (!ok) {
+        toast.error(
+          getErrorMessage(data as Record<string, unknown>, "Failed to check in")
+        );
+        return;
+      }
+      toast.success("Checked in");
+      setCheckInOpen(false);
+      setCheckInNotes("");
+      void loadCore();
+    } catch (err) {
       toast.error(
-        getErrorMessage(data as Record<string, unknown>, "Failed to check in")
+        err instanceof Error ? err.message : "Could not get your location"
       );
-      return;
+    } finally {
+      setCheckBusy(false);
     }
-    toast.success("Checked in");
-    setCheckInOpen(false);
-    setCheckInNotes("");
-    void loadCore();
   }
 
   async function handleCheckOut() {
     setCheckBusy(true);
-    const { ok, data } = await apiFetch("/api/v1/hrms/attendance/check-out", {
-      method: "POST",
-      json: {},
-    });
-    setCheckBusy(false);
-    if (!ok) {
+    try {
+      const loc = await getAttendanceLocation();
+      const { ok, data } = await apiFetch("/api/v1/hrms/attendance/check-out", {
+        method: "POST",
+        json: {
+          latitude: loc.latitude,
+          longitude: loc.longitude,
+          accuracy: loc.accuracy,
+        },
+      });
+      if (!ok) {
+        toast.error(
+          getErrorMessage(
+            data as Record<string, unknown>,
+            "Failed to check out"
+          )
+        );
+        return;
+      }
+      toast.success("Checked out");
+      void loadCore();
+    } catch (err) {
       toast.error(
-        getErrorMessage(data as Record<string, unknown>, "Failed to check out")
+        err instanceof Error ? err.message : "Could not get your location"
       );
-      return;
+    } finally {
+      setCheckBusy(false);
     }
-    toast.success("Checked out");
-    void loadCore();
   }
 
   async function handleCancelLeave() {
@@ -673,9 +702,9 @@ export function HrmsPage({ user }: { user: PublicUser }) {
           <DialogHeader>
             <DialogTitle>Check in</DialogTitle>
             <DialogDescription>
-              Notes are for the team board only — they do not close booking
-              slots. Checked out later means you left for the day. Use Apply
-              leave for full days away.
+              Your device location is required and saved with this check-in so
+              managers can see where you punched. Notes are for the team board
+              only — they do not close booking slots.
             </DialogDescription>
           </DialogHeader>
           <DialogBody className="space-y-3">

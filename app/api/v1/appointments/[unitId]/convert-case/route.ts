@@ -3,7 +3,7 @@ import { requireUser } from "@/lib/api/guard";
 import { hasPermission, requireModuleEnabled } from "@/lib/rbac";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, pickAuditFields, diffAudit } from "@/lib/audit";
 import { displayMobile } from "@/lib/auth/mobile";
 import { canBookForAnyAdvocate } from "@/lib/appointments/booking-rules";
 import { enrichAppointment } from "@/features/appointments/server/enrich";
@@ -74,6 +74,12 @@ export const POST = apiHandler(async (request, context) => {
     item.notes?.trim() || null,
   ].filter(Boolean);
 
+  const aptBefore = pickAuditFields(item as Record<string, unknown>, [
+    "caseUnitId",
+    "clientUnitId",
+    "title",
+  ] as const);
+
   const caseUnitId = await nextUnitId("case");
   const created = await prisma.case.create({
     data: {
@@ -96,20 +102,29 @@ export const POST = apiHandler(async (request, context) => {
     },
   });
 
+  const aptAfter = pickAuditFields(updated as Record<string, unknown>, [
+    "caseUnitId",
+    "clientUnitId",
+    "title",
+  ] as const);
   await writeAudit({
     actorUnitId: user.unitId,
     action: "appointment.convert_case",
     entity: "Appointment",
     entityUnitId: updated.unitId,
-    meta: { caseUnitId: created.unitId },
-  });
-
-  await writeAudit({
-    actorUnitId: user.unitId,
-    action: "case.create",
-    entity: "Case",
-    entityUnitId: created.unitId,
-    meta: { fromAppointment: updated.unitId },
+    meta: {
+      before: aptBefore,
+      after: aptAfter,
+      changes: diffAudit(aptBefore, aptAfter),
+      caseUnitId: created.unitId,
+      case: pickAuditFields(created as Record<string, unknown>, [
+        "clientUnitId",
+        "status",
+        "primaryAdvocateMobile",
+        "advocateMobiles",
+        "notes",
+      ] as const),
+    },
   });
 
   return jsonOk({

@@ -10,7 +10,7 @@ import { requirePerm, requireUser } from "@/lib/api/guard";
 import { hasPermission } from "@/lib/rbac";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, pickAuditFields } from "@/lib/audit";
 import { createOfficeHolidaySchema } from "@/lib/validations/hrms.schema";
 import {
   toOfficeHolidaySummary,
@@ -141,6 +141,14 @@ export const POST = apiHandler(async (request) => {
     action: "holiday.create",
     entity: "OfficeHoliday",
     entityUnitId: row.unitId,
+    meta: {
+      after: pickAuditFields(row as Record<string, unknown>, [
+        "fromDate",
+        "toDate",
+        "title",
+        "notes",
+      ] as const),
+    },
   });
 
   await notifyHoliday(

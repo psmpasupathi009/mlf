@@ -3,13 +3,42 @@ import { apiHandler, jsonFail, jsonOk, jsonOkList, parsePagination } from "@/lib
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, pickAuditFields } from "@/lib/audit";
 import { createCaseSchema } from "@/lib/validations/cases.schema";
 import { toCaseSummary } from "@/features/cases/server/serialize";
 import {
   buildCaseListWhere,
   parseCaseListFilters,
 } from "@/features/cases/server/filters";
+
+const CASE_AUDIT_KEYS = [
+  "clientUnitId",
+  "caseNumber",
+  "filingNumber",
+  "caseYear",
+  "cnr",
+  "state",
+  "district",
+  "city",
+  "courtName",
+  "advocateMobiles",
+  "primaryAdvocateMobile",
+  "opposingParty",
+  "ourSide",
+  "underActs",
+  "policeStation",
+  "firNumber",
+  "stage",
+  "caseType",
+  "status",
+  "filingDate",
+  "nextHearingAt",
+  "agreedFee",
+  "notes",
+  "battaDue",
+  "awaitingService",
+  "filingChecklist",
+] as const;
 
 export const GET = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "cases", "view");
@@ -98,6 +127,9 @@ export const POST = apiHandler(async (request) => {
     action: "case.create",
     entity: "Case",
     entityUnitId: created.unitId,
+    meta: {
+      after: pickAuditFields(created as Record<string, unknown>, CASE_AUDIT_KEYS),
+    },
   });
 
   return jsonOk({ case: toCaseSummary(created) }, 201);

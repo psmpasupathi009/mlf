@@ -1,7 +1,6 @@
 import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
-import { writeAudit } from "@/lib/audit";
 import { storage } from "@/lib/storage";
 import { processProfilePhoto, isAvatarMime } from "@/lib/profile/photo";
 import { toPublicUser } from "@/lib/auth/session";
@@ -50,13 +49,6 @@ export const POST = apiHandler(async (request) => {
     await storage.delete(oldKey).catch(() => undefined);
   }
 
-  await writeAudit({
-    actorUnitId: user.unitId,
-    action: "profile.photo.upload",
-    entity: "User",
-    entityUnitId: updated.unitId,
-  });
-
   return jsonOk({ user: await toPublicUser(updated) });
 });
 
@@ -74,13 +66,6 @@ export const DELETE = apiHandler(async (request) => {
     data: { photoKey: null },
   });
   await storage.delete(oldKey).catch(() => undefined);
-
-  await writeAudit({
-    actorUnitId: user.unitId,
-    action: "profile.photo.remove",
-    entity: "User",
-    entityUnitId: updated.unitId,
-  });
 
   return jsonOk({ user: await toPublicUser(updated) });
 });

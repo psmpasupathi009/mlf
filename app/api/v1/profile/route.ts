@@ -1,7 +1,6 @@
 import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
-import { writeAudit } from "@/lib/audit";
 import { toPublicUser } from "@/lib/auth/session";
 import { updateProfileSchema } from "@/lib/validations/profile.schema";
 
@@ -34,13 +33,6 @@ export const PATCH = apiHandler(async (request) => {
       email: input.email === "" ? null : input.email || undefined,
       address: input.address === "" ? null : input.address || undefined,
     },
-  });
-
-  await writeAudit({
-    actorUnitId: user.unitId,
-    action: "profile.update",
-    entity: "User",
-    entityUnitId: updated.unitId,
   });
 
   return jsonOk({ user: await toPublicUser(updated) });

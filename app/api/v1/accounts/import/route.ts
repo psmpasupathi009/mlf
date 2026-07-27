@@ -204,19 +204,6 @@ export const POST = apiHandler(async (request) => {
         },
       });
 
-      await writeAudit({
-        actorUnitId: user.unitId,
-        action: "payment.create",
-        entity: "CashPayment",
-        entityUnitId: created.unitId,
-        meta: {
-          amount: created.amount,
-          type: created.type,
-          status: created.status,
-          source: "import",
-        },
-      });
-
       createdUnitIds.push(created.unitId);
       results.push({
         row: rowNum,

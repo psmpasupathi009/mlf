@@ -2,7 +2,7 @@ import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/guard";
 import { hasPermission } from "@/lib/rbac";
 import { prisma } from "@/lib/db/prisma";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, pickAuditFields } from "@/lib/audit";
 import { storage } from "@/lib/storage";
 
 export const DELETE = apiHandler(async (request, context) => {
@@ -34,9 +34,16 @@ export const DELETE = apiHandler(async (request, context) => {
     entity: "Document",
     entityUnitId: doc.unitId,
     meta: {
-      caseUnitId: doc.caseUnitId ?? null,
-      clientUnitId: doc.clientUnitId ?? null,
-      docType: doc.docType,
+      before: pickAuditFields(doc as Record<string, unknown>, [
+        "title",
+        "docType",
+        "notes",
+        "caseUnitId",
+        "clientUnitId",
+        "mimeType",
+        "size",
+        "originalName",
+      ] as const),
     },
   });
 

@@ -2,7 +2,7 @@ import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, pickAuditFields, diffAudit } from "@/lib/audit";
 import { adjournHearingSchema } from "@/lib/validations/cases.schema";
 import { toHearingSummary } from "@/features/cases/server/serialize";
 import {
@@ -31,10 +31,18 @@ export const POST = apiHandler(async (request, context) => {
   }
   const input = parsed.data;
 
+  const hearingBefore = pickAuditFields(hearing as Record<string, unknown>, [
+    "hearingDate",
+    "isAdjourned",
+    "outcome",
+    "notes",
+    "caseUnitId",
+  ] as const);
+
   const nextHearingUnitId = await nextUnitId("hearing");
   const caseItem = await prisma.case.findUnique({ where: { id: hearing.caseId } });
 
-  const [, nextHearing] = await prisma.$transaction([
+  const [adjournedHearing, nextHearing] = await prisma.$transaction([
     prisma.hearing.update({
       where: { id: hearing.id },
       data: {
@@ -67,12 +75,27 @@ export const POST = apiHandler(async (request, context) => {
     }),
   ]);
 
+  const hearingAfter = pickAuditFields(
+    adjournedHearing as Record<string, unknown>,
+    ["hearingDate", "isAdjourned", "outcome", "notes", "caseUnitId"] as const
+  );
+
   await writeAudit({
     actorUnitId: user.unitId,
     action: "hearing.adjourn",
     entity: "Hearing",
     entityUnitId: hearing.unitId,
-    meta: { nextHearingUnitId: nextHearing.unitId },
+    meta: {
+      before: hearingBefore,
+      after: hearingAfter,
+      changes: diffAudit(hearingBefore, hearingAfter),
+      nextHearingUnitId: nextHearing.unitId,
+      nextHearing: pickAuditFields(nextHearing as Record<string, unknown>, [
+        "hearingDate",
+        "purpose",
+        "caseUnitId",
+      ] as const),
+    },
   });
 
   if (caseItem && isHearingWithinNextIstDays(nextHearing.hearingDate, 2)) {

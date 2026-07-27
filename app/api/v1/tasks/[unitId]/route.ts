@@ -1,10 +1,23 @@
 import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, pickAuditFields, diffAudit } from "@/lib/audit";
 import { updateOfficeTaskSchema } from "@/lib/validations/tasks.schema";
 import { toOfficeTaskSummary } from "@/features/tasks/server/serialize";
 import { notifyUser, scheduleNotify } from "@/lib/notifications/notify";
+
+const TASK_AUDIT_KEYS = [
+  "title",
+  "kind",
+  "status",
+  "dueDate",
+  "workDate",
+  "assigneeUnitId",
+  "caseUnitId",
+  "notes",
+  "finishNote",
+  "completedAt",
+] as const;
 
 async function resolveAssignee(assigneeUnitId: string | null) {
   if (!assigneeUnitId) {
@@ -84,11 +97,7 @@ export const PATCH = apiHandler(async (request, context) => {
     completedAt = null;
   }
 
-  const before = {
-    title: item.title,
-    status: item.status,
-    assigneeUnitId: item.assigneeUnitId,
-  };
+  const before = pickAuditFields(item as Record<string, unknown>, TASK_AUDIT_KEYS);
 
   const updated = await prisma.officeTask.update({
     where: { id: item.id },
@@ -110,6 +119,11 @@ export const PATCH = apiHandler(async (request, context) => {
     },
   });
 
+  const after = pickAuditFields(
+    updated as Record<string, unknown>,
+    TASK_AUDIT_KEYS
+  );
+
   await writeAudit({
     actorUnitId: user.unitId,
     action: "task.update",
@@ -117,11 +131,8 @@ export const PATCH = apiHandler(async (request, context) => {
     entityUnitId: updated.unitId,
     meta: {
       before,
-      after: {
-        title: updated.title,
-        status: updated.status,
-        assigneeUnitId: updated.assigneeUnitId,
-      },
+      after,
+      changes: diffAudit(before, after),
     },
   });
 

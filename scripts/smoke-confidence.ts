@@ -266,6 +266,9 @@ async function main() {
   // 8. HRMS check-in (409 already checked-in / holiday / leave = acceptable)
   const hrmsRes = await api(token, "POST", "/api/v1/hrms/attendance/check-in", {
     notes: "Smoke confidence check",
+    latitude: 11.341,
+    longitude: 77.7172,
+    accuracy: 25,
   });
   results.push({
     step: "8. HRMS check-in",

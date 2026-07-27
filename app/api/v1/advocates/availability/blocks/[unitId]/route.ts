@@ -1,7 +1,6 @@
 import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
-import { writeAudit } from "@/lib/audit";
 import { canBookForAnyAdvocate } from "@/lib/appointments/booking-rules";
 import { updateTimeBlockSchema } from "@/lib/validations/availability.schema";
 
@@ -67,13 +66,6 @@ export const PATCH = apiHandler(async (request, context) => {
     },
   });
 
-  await writeAudit({
-    actorUnitId: user.unitId,
-    action: "advocate.block_update",
-    entity: "AdvocateTimeBlock",
-    entityUnitId: updated.unitId,
-  });
-
   return jsonOk({ block: toBlock(updated) });
 });
 
@@ -92,13 +84,6 @@ export const DELETE = apiHandler(async (request, context) => {
   }
 
   await prisma.advocateTimeBlock.delete({ where: { id: block.id } });
-
-  await writeAudit({
-    actorUnitId: user.unitId,
-    action: "advocate.block_delete",
-    entity: "AdvocateTimeBlock",
-    entityUnitId: block.unitId,
-  });
 
   return jsonOk({ deleted: true });
 });

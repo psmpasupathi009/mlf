@@ -626,7 +626,7 @@ async function main() {
     "POST",
     "/api/v1/hrms/attendance/check-in",
     "Daily check-in",
-    { notes: "audit" }
+    { notes: "audit", latitude: 11.341, longitude: 77.7172, accuracy: 25 }
   );
   await testApi(
     jar,
@@ -634,7 +634,7 @@ async function main() {
     "POST",
     "/api/v1/hrms/attendance/check-out",
     "Daily check-out",
-    { notes: "audit" },
+    { notes: "audit", latitude: 11.341, longitude: 77.7172, accuracy: 25 },
     (s, j) => accept(s, j) || s === 409
   );
   await testApi(jar, "HRMS", "GET", "/api/v1/hrms/presence", "Office presence board");

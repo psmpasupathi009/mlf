@@ -72,6 +72,7 @@ export const POST = apiHandler(async (request, context) => {
   });
 
   // If leave covers today and they already checked in, close the open attendance row.
+  let autoCheckedOutAttendanceUnitId: string | null = null;
   if (input.decision === "approved") {
     const today = istDateKey();
     if (leave.fromDate <= today && leave.toDate >= today) {
@@ -93,6 +94,7 @@ export const POST = apiHandler(async (request, context) => {
               : "Auto check-out (leave approved)",
           },
         });
+        autoCheckedOutAttendanceUnitId = open.unitId;
       }
     }
   }
@@ -102,6 +104,31 @@ export const POST = apiHandler(async (request, context) => {
     action: `leave.${input.decision}`,
     entity: "LeaveRequest",
     entityUnitId: updated.unitId,
+    meta: {
+      before: {
+        status: leave.status,
+        rejectReason: leave.rejectReason,
+      },
+      after: {
+        status: updated.status,
+        rejectReason: updated.rejectReason,
+        approvedAt: updated.approvedAt?.toISOString() ?? null,
+      },
+      changes: {
+        status: { from: leave.status, to: updated.status },
+        ...(leave.rejectReason !== updated.rejectReason
+          ? {
+              rejectReason: {
+                from: leave.rejectReason,
+                to: updated.rejectReason,
+              },
+            }
+          : {}),
+      },
+      ...(autoCheckedOutAttendanceUnitId
+        ? { autoCheckedOutAttendanceUnitId }
+        : {}),
+    },
   });
 
   scheduleNotify(async () => {

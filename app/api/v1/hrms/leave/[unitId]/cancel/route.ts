@@ -2,7 +2,7 @@ import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, pickAuditFields, diffAudit } from "@/lib/audit";
 import { toLeaveSummary } from "@/features/hrms/server/serialize";
 
 /** Owner can withdraw a pending leave request (soft-cancel for audit). */
@@ -27,6 +27,8 @@ export const POST = apiHandler(async (request, context) => {
     );
   }
 
+  const before = pickAuditFields(leave as Record<string, unknown>, ["status"] as const);
+
   // Soft-cancel — LeaveStatus.cancelled in schema.prisma.
   // Assert via unknown so a stale TS server (pre-generate) does not block.
   const data = {
@@ -38,11 +40,13 @@ export const POST = apiHandler(async (request, context) => {
     data,
   });
 
+  const after = pickAuditFields(updated as Record<string, unknown>, ["status"] as const);
   await writeAudit({
     actorUnitId: user.unitId,
     action: "leave.cancel",
     entity: "LeaveRequest",
     entityUnitId: leave.unitId,
+    meta: { before, after, changes: diffAudit(before, after) },
   });
 
   return jsonOk({

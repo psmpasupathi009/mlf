@@ -2,7 +2,7 @@ import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, pickAuditFields } from "@/lib/audit";
 import { addHearingSchema } from "@/lib/validations/cases.schema";
 import { toHearingSummary } from "@/features/cases/server/serialize";
 import {
@@ -60,7 +60,15 @@ export const POST = apiHandler(async (request, context) => {
     action: "hearing.create",
     entity: "Hearing",
     entityUnitId: hearing.unitId,
-    meta: { caseUnitId: item.unitId },
+    meta: {
+      caseUnitId: item.unitId,
+      after: pickAuditFields(hearing as Record<string, unknown>, [
+        "hearingDate",
+        "purpose",
+        "notes",
+        "caseUnitId",
+      ] as const),
+    },
   });
 
   if (isHearingWithinNextIstDays(hearing.hearingDate, 2)) {

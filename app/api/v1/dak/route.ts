@@ -3,7 +3,7 @@ import { apiHandler, jsonFail, jsonOk, jsonOkList, parsePagination } from "@/lib
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, pickAuditFields } from "@/lib/audit";
 import { createDakSchema } from "@/lib/validations/dak.schema";
 import { toDakSummary } from "@/features/dak/server/serialize";
 import { containsInsensitive } from "@/lib/db/search";
@@ -130,7 +130,19 @@ export const POST = apiHandler(async (request) => {
     action: "dak.create",
     entity: "DakEntry",
     entityUnitId: created.unitId,
-    meta: { direction: created.direction, subject: created.subject },
+    meta: {
+      after: pickAuditFields(created as Record<string, unknown>, [
+        "direction",
+        "entryDate",
+        "subject",
+        "fromTo",
+        "mode",
+        "trackingNo",
+        "caseUnitId",
+        "clientUnitId",
+        "notes",
+      ] as const),
+    },
   });
 
   return jsonOk({ dak: toDakSummary(created) }, 201);

@@ -1,7 +1,7 @@
 import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, pickAuditFields, diffAudit } from "@/lib/audit";
 import { updateDakSchema } from "@/lib/validations/dak.schema";
 import { toDakSummary } from "@/features/dak/server/serialize";
 
@@ -43,11 +43,18 @@ export const PATCH = apiHandler(async (request, context) => {
     nextCaseUnitId = caseItem.unitId;
   }
 
-  const before = {
-    direction: item.direction,
-    subject: item.subject,
-    entryDate: item.entryDate.toISOString(),
-  };
+  const dakAuditKeys = [
+    "direction",
+    "entryDate",
+    "subject",
+    "fromTo",
+    "mode",
+    "trackingNo",
+    "caseUnitId",
+    "clientUnitId",
+    "notes",
+  ] as const;
+  const before = pickAuditFields(item as Record<string, unknown>, dakAuditKeys);
 
   const updated = await prisma.dakEntry.update({
     where: { id: item.id },
@@ -71,6 +78,10 @@ export const PATCH = apiHandler(async (request, context) => {
     },
   });
 
+  const after = pickAuditFields(
+    updated as Record<string, unknown>,
+    dakAuditKeys
+  );
   await writeAudit({
     actorUnitId: user.unitId,
     action: "dak.update",
@@ -78,11 +89,8 @@ export const PATCH = apiHandler(async (request, context) => {
     entityUnitId: updated.unitId,
     meta: {
       before,
-      after: {
-        direction: updated.direction,
-        subject: updated.subject,
-        entryDate: updated.entryDate.toISOString(),
-      },
+      after,
+      changes: diffAudit(before, after),
     },
   });
 
@@ -115,7 +123,19 @@ export const DELETE = apiHandler(async (request, context) => {
     action: "dak.delete",
     entity: "DakEntry",
     entityUnitId: item.unitId,
-    meta: { subject: item.subject, direction: item.direction },
+    meta: {
+      before: pickAuditFields(item as Record<string, unknown>, [
+        "direction",
+        "entryDate",
+        "subject",
+        "fromTo",
+        "mode",
+        "trackingNo",
+        "caseUnitId",
+        "clientUnitId",
+        "notes",
+      ] as const),
+    },
   });
 
   return jsonOk({ deleted: true });

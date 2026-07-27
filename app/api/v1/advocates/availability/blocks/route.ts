@@ -2,7 +2,6 @@ import { apiHandler, jsonFail, jsonOk, jsonOkList, parsePagination } from "@/lib
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
-import { writeAudit } from "@/lib/audit";
 import { resolveAvailabilityTarget } from "@/lib/appointments/resolve-target";
 import { createTimeBlockSchema } from "@/lib/validations/availability.schema";
 
@@ -101,13 +100,6 @@ export const POST = apiHandler(async (request) => {
       kind: parsed.data.kind,
       reason: parsed.data.reason || undefined,
     },
-  });
-
-  await writeAudit({
-    actorUnitId: user.unitId,
-    action: "advocate.block_create",
-    entity: "AdvocateTimeBlock",
-    entityUnitId: created.unitId,
   });
 
   return jsonOk({ block: toBlock(created) }, 201);

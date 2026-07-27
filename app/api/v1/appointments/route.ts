@@ -3,7 +3,7 @@ import { apiHandler, jsonFail, jsonOk, jsonOkList, parsePagination } from "@/lib
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, pickAuditFields } from "@/lib/audit";
 import {
   canBookForAnyAdvocate,
   resolveBookingAdvocateMobile,
@@ -199,6 +199,20 @@ export const POST = apiHandler(async (request) => {
     action: "appointment.create",
     entity: "Appointment",
     entityUnitId: created.unitId,
+    meta: {
+      after: pickAuditFields(created as Record<string, unknown>, [
+        "title",
+        "clientUnitId",
+        "caseUnitId",
+        "advocateMobile",
+        "scheduledAt",
+        "durationMin",
+        "mode",
+        "location",
+        "notes",
+        "status",
+      ] as const),
+    },
   });
 
   scheduleNotify(async () => {

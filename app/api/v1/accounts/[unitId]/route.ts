@@ -1,7 +1,7 @@
 import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, diffAudit } from "@/lib/audit";
 import { updatePaymentSchema } from "@/lib/validations/accounts.schema";
 import { toPaymentSummary } from "@/features/accounts/server/serialize";
 import { resolveActorsByIds } from "@/features/accounts/server/actors";
@@ -154,7 +154,7 @@ export const PATCH = apiHandler(async (request, context) => {
     action: "payment.update",
     entity: "CashPayment",
     entityUnitId: updated.unitId,
-    meta: { before, after },
+    meta: { before, after, changes: diffAudit(before, after) },
   });
 
   return jsonOk({ payment: toPaymentSummary(updated) });

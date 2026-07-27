@@ -7,6 +7,7 @@ export const modules = {
     dashboard: true,
     employees: true,
     permissions: true,
+    activity: true,
     clients: true,
     appointments: true,
     cases: true,

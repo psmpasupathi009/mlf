@@ -1,7 +1,7 @@
 import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, pickAuditFields, diffAudit } from "@/lib/audit";
 import { voidPaymentSchema } from "@/lib/validations/accounts.schema";
 import { toPaymentSummary } from "@/features/accounts/server/serialize";
 
@@ -24,6 +24,13 @@ export const POST = apiHandler(async (request, context) => {
     return jsonFail("VALIDATION", parsed.error.issues[0]?.message ?? "Invalid request", 400, parsed.error.issues);
   }
 
+  const before = pickAuditFields(item as Record<string, unknown>, [
+    "status",
+    "amount",
+    "type",
+    "voidReason",
+  ] as const);
+
   const updated = await prisma.cashPayment.update({
     where: { id: item.id },
     data: {
@@ -34,12 +41,18 @@ export const POST = apiHandler(async (request, context) => {
     },
   });
 
+  const after = pickAuditFields(updated as Record<string, unknown>, [
+    "status",
+    "amount",
+    "type",
+    "voidReason",
+  ] as const);
   await writeAudit({
     actorUnitId: user.unitId,
     action: "payment.void",
     entity: "CashPayment",
     entityUnitId: updated.unitId,
-    meta: { reason: parsed.data.reason },
+    meta: { before, after, changes: diffAudit(before, after), reason: parsed.data.reason },
   });
 
   return jsonOk({ payment: toPaymentSummary(updated) });

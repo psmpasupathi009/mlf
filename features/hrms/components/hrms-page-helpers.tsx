@@ -20,6 +20,10 @@ import type {
   PresenceStatus,
 } from "@/features/hrms/server/presence";
 import { summarizeBusyToday } from "@/features/availability/lib/busy-labels";
+import {
+  formatCoords,
+  openStreetMapUrl,
+} from "@/features/hrms/lib/get-attendance-location";
 import { formatIstTime } from "@/lib/utils/ist";
 import { cn } from "@/lib/utils/cn";
 import { personDisplayName } from "@/shared/lib/person";
@@ -85,6 +89,34 @@ export function personLabel(
 export function formatTime(iso: string | null | undefined) {
   if (!iso) return "—";
   return formatIstTime(new Date(iso));
+}
+
+export function LocationLink({
+  lat,
+  lng,
+  label,
+  className,
+}: {
+  lat: number | null | undefined;
+  lng: number | null | undefined;
+  label?: string;
+  className?: string;
+}) {
+  if (lat == null || lng == null) return null;
+  return (
+    <a
+      href={openStreetMapUrl(lat, lng)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={cn(
+        "text-[11px] font-medium text-brand underline-offset-2 hover:underline",
+        className
+      )}
+    >
+      {label ? `${label} · ` : "Map · "}
+      {formatCoords(lat, lng)}
+    </a>
+  );
 }
 
 export function formatDayLabel(dateKey: string) {
@@ -163,11 +195,25 @@ export function PresenceCard({
           subtitle={row.designation || (row.mobile ? `+91 ${row.mobile}` : undefined)}
         />
         {row.status === "in" || row.status === "out" ? (
-          <p className="mt-1.5 pl-10.5 text-xs tabular-nums text-muted-foreground">
-            {formatTime(row.checkInAt)}
-            <span className="mx-1.5 text-border">→</span>
-            {formatTime(row.checkOutAt)}
-          </p>
+          <div className="mt-1.5 space-y-0.5 pl-10.5">
+            <p className="text-xs tabular-nums text-muted-foreground">
+              {formatTime(row.checkInAt)}
+              <span className="mx-1.5 text-border">→</span>
+              {formatTime(row.checkOutAt)}
+            </p>
+            <LocationLink
+              lat={row.checkInLat}
+              lng={row.checkInLng}
+              label="In"
+            />
+            {row.status === "out" ? (
+              <LocationLink
+                lat={row.checkOutLat}
+                lng={row.checkOutLng}
+                label="Out"
+              />
+            ) : null}
+          </div>
         ) : null}
         {busy ? (
           <p className="mt-1 pl-10.5 text-[11px] font-medium text-navy/80">

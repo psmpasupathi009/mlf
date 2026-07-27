@@ -3,7 +3,7 @@ import { apiHandler, jsonFail, jsonOk, parsePagination } from "@/lib/api/respons
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, pickAuditFields } from "@/lib/audit";
 import { createPaymentSchema } from "@/lib/validations/accounts.schema";
 import { toPaymentSummary } from "@/features/accounts/server/serialize";
 import { resolveActorsByIds } from "@/features/accounts/server/actors";
@@ -148,7 +148,17 @@ export const POST = apiHandler(async (request) => {
     action: "payment.create",
     entity: "CashPayment",
     entityUnitId: created.unitId,
-    meta: { amount: created.amount, type: created.type, status: created.status },
+    meta: {
+      after: pickAuditFields(created as Record<string, unknown>, [
+        "clientUnitId",
+        "caseUnitId",
+        "type",
+        "amount",
+        "status",
+        "paidOn",
+        "notes",
+      ] as const),
+    },
   });
 
   return jsonOk({ payment: toPaymentSummary(created) }, 201);

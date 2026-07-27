@@ -25,6 +25,10 @@ export type PresencePerson = {
   status: PresenceStatus;
   checkInAt: string | null;
   checkOutAt: string | null;
+  checkInLat: number | null;
+  checkInLng: number | null;
+  checkOutLat: number | null;
+  checkOutLng: number | null;
   /** Attendance check-in note (board-only; does not block booking). */
   notes: string | null;
   leaveUnitId: string | null;
@@ -98,6 +102,10 @@ export async function buildPresenceBoard(dateKey: string): Promise<PresenceBoard
             userId: true,
             checkInAt: true,
             checkOutAt: true,
+            checkInLat: true,
+            checkInLng: true,
+            checkOutLat: true,
+            checkOutLng: true,
             notes: true,
           },
         })
@@ -227,6 +235,10 @@ export async function buildPresenceBoard(dateKey: string): Promise<PresenceBoard
       status,
       checkInAt: att?.checkInAt ? att.checkInAt.toISOString() : null,
       checkOutAt: att?.checkOutAt ? att.checkOutAt.toISOString() : null,
+      checkInLat: att?.checkInLat ?? null,
+      checkInLng: att?.checkInLng ?? null,
+      checkOutLat: att?.checkOutLat ?? null,
+      checkOutLng: att?.checkOutLng ?? null,
       notes: att?.notes ?? null,
       leaveUnitId,
       busyToday: blocksByUser.get(s.id) ?? [],

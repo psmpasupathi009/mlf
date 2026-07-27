@@ -1,13 +1,15 @@
 import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, pickAuditFields, diffAudit } from "@/lib/audit";
 import { updateOfficeHolidaySchema } from "@/lib/validations/hrms.schema";
 import { toOfficeHolidaySummary } from "@/features/hrms/lib/office-holiday";
 import {
   notifyUsers,
   scheduleNotify,
 } from "@/lib/notifications/notify";
+
+const HOLIDAY_AUDIT_KEYS = ["fromDate", "toDate", "title", "notes"] as const;
 
 async function notifyHolidayUpdate(holiday: {
   title: string;
@@ -83,6 +85,8 @@ export const PATCH = apiHandler(async (request, context) => {
     );
   }
 
+  const before = pickAuditFields(item as Record<string, unknown>, HOLIDAY_AUDIT_KEYS);
+
   const updated = await prisma.officeHoliday.update({
     where: { id: item.id },
     data: {
@@ -98,11 +102,13 @@ export const PATCH = apiHandler(async (request, context) => {
     },
   });
 
+  const after = pickAuditFields(updated as Record<string, unknown>, HOLIDAY_AUDIT_KEYS);
   await writeAudit({
     actorUnitId: user.unitId,
     action: "holiday.update",
     entity: "OfficeHoliday",
     entityUnitId: updated.unitId,
+    meta: { before, after, changes: diffAudit(before, after) },
   });
 
   const datesChanged =
@@ -140,6 +146,9 @@ export const DELETE = apiHandler(async (request, context) => {
     action: "holiday.delete",
     entity: "OfficeHoliday",
     entityUnitId: item.unitId,
+    meta: {
+      before: pickAuditFields(item as Record<string, unknown>, HOLIDAY_AUDIT_KEYS),
+    },
   });
 
   return jsonOk({ deleted: true });

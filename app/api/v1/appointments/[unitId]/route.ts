@@ -1,7 +1,7 @@
 import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, pickAuditFields, diffAudit } from "@/lib/audit";
 import {
   canBookForAnyAdvocate,
   resolveBookingAdvocateMobile,
@@ -9,6 +9,19 @@ import {
 import { assertSlotBookable } from "@/lib/appointments/availability";
 import { updateAppointmentSchema } from "@/lib/validations/appointments.schema";
 import { enrichAppointment } from "@/features/appointments/server/enrich";
+
+const APPOINTMENT_AUDIT_KEYS = [
+  "title",
+  "clientUnitId",
+  "caseUnitId",
+  "advocateMobile",
+  "scheduledAt",
+  "durationMin",
+  "mode",
+  "location",
+  "notes",
+  "status",
+] as const;
 
 export const GET = apiHandler(async (request, context) => {
   const { user, response } = await requirePerm(request, "appointments", "view");
@@ -143,6 +156,8 @@ export const PATCH = apiHandler(async (request, context) => {
     }
   }
 
+  const before = pickAuditFields(item as Record<string, unknown>, APPOINTMENT_AUDIT_KEYS);
+
   const updated = await prisma.appointment.update({
     where: { id: item.id },
     data: {
@@ -159,6 +174,7 @@ export const PATCH = apiHandler(async (request, context) => {
     },
   });
 
+  const after = pickAuditFields(updated as Record<string, unknown>, APPOINTMENT_AUDIT_KEYS);
   await writeAudit({
     actorUnitId: user.unitId,
     action:
@@ -167,6 +183,7 @@ export const PATCH = apiHandler(async (request, context) => {
         : "appointment.update",
     entity: "Appointment",
     entityUnitId: updated.unitId,
+    meta: { before, after, changes: diffAudit(before, after) },
   });
 
   return jsonOk({ appointment: await enrichAppointment(updated) });

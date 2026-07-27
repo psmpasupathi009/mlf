@@ -3,7 +3,7 @@ import { requirePerm, requireUser } from "@/lib/api/guard";
 import { hasPermission } from "@/lib/rbac";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, pickAuditFields } from "@/lib/audit";
 import { storage } from "@/lib/storage";
 import { documentUploadMetaSchema } from "@/lib/validations/documents.schema";
 import { toDocumentSummary } from "@/features/documents/server/serialize";
@@ -130,9 +130,16 @@ export const POST = apiHandler(async (request) => {
     entity: "Document",
     entityUnitId: created.unitId,
     meta: {
-      caseUnitId: input.caseUnitId || null,
-      clientUnitId: input.clientUnitId || null,
-      docType: input.docType,
+      after: pickAuditFields(created as Record<string, unknown>, [
+        "title",
+        "docType",
+        "notes",
+        "caseUnitId",
+        "clientUnitId",
+        "mimeType",
+        "size",
+        "originalName",
+      ] as const),
     },
   });
 

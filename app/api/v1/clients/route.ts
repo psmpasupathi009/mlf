@@ -3,11 +3,30 @@ import { apiHandler, jsonFail, jsonOk, jsonOkList, parsePagination } from "@/lib
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, pickAuditFields } from "@/lib/audit";
 import { normalizeMobile } from "@/lib/auth/mobile";
 import { createClientSchema } from "@/lib/validations/clients.schema";
 import { toClientSummary } from "@/features/clients/server/serialize";
 import { containsInsensitive } from "@/lib/db/search";
+
+const CLIENT_AUDIT_KEYS = [
+  "name",
+  "fatherOrSpouse",
+  "occupation",
+  "gender",
+  "mobile",
+  "altMobile",
+  "email",
+  "address",
+  "city",
+  "district",
+  "state",
+  "aadhaarLast4",
+  "referredBy",
+  "matterBrief",
+  "notes",
+  "smsConsent",
+] as const;
 
 export const GET = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "clients", "view");
@@ -81,6 +100,9 @@ export const POST = apiHandler(async (request) => {
     action: "client.create",
     entity: "Client",
     entityUnitId: created.unitId,
+    meta: {
+      after: pickAuditFields(created as Record<string, unknown>, CLIENT_AUDIT_KEYS),
+    },
   });
 
   return jsonOk({ client: toClientSummary(created) }, 201);

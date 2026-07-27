@@ -2,13 +2,32 @@ import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import { hasPermission } from "@/lib/rbac";
 import { prisma } from "@/lib/db/prisma";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, pickAuditFields, diffAudit } from "@/lib/audit";
 import { normalizeMobile } from "@/lib/auth/mobile";
 import { updateClientSchema } from "@/lib/validations/clients.schema";
 import { toClientSummary } from "@/features/clients/server/serialize";
 import { toPaymentSummary } from "@/features/accounts/server/serialize";
 import { feeRollupForClient } from "@/features/accounts/server/fee-rollup";
 import { toDocumentSummary } from "@/features/documents/server/serialize";
+
+const CLIENT_AUDIT_KEYS = [
+  "name",
+  "fatherOrSpouse",
+  "occupation",
+  "gender",
+  "mobile",
+  "altMobile",
+  "email",
+  "address",
+  "city",
+  "district",
+  "state",
+  "aadhaarLast4",
+  "referredBy",
+  "matterBrief",
+  "notes",
+  "smsConsent",
+] as const;
 
 export const GET = apiHandler(async (request, context) => {
   const { user, response } = await requirePerm(request, "clients", "view");
@@ -99,6 +118,8 @@ export const PATCH = apiHandler(async (request, context) => {
   }
   const input = parsed.data;
 
+  const before = pickAuditFields(client as Record<string, unknown>, CLIENT_AUDIT_KEYS);
+
   const updated = await prisma.client.update({
     where: { id: client.id },
     data: {
@@ -151,11 +172,13 @@ export const PATCH = apiHandler(async (request, context) => {
     },
   });
 
+  const after = pickAuditFields(updated as Record<string, unknown>, CLIENT_AUDIT_KEYS);
   await writeAudit({
     actorUnitId: user.unitId,
     action: "client.update",
     entity: "Client",
     entityUnitId: updated.unitId,
+    meta: { before, after, changes: diffAudit(before, after) },
   });
 
   return jsonOk({ client: toClientSummary(updated) });

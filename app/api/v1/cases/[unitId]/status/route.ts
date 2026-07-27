@@ -1,7 +1,7 @@
 import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, pickAuditFields, diffAudit } from "@/lib/audit";
 import { updateCaseStatusSchema } from "@/lib/validations/cases.schema";
 import { toCaseSummary } from "@/features/cases/server/serialize";
 import {
@@ -43,17 +43,20 @@ export const PATCH = apiHandler(async (request, context) => {
     );
   }
 
+  const before = pickAuditFields(item as Record<string, unknown>, ["status"] as const);
+
   const updated = await prisma.case.update({
     where: { id: item.id },
     data: { status: input.status },
   });
 
+  const after = pickAuditFields(updated as Record<string, unknown>, ["status"] as const);
   await writeAudit({
     actorUnitId: user.unitId,
     action: "case.status",
     entity: "Case",
     entityUnitId: updated.unitId,
-    meta: { from: item.status, to: input.status },
+    meta: { before, after, changes: diffAudit(before, after) },
   });
 
   if (input.status === "filing_defect") {

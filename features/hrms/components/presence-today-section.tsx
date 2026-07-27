@@ -20,6 +20,7 @@ import {
   PresenceCard,
   PRESENCE_VARIANT,
   STATUS_ROW,
+  LocationLink,
   busyChip,
   formatTime,
   presenceStatusLabel,
@@ -90,6 +91,18 @@ export function PresenceTodaySection({
                   ? ` · checked out at ${formatTime(todayRecord.checkOutAt)}`
                   : " · still present — use Check out when you leave"}
               </p>
+              <LocationLink
+                lat={todayRecord.checkInLat}
+                lng={todayRecord.checkInLng}
+                label="In"
+              />
+              {todayRecord.checkOutAt ? (
+                <LocationLink
+                  lat={todayRecord.checkOutLat}
+                  lng={todayRecord.checkOutLng}
+                  label="Out"
+                />
+              ) : null}
               {todayRecord.notes ? (
                 <p className="text-xs">Note: {todayRecord.notes}</p>
               ) : null}
@@ -155,6 +168,9 @@ export function PresenceTodaySection({
                       <TableHead className="w-28 text-right">
                         Check out
                       </TableHead>
+                      <TableHead className="hidden min-w-40 lg:table-cell">
+                        Location
+                      </TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -211,6 +227,20 @@ export function PresenceTodaySection({
                         </TableCell>
                         <TableCell className="text-right tabular-nums text-muted-foreground">
                           {formatTime(row.checkOutAt)}
+                        </TableCell>
+                        <TableCell className="hidden space-y-0.5 lg:table-cell">
+                          <LocationLink
+                            lat={row.checkInLat}
+                            lng={row.checkInLng}
+                            label="In"
+                          />
+                          {row.checkOutLat != null ? (
+                            <LocationLink
+                              lat={row.checkOutLat}
+                              lng={row.checkOutLng}
+                              label="Out"
+                            />
+                          ) : null}
                         </TableCell>
                       </TableRow>
                     ))}

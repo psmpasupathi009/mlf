@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils/cn";
 import {
   formatDayLabel,
   formatTime,
+  LocationLink,
 } from "@/features/hrms/components/hrms-page-helpers";
 
 export type AttendanceHistorySectionProps = {
@@ -127,6 +128,20 @@ export function AttendanceHistorySection({
                         <span className="mx-1.5 text-border">→</span>
                         {formatTime(row.checkOutAt)}
                       </p>
+                      <div className="mt-1 space-y-0.5">
+                        <LocationLink
+                          lat={row.checkInLat}
+                          lng={row.checkInLng}
+                          label="In"
+                        />
+                        {row.checkOutAt ? (
+                          <LocationLink
+                            lat={row.checkOutLat}
+                            lng={row.checkOutLng}
+                            label="Out"
+                          />
+                        ) : null}
+                      </div>
                       {row.notes ? (
                         <p className="mt-1 truncate text-xs text-muted-foreground">
                           {row.notes}
@@ -163,6 +178,9 @@ export function AttendanceHistorySection({
                   <TableHead className="w-28 text-right">
                     Check out
                   </TableHead>
+                  <TableHead className="hidden min-w-36 lg:table-cell">
+                    Location
+                  </TableHead>
                   <TableHead>Notes</TableHead>
                 </TableRow>
               </TableHeader>
@@ -182,6 +200,20 @@ export function AttendanceHistorySection({
                     </TableCell>
                     <TableCell className="text-right tabular-nums text-muted-foreground">
                       {formatTime(row.checkOutAt)}
+                    </TableCell>
+                    <TableCell className="hidden space-y-0.5 lg:table-cell">
+                      <LocationLink
+                        lat={row.checkInLat}
+                        lng={row.checkInLng}
+                        label="In"
+                      />
+                      {row.checkOutAt ? (
+                        <LocationLink
+                          lat={row.checkOutLat}
+                          lng={row.checkOutLng}
+                          label="Out"
+                        />
+                      ) : null}
                     </TableCell>
                     <TableCell className="max-w-sm truncate text-muted-foreground">
                       {row.notes || "—"}

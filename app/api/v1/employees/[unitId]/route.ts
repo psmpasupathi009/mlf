@@ -1,7 +1,7 @@
 import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, pickAuditFields, diffAudit } from "@/lib/audit";
 import { updateEmployeeSchema } from "@/lib/validations/employees.schema";
 import {
   requireAdminToAssignAdmin,
@@ -9,6 +9,15 @@ import {
   wouldRemoveLastAdmin,
 } from "@/lib/rbac/employee-guards";
 import { toEmployeeSummary } from "@/features/employees/server/serialize";
+
+const EMPLOYEE_AUDIT_KEYS = [
+  "name",
+  "designation",
+  "roles",
+  "email",
+  "address",
+  "isActive",
+] as const;
 
 async function findByUnitId(unitId: string) {
   return prisma.user.findUnique({ where: { unitId } });
@@ -57,6 +66,8 @@ export const PATCH = apiHandler(async (request, context) => {
     return jsonFail("CONFLICT", "This is the last active admin — assign another admin first", 409);
   }
 
+  const before = pickAuditFields(target as Record<string, unknown>, EMPLOYEE_AUDIT_KEYS);
+
   const updated = await prisma.user.update({
     where: { id: target.id },
     data: {
@@ -69,12 +80,13 @@ export const PATCH = apiHandler(async (request, context) => {
     },
   });
 
+  const after = pickAuditFields(updated as Record<string, unknown>, EMPLOYEE_AUDIT_KEYS);
   await writeAudit({
     actorUnitId: user.unitId,
     action: "employee.update",
     entity: "User",
     entityUnitId: updated.unitId,
-    meta: { changes: input },
+    meta: { before, after, changes: diffAudit(before, after) },
   });
 
   return jsonOk({ employee: toEmployeeSummary(updated) });

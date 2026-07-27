@@ -119,6 +119,13 @@ export const navItems: NavItem[] = [
     permission: { module: "employees", action: "view" },
   },
   {
+    href: "/activity",
+    label: "Activity",
+    module: "activity",
+    group: "admin",
+    permission: { module: "activity", action: "view" },
+  },
+  {
     href: "/permissions",
     label: "Permissions",
     module: "permissions",

@@ -3,7 +3,7 @@ import { apiHandler, jsonFail, jsonOk, jsonOkList, parsePagination } from "@/lib
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
-import { writeAudit } from "@/lib/audit";
+import { writeAudit, pickAuditFields } from "@/lib/audit";
 import { createOfficeTaskSchema } from "@/lib/validations/tasks.schema";
 import { toOfficeTaskSummary } from "@/features/tasks/server/serialize";
 import { containsInsensitive } from "@/lib/db/search";
@@ -182,7 +182,19 @@ export const POST = apiHandler(async (request) => {
     action: "task.create",
     entity: "OfficeTask",
     entityUnitId: created.unitId,
-    meta: { title: created.title, kind: created.kind, status: created.status },
+    meta: {
+      after: pickAuditFields(created as Record<string, unknown>, [
+        "title",
+        "kind",
+        "status",
+        "dueDate",
+        "workDate",
+        "assigneeUnitId",
+        "caseUnitId",
+        "notes",
+        "finishNote",
+      ] as const),
+    },
   });
 
   if (assignee?.assigneeId && assignee.assigneeId !== user.id) {

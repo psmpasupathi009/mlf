@@ -2,7 +2,6 @@ import type { Prisma } from "@prisma/client";
 import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
-import { writeAudit } from "@/lib/audit";
 import { updateFilingChecklistSchema } from "@/lib/validations/cases.schema";
 import { toCaseSummary } from "@/features/cases/server/serialize";
 import {
@@ -69,13 +68,6 @@ export const PATCH = apiHandler(async (request, context) => {
   const updated = await prisma.case.update({
     where: { id: item.id },
     data,
-  });
-
-  await writeAudit({
-    actorUnitId: user.unitId,
-    action: "case.checklist",
-    entity: "Case",
-    entityUnitId: updated.unitId,
   });
 
   if (input.battaDue === true && !item.battaDue) {
