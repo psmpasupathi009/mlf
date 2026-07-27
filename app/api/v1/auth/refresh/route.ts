@@ -70,8 +70,7 @@ export async function POST(request: Request) {
 
     if (!result.ok) {
       if (result.reason === "raced") {
-        // Another tab already rotated — browser likely has the new cookies.
-        // Do NOT clear; client should hard-reload.
+        // Cross-isolate race — cookies may still be mid-write. Do not clear.
         return applyCorsHeaders(
           request,
           jsonFail(

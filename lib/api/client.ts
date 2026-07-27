@@ -122,37 +122,63 @@ export type SessionRefreshResult =
       reason: "unauthorized" | "unreachable" | "network" | "error";
     };
 
+async function postRefresh(): Promise<Response> {
+  return fetch("/api/v1/auth/refresh", {
+    method: "POST",
+    credentials: "include",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+    cache: "no-store",
+  });
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function runRefreshAttempt(): Promise<SessionRefreshResult> {
+  try {
+    let res = await postRefresh();
+
+    // 409 = another isolate rotated; wait for Set-Cookie then retry once.
+    if (res.status === 409) {
+      await sleep(400);
+      res = await postRefresh();
+      if (res.status === 409) return { ok: true as const };
+    }
+
+    if (res.ok) return { ok: true as const };
+    if (res.status === 401) {
+      return { ok: false as const, reason: "unauthorized" as const };
+    }
+    if (res.status >= 500 || res.status === 0) {
+      return { ok: false as const, reason: "unreachable" as const };
+    }
+    return { ok: false as const, reason: "error" as const };
+  } catch {
+    return { ok: false as const, reason: "network" as const };
+  }
+}
+
 /**
- * Shared refresh mutex — SessionRefreshGate and apiFetch must share this
- * so concurrent tabs / Strict Mode don't race-rotate and clear cookies.
+ * Shared refresh mutex — SessionRefreshGate and apiFetch must share this.
+ * Uses Web Locks across tabs when available so only one rotate runs.
  */
 export async function refreshSession(): Promise<SessionRefreshResult> {
-  if (!refreshInFlight) {
-    refreshInFlight = (async () => {
-      try {
-        const res = await fetch("/api/v1/auth/refresh", {
-          method: "POST",
-          credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: "{}",
-          cache: "no-store",
-        });
-        // 409 = another tab already rotated; cookies should be the new ones.
-        if (res.ok || res.status === 409) return { ok: true as const };
-        if (res.status === 401) {
-          return { ok: false as const, reason: "unauthorized" as const };
-        }
-        if (res.status >= 500 || res.status === 0) {
-          return { ok: false as const, reason: "unreachable" as const };
-        }
-        return { ok: false as const, reason: "error" as const };
-      } catch {
-        return { ok: false as const, reason: "network" as const };
-      } finally {
-        refreshInFlight = null;
+  if (refreshInFlight) return refreshInFlight;
+
+  refreshInFlight = (async () => {
+    try {
+      const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
+      if (locks?.request) {
+        return await locks.request("mlf-auth-refresh", runRefreshAttempt);
       }
-    })();
-  }
+      return await runRefreshAttempt();
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
   return refreshInFlight;
 }
 

@@ -1,8 +1,14 @@
+import path from "node:path";
 import type { NextConfig } from "next";
 
 const isProd = process.env.NODE_ENV === "production";
 
 const nextConfig: NextConfig = {
+  // Parent /projects/package-lock.json otherwise becomes Turbopack root and
+  // breaks the React Client Manifest (error.tsx / @swc/helpers 500s).
+  turbopack: {
+    root: path.join(__dirname),
+  },
   poweredByHeader: false,
   compress: true,
   reactStrictMode: true,

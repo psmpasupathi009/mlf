@@ -10,7 +10,7 @@ import {
   verifyAccessToken,
   type AccessTokenPayload,
 } from "@/lib/auth/jwt";
-import { getEffectivePermissionsForUser } from "@/lib/rbac";
+import { getEffectivePermissionsForRoles } from "@/lib/rbac";
 import { ACCESS_COOKIE, REFRESH_COOKIE } from "@/lib/auth/cookie-names";
 import { userPhotoUrl } from "@/lib/auth/user-photo";
 
@@ -49,11 +49,9 @@ export type PublicUser = {
 };
 
 export async function toPublicUser(user: AuthUser): Promise<PublicUser> {
-  const permissions = await getEffectivePermissionsForUser({
-    id: user.id,
-    roles: user.roles,
-    isActive: user.isActive,
-  });
+  const permissions = user.isActive
+    ? await getEffectivePermissionsForRoles(user.roles)
+    : [];
   return {
     unitId: user.unitId,
     mobile: user.mobile,
@@ -155,10 +153,69 @@ export type RotateRefreshResult =
     }
   | {
       ok: false;
-      /** `raced` = another request already rotated this token — do not clear cookies. */
+      /**
+       * `raced` = concurrent rotate in flight on another isolate — do not clear
+       * cookies; client should retry briefly.
+       * `invalid` = token unknown/expired — clear cookies.
+       */
       reason: "invalid" | "raced" | "inactive";
     };
 
+/** Short-lived replay so concurrent refreshes share one rotation (same process). */
+type RotationGrace = {
+  accessToken: string;
+  refreshToken: string;
+  userId: string;
+  expiresAt: number;
+};
+
+const ROTATION_GRACE_MS = 60_000;
+const rotationGrace = new Map<string, RotationGrace>();
+
+function readRotationGrace(oldHash: string): RotationGrace | null {
+  const hit = rotationGrace.get(oldHash);
+  if (!hit) return null;
+  if (hit.expiresAt <= Date.now()) {
+    rotationGrace.delete(oldHash);
+    return null;
+  }
+  return hit;
+}
+
+/** First publisher wins; later callers reuse the same opaque tokens. */
+function publishRotationGrace(
+  oldHash: string,
+  tokens: Omit<RotationGrace, "expiresAt">
+): RotationGrace {
+  const existing = readRotationGrace(oldHash);
+  if (existing) return existing;
+  const entry: RotationGrace = {
+    ...tokens,
+    expiresAt: Date.now() + ROTATION_GRACE_MS,
+  };
+  rotationGrace.set(oldHash, entry);
+  return entry;
+}
+
+async function replayGraceRotation(
+  grace: RotationGrace
+): Promise<RotateRefreshResult> {
+  const user = await prisma.user.findUnique({ where: { id: grace.userId } });
+  if (!user || !user.isActive) {
+    return { ok: false, reason: "inactive" };
+  }
+  return {
+    ok: true,
+    accessToken: grace.accessToken,
+    refreshToken: grace.refreshToken,
+    user: await toPublicUser(user as unknown as AuthUser),
+  };
+}
+
+/**
+ * Rotate refresh token. Concurrent requests with the same token reuse one
+ * minted pair via in-process grace (avoids 409-before-Set-Cookie races).
+ */
 export async function rotateRefreshToken(
   refreshToken: string
 ): Promise<RotateRefreshResult> {
@@ -170,8 +227,10 @@ export async function rotateRefreshToken(
   });
 
   if (!existing) {
-    // Already consumed by a concurrent refresh, or never existed.
-    return { ok: false, reason: "raced" };
+    const grace = readRotationGrace(tokenHash);
+    if (grace) return replayGraceRotation(grace);
+    // Unknown or already rotated on another isolate — not safe to treat as OK.
+    return { ok: false, reason: "invalid" };
   }
 
   if (existing.expiresAt.getTime() <= now.getTime()) {
@@ -179,21 +238,58 @@ export async function rotateRefreshToken(
     return { ok: false, reason: "invalid" };
   }
 
-  // Atomic consume — only one concurrent rotate wins.
-  const consumed = await prisma.refreshToken.deleteMany({
-    where: { id: existing.id, tokenHash },
-  });
-  if (consumed.count === 0) {
-    return { ok: false, reason: "raced" };
-  }
-
   const user = await prisma.user.findUnique({ where: { id: existing.userId } });
   if (!user || !user.isActive) {
     return { ok: false, reason: "inactive" };
   }
 
-  const tokens = await issueAuthTokens(user as unknown as AuthUser);
-  return { ok: true, ...tokens };
+  // Mint first, publish grace before consume so a loser never 409s empty-handed.
+  const accessToken = await signAccessToken({
+    userId: user.id,
+    mobile: user.mobile,
+    roles: user.roles,
+  });
+  const nextRefresh = createRefreshTokenValue();
+  const grace = publishRotationGrace(tokenHash, {
+    accessToken,
+    refreshToken: nextRefresh,
+    userId: user.id,
+  });
+
+  // We lost the in-process race — return the winner's pair (same cookies).
+  if (grace.refreshToken !== nextRefresh) {
+    return replayGraceRotation(grace);
+  }
+
+  // Best-effort consume + persist. Unique tokenHash: second create is a no-op.
+  await prisma.refreshToken.deleteMany({
+    where: { id: existing.id, tokenHash },
+  });
+  try {
+    await prisma.refreshToken.create({
+      data: {
+        userId: user.id,
+        tokenHash: hashToken(grace.refreshToken),
+        expiresAt: refreshTokenExpiresAt(),
+      },
+    });
+  } catch {
+    // Already inserted by a concurrent twin that shared this grace pair.
+  }
+
+  // Drop expired rows in the background — don't block the response.
+  void prisma.refreshToken
+    .deleteMany({
+      where: { userId: user.id, expiresAt: { lte: now } },
+    })
+    .catch(() => undefined);
+
+  return {
+    ok: true,
+    accessToken: grace.accessToken,
+    refreshToken: grace.refreshToken,
+    user: await toPublicUser(user as unknown as AuthUser),
+  };
 }
 
 export function getBearerToken(request: Request): string | null {
