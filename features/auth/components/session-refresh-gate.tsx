@@ -1,35 +1,43 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ensureSessionRefresh } from "@/lib/api/client";
+import { refreshSession } from "@/lib/api/client";
+import { DbUnavailable } from "@/features/auth/components/db-unavailable";
+
+type GateState = "loading" | "failed" | "unreachable";
 
 /**
  * When access JWT expired but refresh cookie exists, refresh once then
  * hard-navigate so RSC picks up new cookies reliably.
+ * DB / 5xx failures must NOT clear cookies (that caused connect/disconnect loops).
  */
 export function SessionRefreshGate() {
-  const [failed, setFailed] = useState(false);
+  const [state, setState] = useState<GateState>("loading");
 
   useEffect(() => {
     let cancelled = false;
     const timeout = window.setTimeout(() => {
-      if (!cancelled) {
-        setFailed(true);
-        window.location.assign("/login");
-      }
+      if (!cancelled) setState("unreachable");
     }, 15000);
 
     (async () => {
-      const ok = await ensureSessionRefresh();
+      const result = await refreshSession();
       if (cancelled) return;
       window.clearTimeout(timeout);
-      if (!ok) {
-        setFailed(true);
-        // Clear leftovers then login
+
+      if (result.ok) {
+        window.location.assign("/");
+        return;
+      }
+
+      if (result.reason === "unauthorized") {
+        setState("failed");
         window.location.assign("/api/v1/auth/session-expired");
         return;
       }
-      window.location.assign("/");
+
+      // unreachable | network | error — keep cookies, let user retry
+      setState("unreachable");
     })();
 
     return () => {
@@ -38,11 +46,17 @@ export function SessionRefreshGate() {
     };
   }, []);
 
-  if (failed) {
+  if (state === "failed") {
     return (
       <div className="flex flex-1 items-center justify-center p-8 text-sm text-muted-foreground">
         Session expired. Redirecting to sign in…
       </div>
+    );
+  }
+
+  if (state === "unreachable") {
+    return (
+      <DbUnavailable title="Could not restore session" />
     );
   }
 

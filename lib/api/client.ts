@@ -104,7 +104,7 @@ export async function authFetch<T = Record<string, unknown>>(
       status: 0,
       data: {
         error: aborted
-          ? "Server took too long (often MongoDB Atlas unreachable — check Network Access IP allowlist)."
+          ? "Server took too long (often MongoDB Atlas unreachable — allow 0.0.0.0/0 in Network Access)."
           : "Network error. Please try again.",
       } as T,
     };
@@ -113,13 +113,20 @@ export async function authFetch<T = Record<string, unknown>>(
   }
 }
 
-let refreshInFlight: Promise<boolean> | null = null;
+let refreshInFlight: Promise<SessionRefreshResult> | null = null;
+
+export type SessionRefreshResult =
+  | { ok: true }
+  | {
+      ok: false;
+      reason: "unauthorized" | "unreachable" | "network" | "error";
+    };
 
 /**
  * Shared refresh mutex — SessionRefreshGate and apiFetch must share this
  * so concurrent tabs / Strict Mode don't race-rotate and clear cookies.
  */
-export async function ensureSessionRefresh(): Promise<boolean> {
+export async function refreshSession(): Promise<SessionRefreshResult> {
   if (!refreshInFlight) {
     refreshInFlight = (async () => {
       try {
@@ -131,15 +138,28 @@ export async function ensureSessionRefresh(): Promise<boolean> {
           cache: "no-store",
         });
         // 409 = another tab already rotated; cookies should be the new ones.
-        return res.ok || res.status === 409;
+        if (res.ok || res.status === 409) return { ok: true as const };
+        if (res.status === 401) {
+          return { ok: false as const, reason: "unauthorized" as const };
+        }
+        if (res.status >= 500 || res.status === 0) {
+          return { ok: false as const, reason: "unreachable" as const };
+        }
+        return { ok: false as const, reason: "error" as const };
       } catch {
-        return false;
+        return { ok: false as const, reason: "network" as const };
       } finally {
         refreshInFlight = null;
       }
     })();
   }
   return refreshInFlight;
+}
+
+/** True when refresh succeeded (or raced 409). False on auth / network / DB failure. */
+export async function ensureSessionRefresh(): Promise<boolean> {
+  const result = await refreshSession();
+  return result.ok;
 }
 
 /** @deprecated Use ensureSessionRefresh */
@@ -198,7 +218,7 @@ export async function apiFetch<T = Record<string, unknown>>(
       status: 0,
       data: {
         error: aborted
-          ? "Server took too long (often MongoDB Atlas unreachable — check Network Access IP allowlist)."
+          ? "Server took too long (often MongoDB Atlas unreachable — allow 0.0.0.0/0 in Network Access)."
           : "Network error. Please try again.",
       } as T,
     };

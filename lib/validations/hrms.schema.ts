@@ -33,6 +33,15 @@ export const decideLeaveSchema = z
 
 export const checkInOutSchema = z.object({
   notes: z.string().trim().max(300).optional().or(z.literal("")),
+  latitude: z
+    .number({ error: "Location is required" })
+    .min(-90, "Invalid latitude")
+    .max(90, "Invalid latitude"),
+  longitude: z
+    .number({ error: "Location is required" })
+    .min(-180, "Invalid longitude")
+    .max(180, "Invalid longitude"),
+  accuracy: z.number().nonnegative().max(50_000).optional(),
 });
 
 export const createOfficeHolidaySchema = z

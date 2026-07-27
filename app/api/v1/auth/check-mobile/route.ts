@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/db/prisma";
+import {
+  isDbUnreachableError,
+  prisma,
+  withDbRetry,
+} from "@/lib/db/prisma";
 import {
   isEnvAdminMobile,
   normalizeMobile,
@@ -57,10 +61,12 @@ export async function POST(request: Request) {
       );
     }
 
-    const user = await prisma.user.findUnique({
-      where: { mobile },
-      select: { isActive: true, pinHash: true },
-    });
+    const user = await withDbRetry(() =>
+      prisma.user.findUnique({
+        where: { mobile },
+        select: { isActive: true, pinHash: true },
+      })
+    );
 
     if (user) {
       if (!user.isActive) {
@@ -101,20 +107,12 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     console.error("check-mobile error", error);
-    const message = String(
-      error instanceof Error ? error.message : error
-    ).toLowerCase();
-    const dbDown =
-      message.includes("server selection") ||
-      message.includes("connect") ||
-      message.includes("timed out") ||
-      message.includes("replica");
     return applyCorsHeaders(
       request,
       jsonFail(
         "SERVER_ERROR",
-        dbDown
-          ? "Database unreachable. Check MongoDB Atlas Network Access (IP allowlist)."
+        isDbUnreachableError(error)
+          ? "Database unreachable. Check MongoDB Atlas Network Access (allow 0.0.0.0/0 for Vercel)."
           : "Could not verify this number. Please try again.",
         500
       )

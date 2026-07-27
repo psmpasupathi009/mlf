@@ -12,6 +12,7 @@ import { jsonFail, jsonOk } from "@/lib/api/response";
 import { refreshSchema } from "@/lib/validations/auth.schema";
 import { rateLimit } from "@/lib/rate-limit";
 import { clientRateKey } from "@/lib/rate-limit/client-key";
+import { isDbUnreachableError } from "@/lib/db/prisma";
 
 export async function OPTIONS(request: Request) {
   return corsPreflight(request) ?? new NextResponse(null, { status: 204 });
@@ -104,7 +105,13 @@ export async function POST(request: Request) {
     console.error("refresh error", error);
     return applyCorsHeaders(
       request,
-      jsonFail("SERVER_ERROR", "Failed to refresh session", 500)
+      jsonFail(
+        "SERVER_ERROR",
+        isDbUnreachableError(error)
+          ? "Database unreachable. Check MongoDB Atlas Network Access (allow 0.0.0.0/0 for Vercel)."
+          : "Failed to refresh session",
+        500
+      )
     );
   }
 }
