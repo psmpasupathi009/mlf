@@ -48,35 +48,28 @@ export const GET = apiHandler(async (request) => {
   const isOfficeAdmin =
     user.roles.includes("admin") || user.roles.includes("sub_admin");
 
-  let caseUnitIdFilter: string[] | null = null;
-  let advocateKeys: string[] | null = null;
-  if (advocateParam) {
-    advocateKeys = mobileMatchKeys(advocateParam);
-    if (advocateKeys.length) {
-      const advocateCases = await prisma.case.findMany({
-        where: { primaryAdvocateMobile: { in: advocateKeys } },
-        select: { unitId: true },
-      });
-      caseUnitIdFilter = advocateCases.map((c) => c.unitId);
-    } else {
-      caseUnitIdFilter = [];
-    }
-  }
+  const advocateKeys = advocateParam
+    ? mobileMatchKeys(advocateParam)
+    : null;
+  // When filtering by advocate, pull a larger day window then filter in memory
+  // (avoids unbounded case.findMany for that advocate).
+  const hearingTake =
+    advocateKeys && advocateKeys.length > 0
+      ? Math.min(DIARY_LIMIT * 4, 400)
+      : DIARY_LIMIT + 1;
 
-  const emptyHearings =
-    !canCases || (caseUnitIdFilter !== null && caseUnitIdFilter.length === 0);
-
-  const hearingsPromise = emptyHearings
+  const hearingsPromise = !canCases
     ? Promise.resolve([])
-    : prisma.hearing.findMany({
-        where: {
-          hearingDate: { gte: start, lte: end },
-          isAdjourned: false,
-          ...(caseUnitIdFilter ? { caseUnitId: { in: caseUnitIdFilter } } : {}),
-        },
-        orderBy: { hearingDate: "asc" },
-        take: DIARY_LIMIT + 1,
-      });
+    : advocateParam && (!advocateKeys || advocateKeys.length === 0)
+      ? Promise.resolve([])
+      : prisma.hearing.findMany({
+          where: {
+            hearingDate: { gte: start, lte: end },
+            isAdjourned: false,
+          },
+          orderBy: { hearingDate: "asc" },
+          take: hearingTake,
+        });
 
   const appointmentsPromise =
     !canAppointments
@@ -110,30 +103,66 @@ export const GET = apiHandler(async (request) => {
       })
     : Promise.resolve([]);
 
-  const [hearings, appointmentsRaw, tasksRaw] = await Promise.all([
+  const [hearingsRaw, appointmentsRaw, tasksRaw] = await Promise.all([
     hearingsPromise,
     appointmentsPromise,
     tasksPromise,
   ]);
 
-  const truncated = hearings.length > DIARY_LIMIT;
-  const pageHearings = truncated ? hearings.slice(0, DIARY_LIMIT) : hearings;
-
-  const caseUnitIds = [
+  const caseUnitIdsForLookup = [
     ...new Set([
-      ...pageHearings.map((h) => h.caseUnitId),
+      ...hearingsRaw.map((h) => h.caseUnitId),
       ...appointmentsRaw
         .map((a) => a.caseUnitId)
         .filter(Boolean) as string[],
       ...tasksRaw.map((t) => t.caseUnitId).filter(Boolean) as string[],
     ]),
   ];
-  const cases = caseUnitIds.length
-    ? await prisma.case.findMany({
-        where: { unitId: { in: caseUnitIds } },
-      })
-    : [];
+
+  const assigneeUnitIds = [
+    ...new Set(tasksRaw.map((t) => t.assigneeUnitId).filter(Boolean) as string[]),
+  ];
+
+  const [cases, assigneesEarly] = await Promise.all([
+    caseUnitIdsForLookup.length
+      ? prisma.case.findMany({
+          where: { unitId: { in: caseUnitIdsForLookup } },
+          select: {
+            unitId: true,
+            caseNumber: true,
+            status: true,
+            stage: true,
+            clientUnitId: true,
+            courtName: true,
+            primaryAdvocateMobile: true,
+          },
+        })
+      : Promise.resolve([]),
+    assigneeUnitIds.length
+      ? prisma.user.findMany({
+          where: { unitId: { in: assigneeUnitIds } },
+          select: { unitId: true, name: true },
+        })
+      : Promise.resolve([]),
+  ]);
+
   const caseMap = new Map(cases.map((c) => [c.unitId, c]));
+  const advocateKeySet =
+    advocateKeys && advocateKeys.length
+      ? new Set(advocateKeys.map((k) => toTen(k)).filter(Boolean))
+      : null;
+
+  let pageHearings = hearingsRaw;
+  if (advocateKeySet) {
+    pageHearings = hearingsRaw.filter((h) => {
+      const mob = caseMap.get(h.caseUnitId)?.primaryAdvocateMobile;
+      if (!mob) return false;
+      return advocateKeySet.has(toTen(mob));
+    });
+  }
+
+  const truncated = pageHearings.length > DIARY_LIMIT;
+  pageHearings = truncated ? pageHearings.slice(0, DIARY_LIMIT) : pageHearings;
 
   const clientUnitIds = [
     ...new Set([
@@ -143,12 +172,6 @@ export const GET = apiHandler(async (request) => {
         .filter(Boolean) as string[],
     ]),
   ];
-  const clients = clientUnitIds.length
-    ? await prisma.client.findMany({
-        where: { unitId: { in: clientUnitIds } },
-      })
-    : [];
-  const clientMap = new Map(clients.map((c) => [c.unitId, c]));
 
   const advocateMobiles = [
     ...new Set(
@@ -158,18 +181,28 @@ export const GET = apiHandler(async (request) => {
       ].filter(Boolean) as string[]
     ),
   ];
-  const advocates = advocateMobiles.length
-    ? await prisma.user.findMany({
-        where: {
-          OR: advocateMobiles.flatMap((m) => {
-            const ten = toTen(m);
-            return [{ mobile: m }, { mobile: ten }, { mobile: `91${ten}` }];
-          }),
-        },
-        select: { mobile: true, name: true },
-      })
-    : [];
 
+  const [clients, advocates] = await Promise.all([
+    clientUnitIds.length
+      ? prisma.client.findMany({
+          where: { unitId: { in: clientUnitIds } },
+          select: { unitId: true, name: true },
+        })
+      : Promise.resolve([]),
+    advocateMobiles.length
+      ? prisma.user.findMany({
+          where: {
+            OR: advocateMobiles.flatMap((m) => {
+              const ten = toTen(m);
+              return [{ mobile: m }, { mobile: ten }, { mobile: `91${ten}` }];
+            }),
+          },
+          select: { mobile: true, name: true },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const clientMap = new Map(clients.map((c) => [c.unitId, c]));
   const advName = new Map<string, string>();
   for (const a of advocates) {
     const ten = toTen(a.mobile);
@@ -179,6 +212,8 @@ export const GET = apiHandler(async (request) => {
       advName.set(`91${ten}`, a.name);
     }
   }
+
+  const assigneeMap = new Map(assigneesEarly.map((a) => [a.unitId, a.name]));
 
   const items = pageHearings
     .map((h) => {
@@ -225,17 +260,6 @@ export const GET = apiHandler(async (request) => {
         : null,
     });
   });
-
-  const assigneeUnitIds = [
-    ...new Set(tasksRaw.map((t) => t.assigneeUnitId).filter(Boolean) as string[]),
-  ];
-  const assignees = assigneeUnitIds.length
-    ? await prisma.user.findMany({
-        where: { unitId: { in: assigneeUnitIds } },
-        select: { unitId: true, name: true },
-      })
-    : [];
-  const assigneeMap = new Map(assignees.map((a) => [a.unitId, a.name]));
 
   const tasks = tasksRaw.map((t) =>
     toOfficeTaskSummary(t, {

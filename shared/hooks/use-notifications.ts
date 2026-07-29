@@ -8,7 +8,10 @@ import {
   emitNotificationsChanged,
   onNotificationsChanged,
 } from "@/features/notifications/lib/notifications-sync";
-import { useNotificationStream } from "@/shared/hooks/use-notification-stream";
+import {
+  isNotificationSseEnabled,
+  useNotificationStream,
+} from "@/shared/hooks/use-notification-stream";
 
 type ListEnvelope = {
   data?: NotificationPayload[];
@@ -17,13 +20,15 @@ type ListEnvelope = {
 
 type UnreadEnvelope = { unread?: number };
 
-const POLL_MS = 20_000;
+/** Unread badge poll when SSE is off — keep light (count only). */
+const UNREAD_POLL_MS = 60_000;
 const LIST_LIMIT = 20;
 
 export function useNotifications() {
   const [items, setItems] = useState<NotificationPayload[]>([]);
   const [unread, setUnread] = useState(0);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [listLoaded, setListLoaded] = useState(false);
   const seenLive = useRef(new Set<string>());
   const knownIds = useRef(new Set<string>());
   const marking = useRef(new Set<string>());
@@ -38,7 +43,8 @@ export function useNotifications() {
     }
   }, []);
 
-  const refetch = useCallback(async () => {
+  const refetchList = useCallback(async () => {
+    setLoading(true);
     const [listRes, countRes] = await Promise.all([
       apiFetch<ListEnvelope>(
         `/api/notifications?page=1&pageSize=${LIST_LIMIT}`
@@ -55,8 +61,18 @@ export function useNotifications() {
     if (countRes.ok && typeof countRes.data?.unread === "number") {
       setUnread(countRes.data.unread);
     }
+    setListLoaded(true);
     setLoading(false);
   }, []);
+
+  /** Call when the bell dropdown opens — avoids loading the list on every page. */
+  const ensureList = useCallback(async () => {
+    if (listLoaded) {
+      void refetchList();
+      return;
+    }
+    await refetchList();
+  }, [listLoaded, refetchList]);
 
   const markRead = useCallback(
     async (unitId: string) => {
@@ -119,9 +135,10 @@ export function useNotifications() {
     [refreshUnread]
   );
 
+  // Badge only on mount — do not fetch the full list until the menu opens.
   useEffect(() => {
-    void refetch();
-  }, [refetch]);
+    void refreshUnread();
+  }, [refreshUnread]);
 
   useEffect(() => {
     return onNotificationsChanged(() => {
@@ -129,17 +146,20 @@ export function useNotifications() {
         skipNextSync.current = false;
         return;
       }
-      void refetch();
+      void refreshUnread();
+      if (listLoaded) void refetchList();
     });
-  }, [refetch]);
+  }, [refreshUnread, refetchList, listLoaded]);
 
   useEffect(() => {
+    if (isNotificationSseEnabled()) return;
+
     const id = window.setInterval(() => {
-      if (document.visibilityState === "visible") void refetch();
-    }, POLL_MS);
+      if (document.visibilityState === "visible") void refreshUnread();
+    }, UNREAD_POLL_MS);
 
     const onVis = () => {
-      if (document.visibilityState === "visible") void refetch();
+      if (document.visibilityState === "visible") void refreshUnread();
     };
     document.addEventListener("visibilitychange", onVis);
 
@@ -147,7 +167,7 @@ export function useNotifications() {
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVis);
     };
-  }, [refetch]);
+  }, [refreshUnread]);
 
   useNotificationStream(prependLive);
 
@@ -155,7 +175,8 @@ export function useNotifications() {
     items,
     unread,
     loading,
-    refetch,
+    ensureList,
+    refetch: refetchList,
     markRead,
     markAllRead,
   };

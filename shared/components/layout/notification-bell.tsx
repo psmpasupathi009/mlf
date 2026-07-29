@@ -17,7 +17,8 @@ import type { NotificationPayload } from "@/lib/notifications/sse-hub";
 
 export function NotificationBell() {
   const router = useRouter();
-  const { items, unread, loading, markRead, markAllRead } = useNotifications();
+  const { items, unread, loading, ensureList, markRead, markAllRead } =
+    useNotifications();
 
   async function openItem(item: NotificationPayload) {
     if (!item.readAt) await markRead(item.unitId);
@@ -29,7 +30,11 @@ export function NotificationBell() {
   }
 
   return (
-    <DropdownMenu>
+    <DropdownMenu
+      onOpenChange={(open) => {
+        if (open) void ensureList();
+      }}
+    >
       <DropdownMenuTrigger asChild>
         <Button
           type="button"

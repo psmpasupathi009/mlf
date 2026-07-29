@@ -34,11 +34,18 @@ import {
 
 type WelcomeOverviewProps = {
   user: PublicUser | null;
+  /** Preloaded on the server to avoid a client round-trip on first paint. */
+  initialSummary?: DashboardSummary | null;
 };
 
-export function WelcomeOverview({ user }: WelcomeOverviewProps) {
-  const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [loading, setLoading] = useState(true);
+export function WelcomeOverview({
+  user,
+  initialSummary = null,
+}: WelcomeOverviewProps) {
+  const [summary, setSummary] = useState<DashboardSummary | null>(
+    initialSummary
+  );
+  const [loading, setLoading] = useState(!initialSummary);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [advocateFilter, setAdvocateFilter] = useState<string>("all");
   const [dayFilter, setDayFilter] = useState<DayKindFilter>("all");
@@ -58,7 +65,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
   const myMobile = tenDigits(user?.mobile);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || initialSummary) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
@@ -84,7 +91,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
     return () => {
       cancelled = true;
     };
-  }, [user]);
+  }, [user, initialSummary]);
 
   const firstName = personFirstName({ name: user?.name, fallback: "" });
   const todayHearings = summary?.cases?.todayHearings ?? [];
