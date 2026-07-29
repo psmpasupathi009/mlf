@@ -1,706 +1,1173 @@
 /**
- * One-off generator: MLF Complete Site User Guide (PDF) for client delivery.
+ * Regenerates client deliverables from one content source:
+ *   docs/MLF-Complete-Site-User-Guide.pdf
+ *   docs/MLF-Complete-Site-User-Guide.xlsx
+ *   docs/MLF-Complete-Site-User-Guide.docx
+ *
  * Run: node scripts/generate-client-guide.mjs
  */
-import PDFDocument from "pdfkit";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import PDFDocument from "pdfkit";
+import ExcelJS from "exceljs";
+import {
+  AlignmentType,
+  BorderStyle,
+  Document,
+  HeadingLevel,
+  Packer,
+  Paragraph,
+  Table,
+  TableCell,
+  TableRow,
+  TextRun,
+  WidthType,
+} from "docx";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const outPath = path.join(__dirname, "..", "docs", "MLF-Complete-Site-User-Guide.pdf");
-
-const doc = new PDFDocument({
-  size: "A4",
-  margins: { top: 56, bottom: 64, left: 56, right: 56 },
-  bufferPages: true,
-  info: {
-    Title: "MLF Law Firm Portal — Complete Site User Guide",
-    Author: "MLF",
-    Subject: "How to access and use every part of the MLF office portal",
-  },
+const DOCS = path.join(__dirname, "..", "docs");
+const GENERATED = new Date().toLocaleDateString("en-IN", {
+  year: "numeric",
+  month: "long",
+  day: "numeric",
 });
 
-const stream = fs.createWriteStream(outPath);
-doc.pipe(stream);
+/** Shared guide content — single source of truth for PDF / Excel / Word */
+const guide = {
+  title: "MLF Complete Site User Guide",
+  brand: "Manitham Law Foundation",
+  short: "MLF",
+  tagline: "Advocate office portal — how to access and use every module",
+  subtitle:
+    "One complete document for office staff, advocates, accountants, and administrators.",
+  officeNote:
+    "Primary practice: Gobichettipalayam / Nambiyur region, Erode District, Tamil Nadu (also Karnataka matters as applicable).",
 
-const PAGE_W = 595.28;
-const MARGIN = 56;
-const CONTENT_W = PAGE_W - MARGIN * 2;
-const PAGE_BOTTOM = 760;
+  sections: [
+    {
+      id: "1",
+      title: "What this portal is",
+      paragraphs: [
+        "MLF (Manitham Law Foundation) is the firm’s internal office portal. Use it to manage clients, cases, hearings, appointments, cash payments, postal dak, work allotment, HR attendance/leave, reports, employees, and permissions — in one place.",
+        "You open the site in a web browser (desktop recommended). You sign in with your Indian mobile number and a 6-digit PIN. What you see in the left menu depends on your role and permissions. Important actions are logged in Activity.",
+      ],
+      bullets: [
+        "This guide is for using the live site (not a developer/setup manual).",
+        "If a menu item is missing, you lack permission or the module is off — ask Admin.",
+      ],
+    },
+    {
+      id: "2",
+      title: "How to access the site",
+      subsections: [
+        {
+          title: "2.1 Open the portal",
+          steps: [
+            "Open the portal URL provided by your office.",
+            "If you are not logged in, you are taken to the Login page.",
+            "After a successful login you land on Home.",
+          ],
+        },
+        {
+          title: "2.2 First-time setup (new user / no PIN yet)",
+          steps: [
+            "Enter your 10-digit Indian mobile number (must start with 6–9).",
+            "Continue — the system detects that you need PIN setup.",
+            "Request OTP. An SMS OTP is sent to your mobile.",
+            "Enter the OTP and verify.",
+            "Create a 6-digit PIN and confirm it. Avoid weak PINs (000000, 123456, repeated digits).",
+            "You are signed in and redirected to Home.",
+          ],
+        },
+        {
+          title: "2.3 Returning user (daily login)",
+          steps: [
+            "Enter your 10-digit mobile number.",
+            "Enter your 6-digit PIN.",
+            "Submit — a secure session is set and you go to Home.",
+          ],
+        },
+        {
+          title: "2.4 Forgot PIN",
+          steps: [
+            "On the PIN screen, choose Forgot PIN.",
+            "Request OTP → enter OTP from SMS → verify.",
+            "Set a new 6-digit PIN (confirm it).",
+            "You are signed in with the new PIN.",
+          ],
+        },
+        {
+          title: "2.5 PIN lockout, logout, session expiry",
+          paragraphs: [
+            "Too many wrong PIN attempts locks the PIN temporarily. Wait for the countdown, or use Forgot PIN.",
+            "Logout: open the user menu in the header → Logout. Cookies are cleared; you return to Login.",
+            "If your session expires while working, the app clears cookies and sends you back to Login. Sign in again with mobile + PIN.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "3",
+      title: "Roles & what each person can do",
+      paragraphs: [
+        "Access is role-based. Admin has full control. Other roles get a default permission set (Admin can adjust on the Permissions page).",
+      ],
+      table: {
+        headers: ["Role", "Meant for", "Typical access"],
+        rows: [
+          ["Admin", "Firm owner / full control", "Everything — cannot be restricted"],
+          [
+            "Sub admin",
+            "Office / HR manager",
+            "Ops: clients, cases, HRMS approve, employees, reports",
+          ],
+          [
+            "Staff",
+            "Clerks, PA, reception",
+            "Clients, cases, appointments, dak, tasks",
+          ],
+          [
+            "Advocate",
+            "Counsel / advocates",
+            "Clients, cases, appointments, dak, tasks",
+          ],
+          [
+            "Accountant",
+            "Accounts team",
+            "Accounts cash book, view clients/cases, reports",
+          ],
+        ],
+      },
+      bullets: [
+        "Everyone gets: Home view, HRMS view + own attendance + own leave, Notifications, Profile.",
+        "Permission actions: View, Create, Edit, Upload/import, Deactivate, Cancel, Own attendance, Own leave, Team attendance, Approve leave.",
+      ],
+    },
+    {
+      id: "4",
+      title: "Screen layout & navigation",
+      paragraphs: [
+        "Left sidebar — modules grouped as Workspace, Matters, Schedule, Office, Admin.",
+        "Header — global search (⌘K / Ctrl+K), notification bell, user menu.",
+        "Main content — lists, filters, forms, and detail panels for the selected module.",
+      ],
+      table: {
+        headers: ["Group", "Menu label", "Opens"],
+        rows: [
+          ["Workspace", "Home", "Dashboard summary"],
+          ["Matters", "Clients", "Client registry"],
+          ["Matters", "Cases", "Case pipeline & hearings"],
+          ["Matters", "Day board", "Day view: hearings + appointments + tasks"],
+          ["Schedule", "Appointments", "Consultations / bookings"],
+          ["Schedule", "Availability", "Advocate hours & blocks"],
+          ["Office", "Accounts", "Cash payments / fees"],
+          ["Office", "HRMS", "Attendance, leave, holidays"],
+          ["Office", "Postal", "In/out dak register"],
+          ["Office", "Work allotment", "Office tasks"],
+          ["Office", "Reports", "Excel exports"],
+          ["Admin", "Employees", "Staff & advocate users"],
+          ["Admin", "Activity", "Audit log"],
+          ["Admin", "Permissions", "Role permission matrix"],
+        ],
+      },
+      bullets: [
+        "Notifications — header bell → full inbox (not always in main nav).",
+        "Profile — user menu → your details / photo; office address PDF may be linked here.",
+        "Documents — inside Case / Client screens (no separate Documents menu).",
+      ],
+    },
+    {
+      id: "5",
+      title: "Home dashboard & global search",
+      steps: [
+        "After login, open Home (or click Home in the sidebar).",
+        "Review summary cards / today’s focus (hearings, appointments, tasks as permitted).",
+        "Press ⌘K (Mac) or Ctrl+K (Windows) for global search.",
+        "Type a client name, case id, mobile fragment, etc., then select a result to jump there.",
+      ],
+    },
+    {
+      id: "6",
+      title: "Clients",
+      paragraphs: [
+        "Clients is the party registry. Most cases and payments link to a client (IDs like CLI-00001).",
+        "Required intake: name + mobile. Recommended: father/spouse, address, city, district, state, matter brief. SMS consent may be collected for hearing reminders.",
+      ],
+      steps: [
+        "Open Clients from Matters → search / open a row.",
+        "Create: enter name, 10-digit mobile, other fields → Save (needs clients.create). A CLI-… id is generated.",
+        "Edit existing clients as needed (clients.edit).",
+        "Bulk import via CSV — see Section 15 (recommended first when migrating data).",
+      ],
+    },
+    {
+      id: "7",
+      title: "Cases, hearings & documents",
+      paragraphs: [
+        "Cases track matters from enquiry through disposal. Each case links to a client and may have advocates, hearings, documents, and fee payments. Case IDs look like CSE-00001.",
+      ],
+      table: {
+        headers: ["Status", "Meaning"],
+        rows: [
+          ["Enquiry", "Consultation / early enquiry"],
+          ["Engaged", "Client engaged the firm"],
+          ["Pre-filing", "Draft / preparation before filing"],
+          ["Under filing", "Being filed"],
+          ["Filing defect", "Returned with defect"],
+          ["Active", "Numbered / active matter"],
+          ["Reserved", "Judgment reserved"],
+          ["Disposed", "Disposed"],
+          ["Withdrawn", "Withdrawn"],
+          ["Transferred", "Transferred"],
+          ["Archived", "Archived"],
+        ],
+      },
+      subsections: [
+        {
+          title: "7.1 Create & manage a case",
+          steps: [
+            "Open Cases → Create (cases.create).",
+            "Select the client (must exist first).",
+            "Fill opposing party, court, status, advocates (optional), and other matter fields → Save.",
+            "Open case detail to review client, pipeline, hearings, documents, and fee snippet.",
+            "Update status when the matter moves (cases.edit). Invalid jumps are blocked.",
+            "Complete filing checklist items if shown.",
+          ],
+        },
+        {
+          title: "7.2 Hearings",
+          steps: [
+            "On case detail, add a hearing (date/time, notes as required).",
+            "Saving updates the case next-hearing date; notifications may be sent.",
+            "Adjourn creates a replacement hearing.",
+            "Bulk hearings can be imported via CSV (Section 15).",
+            "A scheduled job can SMS clients about tomorrow’s hearings; Day board may also offer notify tools.",
+          ],
+        },
+        {
+          title: "7.3 Documents",
+          steps: [
+            "Open the Documents panel on the case (or client) screen.",
+            "Upload allowed files: PDF, JPEG, PNG, WebP — max 10 MB each.",
+            "Download later from the same panel (permission follows case/accounts rules by document type).",
+          ],
+        },
+      ],
+    },
+    {
+      id: "8",
+      title: "Day board (diary)",
+      paragraphs: [
+        "Day board shows one IST calendar day: hearings + appointments + tasks together. You can open it if you have view access to Cases, Appointments, or Tasks.",
+      ],
+      steps: [
+        "Open Day board from Matters.",
+        "Pick the date (defaults to today).",
+        "Review sections: court hearings, appointments, allotted work.",
+        "Click an item to open its full record.",
+        "Use notify / hearing SMS actions if available and permitted.",
+      ],
+    },
+    {
+      id: "9",
+      title: "Appointments & advocate availability",
+      subsections: [
+        {
+          title: "9.1 Appointments",
+          steps: [
+            "Open Appointments under Schedule.",
+            "Create: client/contact, advocate, date-time, purpose (IDs like APT-00001).",
+            "Edit or cancel as needed (cancel needs appointments.cancel).",
+            "Convert to enquiry case when the consultation becomes a matter.",
+          ],
+        },
+        {
+          title: "9.2 Availability",
+          steps: [
+            "Open Availability under Schedule.",
+            "Set advocate weekly hours.",
+            "Add time blocks (leave, court, unavailable windows).",
+            "Booking screens use these rules so slots respect hours and blocks.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "10",
+      title: "Accounts (cash / payments)",
+      paragraphs: [
+        "Accounts is the cash ledger for client/case fees and related payments (IDs like PAY-00001). Accountants typically work here daily.",
+        "Payment purposes include: Advance, Stage/partial, Full/final, Consultation, Court fee, Stamp, Copying, Travel, Clerkage, Other. Fee rollup uses fee-type purposes (advance/partial/full/consultation).",
+      ],
+      steps: [
+        "Open Accounts under Office → filter by client, case, date, or purpose.",
+        "Record a payment: link client (and case if known), amount, purpose, mode/notes → Save.",
+        "To reverse a wrong entry, use Void (keeps the audit trail).",
+        "Case detail may show fee rollup filtered for that case.",
+        "CSV import uses payments.sample.csv (needs accounts.upload).",
+      ],
+    },
+    {
+      id: "11",
+      title: "HRMS (attendance & leave)",
+      steps: [
+        "Open HRMS → Check in at start of work; check out at end (own attendance).",
+        "Submit leave with dates and reason (own leave).",
+        "Managers approve/reject leave (approve leave) and may manage team attendance.",
+        "Maintain office holidays under Holidays when permitted.",
+      ],
+    },
+    {
+      id: "12",
+      title: "Postal register (DAK)",
+      paragraphs: [
+        "Postal / DAK tracks inward and outward office dak — letters, parcels, courier (IDs like DAK-00001).",
+      ],
+      steps: [
+        "Open Postal under Office.",
+        "Create an entry: in/out, reference, parties, date, remarks.",
+        "Edit when status or details change.",
+        "Import historical dak via CSV if migrating (Section 15).",
+      ],
+    },
+    {
+      id: "13",
+      title: "Work allotment (tasks)",
+      paragraphs: [
+        "Office tasks assign work to staff/advocates, often linked to a case (IDs like TSK-00001).",
+      ],
+      steps: [
+        "Open Work allotment under Office.",
+        "Create a task: title, assignee, due date, linked case (optional).",
+        "Update status as work progresses (assignees may get notifications).",
+        "Due items also appear on Day board for the selected day.",
+      ],
+    },
+    {
+      id: "14",
+      title: "Reports & Excel exports",
+      paragraphs: [
+        "Open Reports (needs reports.view). Each export also needs view permission on that domain.",
+      ],
+      table: {
+        headers: ["Export", "Also needs"],
+        rows: [
+          ["Cases register", "cases.view"],
+          ["Clients register", "clients.view"],
+          ["Employees register", "employees.view"],
+          ["Tasks", "tasks.view"],
+          ["Postal / Dak", "dak.view"],
+          ["Accounts / payments", "accounts.view"],
+          ["Appointments", "appointments.view"],
+          ["Fees outstanding", "accounts.view (+ related)"],
+          ["Attendance", "hrms / attendance rights as shown"],
+        ],
+      },
+      bullets: [
+        "Some list pages (e.g. Cases) also offer filtered Export on that page.",
+        "Day board / diary may offer printable day views where enabled.",
+      ],
+    },
+    {
+      id: "15",
+      title: "CSV bulk import",
+      paragraphs: [
+        "Most list screens offer Import. Always dry-run first, then confirm. Sample CSVs download from the Import dialog. Max about 500 rows per import.",
+      ],
+      steps: [
+        "Open the module → Import.",
+        "Download the sample CSV for that module.",
+        "Fill rows; save as UTF-8 CSV with the header row.",
+        "Upload → Dry run. Fix any row errors shown.",
+        "Confirm import (writes data + audit).",
+      ],
+      table: {
+        headers: ["Order", "Module", "Sample / permission"],
+        rows: [
+          ["1", "Clients", "clients.sample.csv · clients.create (+edit upsert)"],
+          ["2", "Cases", "cases.sample.csv · cases.upload (+edit upsert)"],
+          ["3+", "Hearings", "hearings.sample.csv · cases.edit"],
+          ["3+", "Payments", "payments.sample.csv · accounts.upload"],
+          ["3+", "Dak / Tasks / Appointments", "matching *.sample.csv · create perms"],
+          ["Any", "Employees", "employees.sample.csv · employees.create"],
+        ],
+      },
+      bullets: [
+        "Dates: YYYY-MM-DD (IST). Appointment scheduledAt may be full ISO datetime.",
+        "Mobile: 10 digits (system normalizes to 91…).",
+        "Link related rows with *UnitId columns only (CLI-…, CSE-…, etc.).",
+        "Empty unitId on clients/cases/employees → auto-generated.",
+        "Unknown extra columns are ignored (shown in dry-run).",
+      ],
+    },
+    {
+      id: "16",
+      title: "Employees & user accounts",
+      steps: [
+        "Admin/Sub-admin opens Employees.",
+        "Create employee: name, mobile, role(s), designation (IDs like EMP-00001).",
+        "The person signs in with that mobile and sets/uses a PIN (OTP on first login).",
+        "Edit details; upload photo if supported.",
+        "Deactivate when someone leaves; reactivate if they return.",
+        "Force reset PIN when a user is locked out and cannot use OTP themselves.",
+      ],
+      bullets: [
+        "Only Admin can assign the Admin role. Sub-admin manages other employees within policy.",
+      ],
+    },
+    {
+      id: "17",
+      title: "Permissions administration",
+      steps: [
+        "Admin opens Permissions.",
+        "Review the matrix: each role × each module.action.",
+        "Turn allowed on/off for Sub-admin, Staff, Advocate, Accountant as policy requires.",
+        "Save. Users get the union of permissions from all their roles.",
+      ],
+      bullets: ["Admin remains full access by design."],
+    },
+    {
+      id: "18",
+      title: "Notifications & profile",
+      steps: [
+        "Click the bell in the header for recent alerts; open the full Notifications page if needed.",
+        "Mark items read as you handle them.",
+        "Open user menu → Profile to update display details / photo.",
+        "From Profile you may download the office address & mail PDF (signed-in).",
+        "Logout from the same menu when finished.",
+      ],
+    },
+    {
+      id: "19",
+      title: "Activity (audit log)",
+      steps: [
+        "Open Activity under Admin (activity.view).",
+        "Filter/search creates, updates, voids, imports, and other audited actions.",
+        "Use this for accountability and “who changed what”.",
+      ],
+    },
+    {
+      id: "20",
+      title: "End-to-end office workflows",
+      subsections: [
+        {
+          title: "20.1 New client → case → hearing → fee",
+          steps: [
+            "Create Client (or find existing).",
+            "Create Case linked to that client; set status (often Enquiry or Engaged).",
+            "Assign advocates; move status through pre-filing / filing / active.",
+            "Add Hearings; watch Day board for the hearing day.",
+            "Upload Documents on the case.",
+            "Record fee Payments in Accounts against client/case.",
+            "When finished, move status to Disposed / Withdrawn / Archived as appropriate.",
+          ],
+        },
+        {
+          title: "20.2 Consultation → appointment → case",
+          steps: [
+            "Set advocate Availability.",
+            "Book Appointment.",
+            "After meeting, Convert appointment to enquiry Case if engaged.",
+            "Continue on the Cases workflow above.",
+          ],
+        },
+        {
+          title: "20.3 Daily office rhythm",
+          steps: [
+            "Login → check Home + Notifications.",
+            "Open Day board for today.",
+            "HRMS check-in.",
+            "Work Cases / Clients / Accounts / Dak / Tasks as assigned.",
+            "Export Reports if needed.",
+            "HRMS check-out → Logout.",
+          ],
+        },
+        {
+          title: "20.4 Onboarding a new staff member",
+          steps: [
+            "Admin creates Employee with correct role.",
+            "Adjust Permissions if the default role matrix is not enough.",
+            "Staff opens site → OTP → set PIN → starts work.",
+          ],
+        },
+      ],
+    },
+    {
+      id: "21",
+      title: "Quick reference checklist",
+      table: {
+        headers: ["I need to…", "Go to"],
+        rows: [
+          ["Register a party", "Clients"],
+          ["Open / move a matter", "Cases"],
+          ["See today’s court & meetings", "Day board"],
+          ["Book a consultation", "Appointments"],
+          ["Set advocate free slots", "Availability"],
+          ["Record a fee / cash entry", "Accounts"],
+          ["Check in / apply leave", "HRMS"],
+          ["Log inward/outward post", "Postal"],
+          ["Assign office work", "Work allotment"],
+          ["Download Excel", "Reports"],
+          ["Bulk upload CSV", "Module → Import (dry-run first)"],
+          ["Add a staff login", "Employees"],
+          ["Change who can do what", "Permissions"],
+          ["See who changed data", "Activity"],
+          ["Upload case papers", "Case detail → Documents"],
+          ["Office address PDF", "Profile → office files link"],
+        ],
+      },
+      bullets: [
+        "Unit IDs: EMP employees · CLI clients · CSE cases · HRG hearings · APT appointments · PAY payments · DOC documents · DAK postal · TSK tasks · LVE leave · ATT attendance · NTF notifications · HOL holidays.",
+        "Always use these unit IDs in CSV imports and when speaking with support.",
+      ],
+    },
+  ],
+};
 
-function ensureSpace(needed = 80) {
-  if (doc.y + needed > PAGE_BOTTOM) {
-    doc.addPage();
+// ─── PDF ─────────────────────────────────────────────────
+async function writePdf() {
+  const outPath = path.join(DOCS, "MLF-Complete-Site-User-Guide.pdf");
+  const doc = new PDFDocument({
+    size: "A4",
+    margins: { top: 56, bottom: 64, left: 56, right: 56 },
+    bufferPages: true,
+    info: {
+      Title: `${guide.brand} — ${guide.title}`,
+      Author: guide.short,
+      Subject: guide.tagline,
+    },
+  });
+  const stream = fs.createWriteStream(outPath);
+  doc.pipe(stream);
+
+  const PAGE_W = 595.28;
+  const MARGIN = 56;
+  const CONTENT_W = PAGE_W - MARGIN * 2;
+  const PAGE_BOTTOM = 760;
+
+  function ensureSpace(needed = 80) {
+    if (doc.y + needed > PAGE_BOTTOM) doc.addPage();
   }
-}
-
-function h1(text) {
-  ensureSpace(60);
-  doc.moveDown(0.4);
-  doc.fontSize(18).fillColor("#0f2744").font("Helvetica-Bold").text(text, {
-    width: CONTENT_W,
-  });
-  doc.moveDown(0.25);
-  doc
-    .moveTo(MARGIN, doc.y)
-    .lineTo(MARGIN + CONTENT_W, doc.y)
-    .strokeColor("#c9a227")
-    .lineWidth(1.5)
-    .stroke();
-  doc.moveDown(0.5);
-  doc.fillColor("#111111").font("Helvetica");
-}
-
-function h2(text) {
-  ensureSpace(50);
-  doc.moveDown(0.35);
-  doc.fontSize(13).fillColor("#1a3a5c").font("Helvetica-Bold").text(text, {
-    width: CONTENT_W,
-  });
-  doc.moveDown(0.25);
-  doc.fillColor("#111111").font("Helvetica").fontSize(10);
-}
-
-function h3(text) {
-  ensureSpace(40);
-  doc.moveDown(0.2);
-  doc.fontSize(11).fillColor("#243447").font("Helvetica-Bold").text(text, {
-    width: CONTENT_W,
-  });
-  doc.moveDown(0.15);
-  doc.fillColor("#111111").font("Helvetica").fontSize(10);
-}
-
-function p(text) {
-  ensureSpace(36);
-  doc.fontSize(10).font("Helvetica").fillColor("#222222").text(text, {
-    width: CONTENT_W,
-    align: "left",
-    lineGap: 2,
-  });
-  doc.moveDown(0.35);
-}
-
-function bullet(text, indent = 12) {
-  ensureSpace(28);
-  const x = MARGIN + indent;
-  const bulletW = CONTENT_W - indent;
-  doc.fontSize(10).font("Helvetica").fillColor("#222222");
-  doc.text("•  " + text, x, doc.y, { width: bulletW, lineGap: 1.5 });
-  doc.moveDown(0.15);
-}
-
-function step(n, text) {
-  ensureSpace(28);
-  doc.fontSize(10).font("Helvetica-Bold").fillColor("#0f2744");
-  doc.text(`Step ${n}: `, MARGIN, doc.y, { continued: true });
-  doc.font("Helvetica").fillColor("#222222").text(text, {
-    width: CONTENT_W,
-    lineGap: 1.5,
-  });
-  doc.moveDown(0.2);
-}
-
-function note(text) {
-  const body = "Note: " + text;
-  doc.fontSize(9).font("Helvetica-Oblique");
-  const h = doc.heightOfString(body, { width: CONTENT_W - 20 });
-  ensureSpace(h + 20);
-  const startY = doc.y;
-  doc.rect(MARGIN, startY, CONTENT_W, h + 12).fill("#fff8e6");
-  doc.fillColor("#4a3b12");
-  doc.text(body, MARGIN + 10, startY + 4, {
-    width: CONTENT_W - 20,
-    lineGap: 1,
-  });
-  doc.y = startY + h + 16;
-  doc.fillColor("#111111").font("Helvetica");
-}
-
-function table(headers, rows, colWidths) {
-  ensureSpace(40 + rows.length * 16);
-  const startX = MARGIN;
-  let x = startX;
-  const rowH = 16;
-  const headerH = 18;
-
-  // Header
-  doc.rect(startX, doc.y, CONTENT_W, headerH).fill("#0f2744");
-  doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(8);
-  x = startX;
-  const hy = doc.y + 5;
-  headers.forEach((h, i) => {
-    doc.text(h, x + 4, hy, { width: colWidths[i] - 8, ellipsis: true });
-    x += colWidths[i];
-  });
-  doc.y += headerH;
-
-  rows.forEach((row, ri) => {
-    ensureSpace(rowH + 4);
-    const bg = ri % 2 === 0 ? "#f5f7fa" : "#ffffff";
-    doc.rect(startX, doc.y, CONTENT_W, rowH).fill(bg);
-    doc.fillColor("#222222").font("Helvetica").fontSize(8);
-    x = startX;
-    const ty = doc.y + 4;
-    row.forEach((cell, i) => {
-      doc.text(String(cell), x + 4, ty, {
-        width: colWidths[i] - 8,
-        ellipsis: true,
-      });
-      x += colWidths[i];
+  function h1(text) {
+    ensureSpace(60);
+    doc.moveDown(0.35);
+    doc.fontSize(16).fillColor("#0f2744").font("Helvetica-Bold").text(text, {
+      width: CONTENT_W,
     });
-    doc.y += rowH;
-  });
-  doc.moveDown(0.6);
-  doc.fillColor("#111111").font("Helvetica");
-}
+    doc.moveDown(0.2);
+    doc
+      .moveTo(MARGIN, doc.y)
+      .lineTo(MARGIN + CONTENT_W, doc.y)
+      .strokeColor("#c9a227")
+      .lineWidth(1.5)
+      .stroke();
+    doc.moveDown(0.45);
+    doc.fillColor("#111111").font("Helvetica");
+  }
+  function h2(text) {
+    ensureSpace(44);
+    doc.moveDown(0.25);
+    doc.fontSize(12).fillColor("#1a3a5c").font("Helvetica-Bold").text(text, {
+      width: CONTENT_W,
+    });
+    doc.moveDown(0.2);
+    doc.fillColor("#111111").font("Helvetica").fontSize(10);
+  }
+  function p(text) {
+    ensureSpace(32);
+    doc.fontSize(10).font("Helvetica").fillColor("#222222").text(text, {
+      width: CONTENT_W,
+      lineGap: 2,
+    });
+    doc.moveDown(0.3);
+  }
+  function bullet(text) {
+    ensureSpace(26);
+    doc.fontSize(10).font("Helvetica").fillColor("#222222");
+    doc.text("•  " + text, MARGIN + 8, doc.y, {
+      width: CONTENT_W - 8,
+      lineGap: 1.5,
+    });
+    doc.moveDown(0.12);
+  }
+  function step(n, text) {
+    ensureSpace(26);
+    doc.fontSize(10).font("Helvetica-Bold").fillColor("#0f2744");
+    doc.text(`Step ${n}: `, MARGIN, doc.y, { continued: true });
+    doc.font("Helvetica").fillColor("#222222").text(text, {
+      width: CONTENT_W,
+      lineGap: 1.5,
+    });
+    doc.moveDown(0.15);
+  }
+  function table(headers, rows) {
+    const colW = headers.map((_, i) =>
+      i === 0 ? Math.min(140, CONTENT_W / headers.length) : 0
+    );
+    const rest = CONTENT_W - colW[0] * (headers.length > 1 ? 1 : 0);
+    if (headers.length === 2) {
+      colW[0] = Math.floor(CONTENT_W * 0.32);
+      colW[1] = CONTENT_W - colW[0];
+    } else if (headers.length === 3) {
+      colW[0] = 90;
+      colW[1] = 150;
+      colW[2] = CONTENT_W - 240;
+    }
+    ensureSpace(36);
+    const startX = MARGIN;
+    const headerH = 17;
+    const rowH = 15;
+    doc.rect(startX, doc.y, CONTENT_W, headerH).fill("#0f2744");
+    doc.fillColor("#ffffff").font("Helvetica-Bold").fontSize(8);
+    let x = startX;
+    const hy = doc.y + 4;
+    headers.forEach((h, i) => {
+      doc.text(h, x + 3, hy, { width: colW[i] - 6, ellipsis: true });
+      x += colW[i];
+    });
+    doc.y += headerH;
+    rows.forEach((row, ri) => {
+      ensureSpace(rowH + 2);
+      doc.rect(startX, doc.y, CONTENT_W, rowH).fill(ri % 2 ? "#ffffff" : "#f5f7fa");
+      doc.fillColor("#222222").font("Helvetica").fontSize(8);
+      x = startX;
+      const ty = doc.y + 3;
+      row.forEach((cell, i) => {
+        doc.text(String(cell), x + 3, ty, {
+          width: colW[i] - 6,
+          ellipsis: true,
+        });
+        x += colW[i];
+      });
+      doc.y += rowH;
+    });
+    doc.moveDown(0.5);
+    doc.fillColor("#111111").font("Helvetica");
+  }
 
-// ─── COVER ───────────────────────────────────────────────
-doc.rect(0, 0, PAGE_W, 841.89).fill("#0f2744");
-doc.fillColor("#c9a227").font("Helvetica-Bold").fontSize(11);
-doc.text("LAW FIRM OFFICE PORTAL", MARGIN, 200, {
-  width: CONTENT_W,
-  align: "center",
-});
-doc.moveDown(1);
-doc.fillColor("#ffffff").fontSize(28).font("Helvetica-Bold");
-doc.text("MLF Complete Site", { align: "center", width: CONTENT_W });
-doc.text("User Guide", { align: "center", width: CONTENT_W });
-doc.moveDown(1.2);
-doc.fillColor("#d4dce8").fontSize(12).font("Helvetica");
-doc.text(
-  "One complete document: how to access the portal and how every module works, step by step.",
-  { align: "center", width: CONTENT_W }
-);
-doc.moveDown(2);
-doc.fillColor("#c9a227").fontSize(10);
-doc.text("For office staff, advocates, accountants, and administrators", {
-  align: "center",
-  width: CONTENT_W,
-});
-doc.moveDown(0.5);
-doc.fillColor("#8899aa").fontSize(9);
-doc.text(`Generated: ${new Date().toLocaleDateString("en-IN", { year: "numeric", month: "long", day: "numeric" })}`, {
-  align: "center",
-  width: CONTENT_W,
-});
-doc.fillColor("#667788").fontSize(8);
-doc.text("Confidential — for authorized MLF office users", MARGIN, 760, {
-  width: CONTENT_W,
-  align: "center",
-});
+  function renderSection(sec) {
+    h1(`${sec.id}. ${sec.title}`);
+    (sec.paragraphs || []).forEach(p);
+    (sec.steps || []).forEach((s, i) => step(i + 1, s));
+    if (sec.table) table(sec.table.headers, sec.table.rows);
+    (sec.bullets || []).forEach(bullet);
+    for (const sub of sec.subsections || []) {
+      h2(sub.title);
+      (sub.paragraphs || []).forEach(p);
+      (sub.steps || []).forEach((s, i) => step(i + 1, s));
+      if (sub.table) table(sub.table.headers, sub.table.rows);
+      (sub.bullets || []).forEach(bullet);
+    }
+  }
 
-// Start content on a fresh page after cover
-doc.addPage();
-doc.fillColor("#111111");
-
-// ─── TOC ─────────────────────────────────────────────────
-h1("Table of contents");
-const toc = [
-  "1. What this portal is",
-  "2. How to access (login, PIN, OTP, logout)",
-  "3. Roles & what each person can do",
-  "4. Screen layout & navigation",
-  "5. Home dashboard & global search",
-  "6. Clients",
-  "7. Cases, hearings & documents",
-  "8. Day board (diary)",
-  "9. Appointments & advocate availability",
-  "10. Accounts (cash / payments)",
-  "11. HRMS (attendance & leave)",
-  "12. Postal register (DAK)",
-  "13. Work allotment (tasks)",
-  "14. Reports & Excel exports",
-  "15. CSV bulk import",
-  "16. Employees & user accounts",
-  "17. Permissions administration",
-  "18. Notifications & profile",
-  "19. Activity (audit log)",
-  "20. End-to-end office workflows",
-  "21. Quick reference checklist",
-];
-toc.forEach((t) => bullet(t, 0));
-
-// ─── 1 ───────────────────────────────────────────────────
-h1("1. What this portal is");
-p(
-  "MLF is the law firm’s internal office portal. It is used to manage clients, cases, hearings, appointments, cash payments, postal dak, work allotment, HR attendance/leave, reports, and staff permissions — in one place."
-);
-p("Typical users: Admin, Sub-admin (office/HR manager), Staff (clerks, PA, receptionist), Advocates, and Accountants.");
-bullet("You open the site in a web browser (desktop recommended).");
-bullet("You sign in with your Indian mobile number and a 6-digit PIN.");
-bullet("What you see in the left menu depends on your role and permissions.");
-bullet("All important actions are logged in Activity for accountability.");
-note(
-  "This guide is for using the live site. It is not a developer/setup manual."
-);
-
-// ─── 2 ───────────────────────────────────────────────────
-h1("2. How to access the site");
-h2("2.1 Open the portal");
-step(1, "Open the portal URL provided by your office (for example the production website address).");
-step(2, "If you are not logged in, you are taken to the Login page.");
-step(3, "After a successful login you land on Home (/).");
-
-h2("2.2 First-time setup (new user / no PIN yet)");
-step(1, "Enter your 10-digit Indian mobile number (must start with 6–9).");
-step(2, "Continue. The system detects that you need PIN setup.");
-step(3, "Request OTP. An SMS OTP is sent to your mobile (via 2Factor).");
-step(4, "Enter the OTP and verify.");
-step(5, "Create a 6-digit PIN (and confirm it). Avoid weak PINs such as 000000, 123456, or repeated digits.");
-step(6, "You are signed in and redirected to Home.");
-
-h2("2.3 Returning user (normal daily login)");
-step(1, "Enter your 10-digit mobile number.");
-step(2, "Enter your 6-digit PIN.");
-step(3, "Submit. A secure session cookie is set and you go to Home.");
-
-h2("2.4 Forgot PIN");
-step(1, "On the PIN screen, choose Forgot PIN.");
-step(2, "Request OTP → enter OTP from SMS → verify.");
-step(3, "Set a new 6-digit PIN (confirm it).");
-step(4, "You are signed in with the new PIN.");
-
-h2("2.5 PIN lockout");
-p(
-  "Too many wrong PIN attempts locks the PIN temporarily. Wait for the countdown, or use Forgot PIN to reset via OTP."
-);
-
-h2("2.6 Logout");
-step(1, "Open the user menu (profile area in the header).");
-step(2, "Choose Logout. Session cookies are cleared and you return to Login.");
-
-h2("2.7 Session expired");
-p(
-  "If your session expires while working, the app clears cookies and sends you back to Login. Sign in again with mobile + PIN."
-);
-
-// ─── 3 ───────────────────────────────────────────────────
-h1("3. Roles & what each person can do");
-p(
-  "Access is role-based. Admin has full control. Other roles get a default set of permissions (which Admin can adjust on the Permissions page)."
-);
-
-table(
-  ["Role", "Meant for", "Typical access"],
-  [
-    ["Admin", "Firm owner / full control", "Everything; cannot be restricted"],
-    ["Sub admin", "Office / HR manager", "Ops: clients, cases, HRMS approve, employees, reports"],
-    ["Staff", "Clerks, PA, reception", "Clients, cases, appointments, dak, tasks"],
-    ["Advocate", "Counsel / advocates", "Clients, cases, appointments, dak, tasks"],
-    ["Accountant", "Accounts team", "Accounts cash book, view clients/cases, reports"],
-  ],
-  [80, 140, 263]
-);
-
-h3("Everyone gets");
-bullet("Home (dashboard) view");
-bullet("HRMS view + own attendance check-in/out + own leave requests");
-bullet("Notifications inbox (bell) and Profile");
-
-h3("Permission actions you may see");
-bullet("View — open list/detail screens");
-bullet("Create — add new records");
-bullet("Edit — change existing records");
-bullet("Upload / import — CSV bulk import (and related uploads)");
-bullet("Deactivate — deactivate employees");
-bullet("Cancel — cancel appointments");
-bullet("Own attendance / Own leave / Team attendance / Approve leave — HRMS splits");
-
-note(
-  "If a menu item is missing, you do not have permission (or the module is disabled). Ask Admin."
-);
-
-// ─── 4 ───────────────────────────────────────────────────
-h1("4. Screen layout & navigation");
-h2("4.1 Main areas");
-bullet("Left sidebar — modules grouped as Workspace, Matters, Schedule, Office, Admin.");
-bullet("Header — global search (⌘K / Ctrl+K), notification bell, user menu.");
-bullet("Main content — list, filters, forms, detail panels for the selected module.");
-
-h2("4.2 Menu map");
-table(
-  ["Group", "Menu label", "Opens"],
-  [
-    ["Workspace", "Home", "Dashboard summary"],
-    ["Matters", "Clients", "Client registry"],
-    ["Matters", "Cases", "Case pipeline & hearings"],
-    ["Matters", "Day board", "Day view: hearings + appointments + tasks"],
-    ["Schedule", "Appointments", "Consultations / bookings"],
-    ["Schedule", "Availability", "Advocate hours & blocks"],
-    ["Office", "Accounts", "Cash payments / fees"],
-    ["Office", "HRMS", "Attendance, leave, holidays"],
-    ["Office", "Postal", "In/out dak register"],
-    ["Office", "Work allotment", "Office tasks"],
-    ["Office", "Reports", "Excel exports"],
-    ["Admin", "Employees", "Staff & advocate users"],
-    ["Admin", "Activity", "Audit log"],
-    ["Admin", "Permissions", "Role permission matrix"],
-  ],
-  [90, 120, 273]
-);
-
-h3("Also reachable (not always in main nav)");
-bullet("Notifications — header bell → full inbox");
-bullet("Profile — user menu → your photo / details");
-bullet("Documents — inside Case / Client screens (no separate Documents menu)");
-
-// ─── 5 ───────────────────────────────────────────────────
-h1("5. Home dashboard & global search");
-h2("5.1 Home");
-step(1, "After login, open Home (or click Home in the sidebar).");
-step(2, "Review summary cards / today’s focus (hearings, appointments, tasks as permitted).");
-step(3, "Use shortcuts from the dashboard into Cases, Day board, or other modules.");
-
-h2("5.2 Global search");
-step(1, "Press ⌘K (Mac) or Ctrl+K (Windows), or open the search control in the header.");
-step(2, "Type a client name, case id, mobile fragment, etc.");
-step(3, "Select a result to jump to that record.");
-
-// ─── 6 ───────────────────────────────────────────────────
-h1("6. Clients");
-p("Clients is the party registry. Most cases and payments link to a client record (IDs like CLI-00001).");
-
-h2("6.1 View clients");
-step(1, "Open Clients from Matters.");
-step(2, "Use search / pagination to find a client.");
-step(3, "Open a row to see detail.");
-
-h2("6.2 Create a client");
-step(1, "Click Create / Add (needs clients.create).");
-step(2, "Enter name, mobile (10 digits), and other intake fields (including SMS consent if shown).");
-step(3, "Save. A client unit ID is generated automatically.");
-
-h2("6.3 Edit a client");
-step(1, "Open the client.");
-step(2, "Edit fields and save (needs clients.edit).");
-
-h2("6.4 Import clients (CSV)");
-p("See Section 15. Recommended first import when migrating data.");
-
-// ─── 7 ───────────────────────────────────────────────────
-h1("7. Cases, hearings & documents");
-p(
-  "Cases track matters from enquiry through disposal. Each case links to a client and may have advocates, hearings, documents, and fee payments."
-);
-
-h2("7.1 Case pipeline statuses");
-table(
-  ["Status", "Meaning"],
-  [
-    ["Enquiry", "Consultation / early enquiry"],
-    ["Engaged", "Client engaged the firm"],
-    ["Pre-filing", "Draft / preparation before filing"],
-    ["Under filing", "Being filed"],
-    ["Filing defect", "Returned with defect"],
-    ["Active", "Numbered / active matter"],
-    ["Reserved", "Judgment reserved"],
-    ["Disposed", "Disposed"],
-    ["Withdrawn", "Withdrawn"],
-    ["Transferred", "Transferred"],
-    ["Archived", "Archived"],
-  ],
-  [120, 363]
-);
-p("Status changes follow allowed transitions only (the system blocks invalid jumps).");
-
-h2("7.2 Create a case");
-step(1, "Open Cases → Create (needs cases.create).");
-step(2, "Select the client (must exist first).");
-step(3, "Fill opposing party, court, stage/status, advocates (optional), and other matter fields.");
-step(4, "Save. A case unit ID is generated (e.g. CAS-00001).");
-
-h2("7.3 Open case detail");
-step(1, "From the Cases list, open a case.");
-step(2, "Review client link, status pipeline, hearings list, documents, and fee snippet.");
-step(3, "Update status when the matter moves (needs cases.edit).");
-step(4, "Complete filing checklist items if shown.");
-
-h2("7.4 Hearings");
-step(1, "On case detail, add a hearing (date/time, court notes as required).");
-step(2, "Saving updates the case next hearing date; notifications may be sent.");
-step(3, "To adjourn: use adjourn on the hearing — this creates a replacement hearing.");
-step(4, "Bulk hearings can be imported via CSV (see Section 15).");
-
-h2("7.5 Documents on a case / client");
-step(1, "Open the Documents panel on the case (or client) screen.");
-step(2, "Upload a file (allowed types/sizes enforced by the system).");
-step(3, "Download later from the same panel (permission follows cases / accounts rules by document type).");
-note(
-  "There is no standalone Documents page in the main menu — documents live on the related case/client."
-);
-
-h2("7.6 Hearing SMS (automatic reminder)");
-p(
-  "A scheduled job can SMS clients about tomorrow’s hearings. Manual triggers may also exist from Day board / diary tools for authorized users."
-);
-
-// ─── 8 ───────────────────────────────────────────────────
-h1("8. Day board (diary)");
-p(
-  "Day board shows one IST calendar day: hearings + appointments + tasks together. You can open it if you have view access to Cases, Appointments, or Tasks."
-);
-step(1, "Open Day board from Matters.");
-step(2, "Pick the date (defaults to today).");
-step(3, "Review each section: court hearings, appointments, allotted work.");
-step(4, "Click an item to open its full record.");
-step(5, "Use notify / hearing SMS actions if available and permitted.");
-
-// ─── 9 ───────────────────────────────────────────────────
-h1("9. Appointments & advocate availability");
-h2("9.1 Appointments");
-step(1, "Open Appointments under Schedule.");
-step(2, "Create an appointment: client/contact, advocate, date-time, purpose.");
-step(3, "Edit or cancel as needed (cancel needs appointments.cancel).");
-step(4, "Convert to enquiry case when the consultation becomes a matter (Convert action on the appointment).");
-
-h2("9.2 Availability");
-step(1, "Open Availability under Schedule.");
-step(2, "Set advocate weekly hours.");
-step(3, "Add time blocks (leave, court, unavailable windows).");
-step(4, "Booking screens use these rules so slots respect hours and blocks.");
-
-// ─── 10 ──────────────────────────────────────────────────
-h1("10. Accounts (cash / payments)");
-p(
-  "Accounts is the cash ledger for client/case fees and related payments. Accountants typically work here daily."
-);
-step(1, "Open Accounts under Office.");
-step(2, "Filter by client, case, date, or purpose as needed.");
-step(3, "Record a payment: link client (and case if known), amount, purpose, mode/notes.");
-step(4, "Save. A payment unit ID is created.");
-step(5, "To reverse a wrong entry, use Void (do not delete casually — void keeps the audit trail).");
-step(6, "On a case detail screen, fee rollup may show payments filtered for that case.");
-p("CSV import of payments is available (sample file is named payments.sample.csv). Needs accounts.upload.");
-
-// ─── 11 ──────────────────────────────────────────────────
-h1("11. HRMS (attendance & leave)");
-h2("11.1 Own attendance");
-step(1, "Open HRMS.");
-step(2, "Check in at the start of work; check out at the end (own_attendance).");
-step(3, "Review your attendance history on the same screen.");
-
-h2("11.2 Own leave");
-step(1, "In HRMS, open Leave.");
-step(2, "Submit a leave request with dates and reason (own_leave).");
-step(3, "Wait for approval from a manager who has approve_leave.");
-
-h2("11.3 Managers");
-step(1, "Approve or reject pending leave (approve_leave).");
-step(2, "Manage team attendance / corrections if you have manage_attendance.");
-step(3, "Maintain office holidays under Holidays (as permitted).");
-
-// ─── 12 ──────────────────────────────────────────────────
-h1("12. Postal register (DAK)");
-p("Postal / DAK tracks inward and outward office dak (letters, parcels, courier).");
-step(1, "Open Postal under Office.");
-step(2, "Create an entry: in/out, reference, parties, date, remarks.");
-step(3, "Edit when status or details change.");
-step(4, "Import historical dak via CSV if migrating (Section 15).");
-
-// ─── 13 ──────────────────────────────────────────────────
-h1("13. Work allotment (tasks)");
-p("Office tasks assign work to staff/advocates, often linked to a case.");
-step(1, "Open Work allotment under Office.");
-step(2, "Create a task: title, assignee, due date, linked case (optional).");
-step(3, "Update status as work progresses (assignees may get notifications).");
-step(4, "Due items also appear on Day board for the selected day.");
-
-// ─── 14 ──────────────────────────────────────────────────
-h1("14. Reports & Excel exports");
-step(1, "Open Reports (needs reports.view).");
-step(2, "Choose an export type (examples: cases, clients, employees, tasks, dak, accounts, appointments, fees outstanding, and other types listed in the UI).");
-step(3, "Download the Excel file.");
-note(
-  "Each export also requires view permission on that domain (e.g. cases export needs cases.view as well as reports.view)."
-);
-
-// ─── 15 ──────────────────────────────────────────────────
-h1("15. CSV bulk import");
-p(
-  "Most list screens offer Import. Always dry-run first, then confirm. Sample CSVs download from the Import dialog."
-);
-
-h2("15.1 Safe import procedure (every time)");
-step(1, "Open the module → Import.");
-step(2, "Download the sample CSV for that module.");
-step(3, "Fill rows in Excel/Sheets; save as UTF-8 CSV with the header row.");
-step(4, "Upload → Dry run. Fix any row errors shown.");
-step(5, "Confirm import (writes data + audit).");
-
-h2("15.2 Recommended import order");
-table(
-  ["Order", "Module", "Why"],
-  [
-    ["1", "Clients", "Creates CLI-… IDs used later"],
-    ["2", "Cases", "Needs clientUnitId from step 1"],
-    ["3+", "Hearings / Payments / Dak / Tasks / Appointments", "Link with caseUnitId / clientUnitId"],
-    ["Any", "Employees", "Independent user roster (admin)"],
-  ],
-  [50, 160, 273]
-);
-
-h2("15.3 CSV rules");
-bullet("UTF-8 CSV; header row required.");
-bullet("Dates: YYYY-MM-DD (IST). Appointment scheduledAt may be full ISO datetime.");
-bullet("Mobile: 10 digits (system normalizes to 91…).");
-bullet("Link related rows with *UnitId columns only.");
-bullet("Empty unitId on clients/cases/employees → auto-generated.");
-bullet("Unknown extra columns are ignored (shown in dry-run as ignored).");
-
-h2("15.4 Permissions for import");
-table(
-  ["Import", "Permission needed"],
-  [
-    ["Clients", "clients.create (+ edit for upsert)"],
-    ["Cases", "cases.upload (+ edit for upsert)"],
-    ["Hearings", "cases.edit"],
-    ["Accounts / payments", "accounts.upload"],
-    ["Employees", "employees.create (+ edit for upsert)"],
-    ["DAK", "dak.create"],
-    ["Tasks", "tasks.create"],
-    ["Appointments", "appointments.create"],
-  ],
-  [200, 283]
-);
-
-// ─── 16 ──────────────────────────────────────────────────
-h1("16. Employees & user accounts");
-step(1, "Admin/Sub-admin opens Employees.");
-step(2, "Create employee: name, mobile, role(s), designation as required.");
-step(3, "The person signs in with that mobile and sets/uses a PIN (OTP flow on first login).");
-step(4, "Edit profile details; upload photo if supported.");
-step(5, "Deactivate when someone leaves (deactivate permission). Reactivate if they return.");
-step(6, "Force reset PIN when a user is locked out and cannot use OTP themselves (admin tools).");
-note(
-  "Only Admin can assign the Admin role. Sub-admin can manage other employees within policy."
-);
-
-// ─── 17 ──────────────────────────────────────────────────
-h1("17. Permissions administration");
-step(1, "Admin opens Permissions (permissions.view / edit).");
-step(2, "Review the matrix: each role × each module.action.");
-step(3, "Turn allowed on/off for Sub-admin, Staff, Advocate, Accountant as your office policy requires.");
-step(4, "Save. Users get the union of permissions from all their roles on next session use.");
-p("Admin remains full access by design.");
-
-// ─── 18 ──────────────────────────────────────────────────
-h1("18. Notifications & profile");
-h2("18.1 Notifications");
-step(1, "Click the bell in the header to see recent alerts.");
-step(2, "Open the full Notifications page from there if needed.");
-step(3, "Mark items read as you handle them.");
-p(
-  "Alerts are created by office events (e.g. task assigned, hearing updates). Live push may be enabled on some deployments; otherwise the UI polls."
-);
-
-h2("18.2 Profile");
-step(1, "Open user menu → Profile.");
-step(2, "Update display details / photo as allowed.");
-step(3, "Logout from the same menu when finished for the day.");
-
-// ─── 19 ──────────────────────────────────────────────────
-h1("19. Activity (audit log)");
-step(1, "Open Activity under Admin (activity.view).");
-step(2, "Filter/search recent creates, updates, voids, imports, and other audited actions.");
-step(3, "Use this for accountability and troubleshooting “who changed what”.");
-
-// ─── 20 ──────────────────────────────────────────────────
-h1("20. End-to-end office workflows");
-
-h2("20.1 New client → case → hearing → fee");
-step(1, "Create Client (or find existing).");
-step(2, "Create Case linked to that client; set status (often Enquiry or Engaged).");
-step(3, "Assign advocates; move status through pre-filing / filing / active as work progresses.");
-step(4, "Add Hearings; watch Day board for the hearing day.");
-step(5, "Upload Documents on the case.");
-step(6, "Record fee Payments in Accounts against client/case.");
-step(7, "When finished, move status to Disposed / Withdrawn / Archived as appropriate.");
-
-h2("20.2 Consultation → appointment → case");
-step(1, "Set advocate Availability.");
-step(2, "Book Appointment.");
-step(3, "After meeting, Convert appointment to enquiry Case if engaged.");
-step(4, "Continue on the Cases workflow above.");
-
-h2("20.3 Daily office rhythm");
-step(1, "Login → check Home + Notifications.");
-step(2, "Open Day board for today — hearings, appointments, tasks.");
-step(3, "HRMS check-in.");
-step(4, "Work Cases / Clients / Accounts / Dak / Tasks as assigned.");
-step(5, "Export Reports if needed for accounts or management.");
-step(6, "HRMS check-out → Logout.");
-
-h2("20.4 Onboarding a new staff member");
-step(1, "Admin creates Employee with correct role.");
-step(2, "Adjust Permissions if the default role matrix is not enough.");
-step(3, "Staff opens site → OTP → set PIN → starts work.");
-
-// ─── 21 ──────────────────────────────────────────────────
-h1("21. Quick reference checklist");
-h2("Access");
-bullet("URL → Login → Mobile → PIN (or OTP setup / forgot PIN) → Home");
-bullet("Logout from user menu; session expiry returns to Login");
-
-h2("Where to do common jobs");
-table(
-  ["I need to…", "Go to"],
-  [
-    ["Register a party", "Clients"],
-    ["Open / move a matter", "Cases"],
-    ["See today’s court & meetings", "Day board"],
-    ["Book a consultation", "Appointments"],
-    ["Set advocate free slots", "Availability"],
-    ["Record a fee / cash entry", "Accounts"],
-    ["Check in / apply leave", "HRMS"],
-    ["Log inward/outward post", "Postal"],
-    ["Assign office work", "Work allotment"],
-    ["Download Excel", "Reports"],
-    ["Bulk upload CSV", "Module → Import (dry-run first)"],
-    ["Add a staff login", "Employees"],
-    ["Change who can do what", "Permissions"],
-    ["See who changed data", "Activity"],
-    ["Upload case papers", "Case detail → Documents"],
-  ],
-  [220, 263]
-);
-
-h2("IDs you will see");
-bullet("CLI-… clients");
-bullet("CAS-… cases (and similar unit IDs for hearings, payments, tasks, etc.)");
-bullet("Public IDs are these unit IDs — use them in imports and when speaking with support.");
-
-doc.moveDown(1.5);
-ensureSpace(80);
-doc.fontSize(11).font("Helvetica-Bold").fillColor("#0f2744");
-doc.text("End of guide", { align: "center", width: CONTENT_W });
-doc.moveDown(0.4);
-doc.fontSize(9).font("Helvetica").fillColor("#555555");
-doc.text(
-  "If a button or menu is missing, ask your Admin to grant the matching permission or confirm the module is enabled.",
-  { align: "center", width: CONTENT_W }
-);
-
-// Footers on all pages except cover (index 0)
-const range = doc.bufferedPageRange();
-for (let i = range.start; i < range.start + range.count; i++) {
-  doc.switchToPage(i);
-  if (i === range.start) continue; // cover
-  const label = `MLF Portal — Complete User Guide  ·  Page ${i - range.start}`;
-  doc.fontSize(8).fillColor("#666666");
-  doc.text(label, MARGIN, 800, {
+  // Cover
+  doc.rect(0, 0, PAGE_W, 841.89).fill("#0f2744");
+  doc.fillColor("#c9a227").font("Helvetica-Bold").fontSize(11);
+  doc.text(guide.brand.toUpperCase(), MARGIN, 180, {
     width: CONTENT_W,
     align: "center",
-    lineBreak: false,
   });
+  doc.moveDown(1);
+  doc.fillColor("#ffffff").fontSize(26).font("Helvetica-Bold");
+  doc.text("Complete Site", { align: "center", width: CONTENT_W });
+  doc.text("User Guide", { align: "center", width: CONTENT_W });
+  doc.moveDown(1);
+  doc.fillColor("#d4dce8").fontSize(11).font("Helvetica");
+  doc.text(guide.tagline, { align: "center", width: CONTENT_W });
+  doc.moveDown(0.6);
+  doc.fillColor("#a8b4c4").fontSize(9);
+  doc.text(guide.officeNote, { align: "center", width: CONTENT_W });
+  doc.moveDown(1.5);
+  doc.fillColor("#c9a227").fontSize(10);
+  doc.text(guide.subtitle, { align: "center", width: CONTENT_W });
+  doc.moveDown(0.8);
+  doc.fillColor("#8899aa").fontSize(9);
+  doc.text(`Updated: ${GENERATED}`, { align: "center", width: CONTENT_W });
+  doc.fillColor("#667788").fontSize(8);
+  doc.text("Confidential — for authorized MLF office users", MARGIN, 760, {
+    width: CONTENT_W,
+    align: "center",
+  });
+
+  doc.addPage();
+  doc.fillColor("#111111");
+  h1("Table of contents");
+  guide.sections.forEach((s) => bullet(`${s.id}. ${s.title}`));
+  guide.sections.forEach(renderSection);
+
+  doc.moveDown(1);
+  ensureSpace(60);
+  doc.fontSize(11).font("Helvetica-Bold").fillColor("#0f2744");
+  doc.text("End of guide", { align: "center", width: CONTENT_W });
+  doc.moveDown(0.3);
+  doc.fontSize(9).font("Helvetica").fillColor("#555555");
+  doc.text(
+    "If a button or menu is missing, ask Admin to grant the matching permission or confirm the module is enabled.",
+    { align: "center", width: CONTENT_W }
+  );
+
+  const range = doc.bufferedPageRange();
+  for (let i = range.start; i < range.start + range.count; i++) {
+    doc.switchToPage(i);
+    if (i === range.start) continue;
+    doc.fontSize(8).fillColor("#666666");
+    doc.text(
+      `${guide.short} Portal — Complete User Guide  ·  Page ${i - range.start}`,
+      MARGIN,
+      800,
+      { width: CONTENT_W, align: "center", lineBreak: false }
+    );
+  }
+
+  doc.end();
+  await new Promise((resolve, reject) => {
+    stream.on("finish", resolve);
+    stream.on("error", reject);
+  });
+  console.log("Wrote", outPath);
 }
 
-doc.end();
+// ─── Excel ───────────────────────────────────────────────
+async function writeExcel() {
+  const outPath = path.join(DOCS, "MLF-Complete-Site-User-Guide.xlsx");
+  const wb = new ExcelJS.Workbook();
+  wb.creator = guide.short;
+  wb.created = new Date();
+  wb.title = guide.title;
 
-await new Promise((resolve, reject) => {
-  stream.on("finish", resolve);
-  stream.on("error", reject);
-});
+  function styleHeader(row) {
+    row.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    row.fill = {
+      type: "pattern",
+      pattern: "solid",
+      fgColor: { argb: "FF0F2744" },
+    };
+    row.alignment = { vertical: "middle", wrapText: true };
+  }
+  function addSheet(name, headers, rows, widths) {
+    const ws = wb.addWorksheet(name.slice(0, 31));
+    ws.columns = headers.map((h, i) => ({
+      header: h,
+      key: `c${i}`,
+      width: widths[i] || 22,
+    }));
+    styleHeader(ws.getRow(1));
+    for (const r of rows) ws.addRow(Array.isArray(r) ? r : Object.values(r));
+    ws.views = [{ state: "frozen", ySplit: 1 }];
+    return ws;
+  }
 
-console.log("Wrote", outPath);
+  addSheet(
+    "01 Overview",
+    ["Topic", "Details"],
+    [
+      ["Product", `${guide.brand} (${guide.short})`],
+      ["Tagline", guide.tagline],
+      ["Office", guide.officeNote],
+      ["Access", "Browser → portal URL → Mobile + 6-digit PIN (OTP for setup / forgot PIN)"],
+      ["Roles", "Admin, Sub admin, Staff, Advocate, Accountant"],
+      ["Updated", GENERATED],
+      ["Companions", "Also see .pdf and .docx in the same docs folder"],
+    ],
+    [18, 85]
+  );
+
+  addSheet(
+    "02 Login steps",
+    ["Scenario", "Step", "Action"],
+    [
+      ["First time", "1", "Open portal URL"],
+      ["First time", "2", "Enter 10-digit Indian mobile (starts 6–9)"],
+      ["First time", "3", "Request OTP from SMS"],
+      ["First time", "4", "Verify OTP"],
+      ["First time", "5", "Set & confirm 6-digit PIN (avoid weak PINs)"],
+      ["First time", "6", "Land on Home"],
+      ["Daily login", "1", "Enter mobile"],
+      ["Daily login", "2", "Enter PIN"],
+      ["Daily login", "3", "Go to Home"],
+      ["Forgot PIN", "1", "Forgot PIN → OTP → verify"],
+      ["Forgot PIN", "2", "Set new PIN → signed in"],
+      ["Logout", "1", "User menu → Logout"],
+      ["Session expired", "1", "Returned to Login → sign in again"],
+    ],
+    [16, 8, 58]
+  );
+
+  addSheet(
+    "03 Menu map",
+    ["Group", "Menu", "Opens", "Typical permission"],
+    [
+      ["Workspace", "Home", "Dashboard", "dashboard.view"],
+      ["Matters", "Clients", "Client registry", "clients.view"],
+      ["Matters", "Cases", "Case pipeline & hearings", "cases.view"],
+      ["Matters", "Day board", "Hearings + appointments + tasks", "cases|appointments|tasks.view"],
+      ["Schedule", "Appointments", "Consultations", "appointments.view"],
+      ["Schedule", "Availability", "Advocate hours & blocks", "appointments.view"],
+      ["Office", "Accounts", "Cash / fee ledger", "accounts.view"],
+      ["Office", "HRMS", "Attendance & leave", "hrms.view"],
+      ["Office", "Postal", "In/out dak", "dak.view"],
+      ["Office", "Work allotment", "Office tasks", "tasks.view"],
+      ["Office", "Reports", "Excel exports", "reports.view"],
+      ["Admin", "Employees", "Staff users", "employees.view"],
+      ["Admin", "Activity", "Audit log", "activity.view"],
+      ["Admin", "Permissions", "Role matrix", "permissions.view"],
+      ["Header", "Bell", "Notifications", "any logged-in user"],
+      ["Header", "Profile", "Own profile + office PDF", "any logged-in user"],
+      ["Case UI", "Documents", "Upload/download (PDF/JPG/PNG/WebP ≤10MB)", "cases.* / accounts.*"],
+    ],
+    [12, 16, 42, 30]
+  );
+
+  addSheet(
+    "04 Roles",
+    ["Role", "Who", "Typical access"],
+    guide.sections.find((s) => s.id === "3").table.rows,
+    [14, 24, 58]
+  );
+
+  const howToRows = [];
+  for (const sec of guide.sections) {
+    if (sec.steps) {
+      sec.steps.forEach((s, i) => howToRows.push([sec.title, String(i + 1), s]));
+    }
+    for (const sub of sec.subsections || []) {
+      (sub.steps || []).forEach((s, i) =>
+        howToRows.push([sub.title, String(i + 1), s])
+      );
+    }
+  }
+  addSheet("05 Module how-to", ["Module / section", "Step", "What to do"], howToRows, [
+    28,
+    8,
+    70,
+  ]);
+
+  addSheet(
+    "06 Case statuses",
+    ["Status", "Meaning"],
+    guide.sections.find((s) => s.id === "7").table.rows,
+    [16, 45]
+  );
+
+  addSheet(
+    "07 CSV import",
+    ["Order", "Module", "Sample / permission"],
+    guide.sections.find((s) => s.id === "15").table.rows,
+    [10, 28, 55]
+  );
+
+  addSheet(
+    "08 Reports exports",
+    ["Export", "Also needs"],
+    guide.sections.find((s) => s.id === "14").table.rows,
+    [28, 40]
+  );
+
+  addSheet(
+    "09 Quick jobs",
+    ["I need to…", "Go to"],
+    guide.sections.find((s) => s.id === "21").table.rows,
+    [36, 42]
+  );
+
+  addSheet(
+    "10 Unit IDs",
+    ["Prefix", "Entity"],
+    [
+      ["EMP", "Employees"],
+      ["CLI", "Clients"],
+      ["CSE", "Cases"],
+      ["HRG", "Hearings"],
+      ["APT", "Appointments"],
+      ["PAY", "Payments"],
+      ["DOC", "Documents"],
+      ["DAK", "Postal / dak"],
+      ["TSK", "Office tasks"],
+      ["LVE", "Leave"],
+      ["ATT", "Attendance"],
+      ["NTF", "Notifications"],
+      ["HOL", "Holidays"],
+    ],
+    [12, 24]
+  );
+
+  await wb.xlsx.writeFile(outPath);
+  console.log("Wrote", outPath);
+}
+
+// ─── Word (.docx) ────────────────────────────────────────
+async function writeDocx() {
+  const outPath = path.join(DOCS, "MLF-Complete-Site-User-Guide.docx");
+  const children = [];
+
+  const pushP = (text, opts = {}) => {
+    children.push(
+      new Paragraph({
+        spacing: { after: 160 },
+        ...opts,
+        children: [
+          new TextRun({
+            text,
+            size: opts.size || 20,
+            bold: opts.bold,
+            italics: opts.italics,
+            color: opts.color || "222222",
+            font: "Calibri",
+          }),
+        ],
+      })
+    );
+  };
+
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 120 },
+      children: [
+        new TextRun({
+          text: guide.brand.toUpperCase(),
+          bold: true,
+          size: 22,
+          color: "C9A227",
+          font: "Calibri",
+        }),
+      ],
+    })
+  );
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 200 },
+      children: [
+        new TextRun({
+          text: guide.title,
+          bold: true,
+          size: 36,
+          color: "0F2744",
+          font: "Calibri",
+        }),
+      ],
+    })
+  );
+  pushP(guide.tagline, { size: 22 });
+  pushP(guide.officeNote, { italics: true, size: 18, color: "555555" });
+  pushP(`Updated: ${GENERATED}`, { size: 18, color: "666666" });
+  pushP("Confidential — for authorized MLF office users", {
+    size: 18,
+    color: "666666",
+  });
+
+  children.push(
+    new Paragraph({
+      heading: HeadingLevel.HEADING_1,
+      spacing: { before: 280, after: 160 },
+      children: [
+        new TextRun({
+          text: "Table of contents",
+          bold: true,
+          size: 28,
+          color: "0F2744",
+          font: "Calibri",
+        }),
+      ],
+    })
+  );
+  for (const s of guide.sections) {
+    children.push(
+      new Paragraph({
+        spacing: { after: 60 },
+        children: [
+          new TextRun({
+            text: `${s.id}. ${s.title}`,
+            size: 20,
+            font: "Calibri",
+          }),
+        ],
+      })
+    );
+  }
+
+  function docTable(headers, rows) {
+    const colCount = headers.length;
+    const widths = headers.map((_, i) =>
+      colCount === 2 ? (i === 0 ? 2800 : 6500) : Math.floor(9300 / colCount)
+    );
+    const border = {
+      style: BorderStyle.SINGLE,
+      size: 4,
+      color: "CCCCCC",
+    };
+    const borders = { top: border, bottom: border, left: border, right: border };
+    const headerRow = new TableRow({
+      children: headers.map(
+        (h, i) =>
+          new TableCell({
+            borders,
+            width: { size: widths[i], type: WidthType.DXA },
+            shading: { fill: "0F2744" },
+            children: [
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: h,
+                    bold: true,
+                    color: "FFFFFF",
+                    size: 18,
+                    font: "Calibri",
+                  }),
+                ],
+              }),
+            ],
+          })
+      ),
+    });
+    const body = rows.map(
+      (row, ri) =>
+        new TableRow({
+          children: row.map(
+            (cell, i) =>
+              new TableCell({
+                borders,
+                width: { size: widths[i], type: WidthType.DXA },
+                shading: { fill: ri % 2 ? "FFFFFF" : "F5F7FA" },
+                children: [
+                  new Paragraph({
+                    children: [
+                      new TextRun({
+                        text: String(cell),
+                        size: 18,
+                        font: "Calibri",
+                      }),
+                    ],
+                  }),
+                ],
+              })
+          ),
+        })
+    );
+    children.push(
+      new Table({
+        width: { size: 9300, type: WidthType.DXA },
+        rows: [headerRow, ...body],
+      })
+    );
+    children.push(new Paragraph({ spacing: { after: 160 }, children: [] }));
+  }
+
+  function renderSec(sec) {
+    children.push(
+      new Paragraph({
+        heading: HeadingLevel.HEADING_1,
+        spacing: { before: 320, after: 160 },
+        children: [
+          new TextRun({
+            text: `${sec.id}. ${sec.title}`,
+            bold: true,
+            size: 28,
+            color: "0F2744",
+            font: "Calibri",
+          }),
+        ],
+      })
+    );
+    for (const t of sec.paragraphs || []) pushP(t);
+    (sec.steps || []).forEach((s, i) =>
+      pushP(`Step ${i + 1}: ${s}`, { size: 20 })
+    );
+    if (sec.table) docTable(sec.table.headers, sec.table.rows);
+    for (const b of sec.bullets || []) {
+      children.push(
+        new Paragraph({
+          spacing: { after: 80 },
+          children: [
+            new TextRun({ text: `•  ${b}`, size: 20, font: "Calibri" }),
+          ],
+        })
+      );
+    }
+    for (const sub of sec.subsections || []) {
+      children.push(
+        new Paragraph({
+          heading: HeadingLevel.HEADING_2,
+          spacing: { before: 220, after: 120 },
+          children: [
+            new TextRun({
+              text: sub.title,
+              bold: true,
+              size: 24,
+              color: "1A3A5C",
+              font: "Calibri",
+            }),
+          ],
+        })
+      );
+      for (const t of sub.paragraphs || []) pushP(t);
+      (sub.steps || []).forEach((s, i) =>
+        pushP(`Step ${i + 1}: ${s}`, { size: 20 })
+      );
+      if (sub.table) docTable(sub.table.headers, sub.table.rows);
+      for (const b of sub.bullets || []) {
+        children.push(
+          new Paragraph({
+            spacing: { after: 80 },
+            children: [
+              new TextRun({ text: `•  ${b}`, size: 20, font: "Calibri" }),
+            ],
+          })
+        );
+      }
+    }
+  }
+
+  guide.sections.forEach(renderSec);
+
+  children.push(
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 400 },
+      children: [
+        new TextRun({
+          text: "End of guide",
+          bold: true,
+          size: 22,
+          color: "0F2744",
+          font: "Calibri",
+        }),
+      ],
+    })
+  );
+  pushP(
+    "If a button or menu is missing, ask Admin to grant the matching permission or confirm the module is enabled."
+  );
+
+  const document = new Document({
+    creator: guide.short,
+    title: guide.title,
+    description: guide.tagline,
+    sections: [
+      {
+        properties: {
+          page: {
+            margin: {
+              top: 720,
+              bottom: 720,
+              left: 720,
+              right: 720,
+            },
+          },
+        },
+        children,
+      },
+    ],
+  });
+
+  const buffer = await Packer.toBuffer(document);
+  fs.writeFileSync(outPath, buffer);
+  console.log("Wrote", outPath);
+}
+
+await writePdf();
+await writeExcel();
+await writeDocx();
+console.log("All client guide files updated in docs/");

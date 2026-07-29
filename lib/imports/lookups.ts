@@ -10,11 +10,15 @@ export type ImportClientRef = {
 export type ImportCaseRef = {
   id: string;
   unitId: string;
+  clientId: string;
   clientUnitId: string;
   status: string;
   caseNumber: string | null;
+  filingNumber: string | null;
   cnr: string | null;
   nextHearingAt: Date | null;
+  primaryAdvocateMobile: string | null;
+  advocateMobiles: string[];
 };
 
 export type ImportUserRef = {
@@ -55,11 +59,15 @@ export async function findCaseByUnitId(
     select: {
       id: true,
       unitId: true,
+      clientId: true,
       clientUnitId: true,
       status: true,
       caseNumber: true,
+      filingNumber: true,
       cnr: true,
       nextHearingAt: true,
+      primaryAdvocateMobile: true,
+      advocateMobiles: true,
     },
   });
 }

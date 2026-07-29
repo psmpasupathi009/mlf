@@ -27,6 +27,7 @@ import type { PresenceBoard } from "@/features/hrms/server/presence";
 import { LeaveApplyDialog } from "@/features/hrms/components/leave-apply-dialog";
 import { PresenceTodaySection } from "@/features/hrms/components/presence-today-section";
 import { AttendanceHistorySection } from "@/features/hrms/components/attendance-history-section";
+import type { AttendanceExportScope } from "@/features/hrms/components/attendance-history-section";
 import { LeaveSection } from "@/features/hrms/components/leave-section";
 import { OfficeHolidayDialog } from "@/features/hrms/components/office-holiday-dialog";
 import { OfficeHolidaysSection } from "@/features/hrms/components/office-holidays-section";
@@ -40,6 +41,7 @@ import {
   formatTime,
   personLabel,
 } from "@/features/hrms/components/hrms-page-helpers";
+import { applyAttendanceScopeParams } from "@/features/hrms/lib/attendance-scope";
 import {
   last30DateKeys,
   thisMonthDateKeys,
@@ -99,9 +101,23 @@ export function HrmsPage({ user }: { user: PublicUser }) {
   const [historyPeriod, setHistoryPeriod] = useState<HistoryPeriod>("month");
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
+  const [exportScope, setExportScope] =
+    useState<AttendanceExportScope>("all");
+  const [selectedEmployeeUnitIds, setSelectedEmployeeUnitIds] = useState<
+    string[]
+  >([]);
 
   const today = istDateKey();
 
+  const attendanceEmployees = useMemo(() => {
+    const people = presence?.people ?? [];
+    return people
+      .map((p) => ({
+        unitId: p.unitId,
+        label: p.displayName || p.name || p.unitId,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }, [presence?.people]);
   const officeHolidayToday = useMemo(() => {
     if (presence?.officeHoliday) return presence.officeHoliday;
     const hit = holidays.find((h) =>
@@ -262,11 +278,30 @@ export function HrmsPage({ user }: { user: PublicUser }) {
   ]);
 
   const loadHistory = useCallback(async () => {
-    if (!canOwnAttendance || !historyRange) return;
+    if (!(canOwnAttendance || canManageAttendance) || !historyRange) return;
+    if (
+      canManageAttendance &&
+      exportScope === "selected" &&
+      selectedEmployeeUnitIds.length === 0
+    ) {
+      setHistory([]);
+      setHistoryTotal(0);
+      return;
+    }
     setHistoryLoading(true);
     try {
+      const params = new URLSearchParams({
+        from: historyRange.from,
+        to: historyRange.to,
+        pageSize: "50",
+      });
+      applyAttendanceScopeParams(params, {
+        canManage: canManageAttendance,
+        scope: canManageAttendance ? exportScope : "mine",
+        unitIds: selectedEmployeeUnitIds,
+      });
       const res = await apiFetch<AttendanceList>(
-        `/api/hrms/attendance?mine=1&from=${historyRange.from}&to=${historyRange.to}&pageSize=50`
+        `/api/hrms/attendance?${params.toString()}`
       );
       if (!res.ok) {
         toast.error(
@@ -283,7 +318,13 @@ export function HrmsPage({ user }: { user: PublicUser }) {
     } finally {
       setHistoryLoading(false);
     }
-  }, [canOwnAttendance, historyRange]);
+  }, [
+    canOwnAttendance,
+    canManageAttendance,
+    historyRange,
+    exportScope,
+    selectedEmployeeUnitIds,
+  ]);
 
   useEffect(() => {
     void (async () => {
@@ -473,7 +514,14 @@ export function HrmsPage({ user }: { user: PublicUser }) {
   const counts = presence?.counts;
   const sections: { id: DeskSection; label: string }[] = [
     { id: "today", label: "Today" },
-    ...(canOwnAttendance ? [{ id: "history" as const, label: "My history" }] : []),
+    ...(canOwnAttendance || canManageAttendance
+      ? [
+          {
+            id: "history" as const,
+            label: canManageAttendance ? "History" : "My history",
+          },
+        ]
+      : []),
     ...(canOwnLeave || canApproveLeave
       ? [{ id: "leave" as const, label: "Leave" }]
       : []),
@@ -632,9 +680,15 @@ export function HrmsPage({ user }: { user: PublicUser }) {
           customFrom={customFrom}
           customTo={customTo}
           historyRange={historyRange}
+          canManageExport={canManageAttendance}
+          exportScope={exportScope}
+          selectedEmployeeUnitIds={selectedEmployeeUnitIds}
+          employees={attendanceEmployees}
           onPeriodChange={setHistoryPeriod}
           onCustomFromChange={setCustomFrom}
           onCustomToChange={setCustomTo}
+          onExportScopeChange={setExportScope}
+          onSelectedEmployeesChange={setSelectedEmployeeUnitIds}
         />
       ) : null}
 

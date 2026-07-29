@@ -299,7 +299,7 @@ Each section: **purpose → files → how it works**.
 1. Create case (client + optional advocates).
 2. Detail loads case + client + hearings + documents.
 3. Status changes go through `canTransitionStatus`.
-4. Add hearing updates `nextHearingAt` (may notify); adjourn creates a replacement hearing.
+4. Add hearing updates `nextHearingAt` (may notify); adjourn creates a replacement hearing. **CSV hearing import** also sets `nextHearingAt` to the earliest upcoming hearing per case, shows SMS eligibility per row, and immediately sends client SMS for **tomorrow** dates (catch-up if nightly cron already ran). Future dates still go out day-before via cron.
 5. Fee snippet: `GET /api/accounts?caseUnitId=...`.
 
 ### Employees and advocates
@@ -387,6 +387,8 @@ Same CRUD pattern as clients: `app/(portal)/dak/` · `features/dak/` · `/api/da
 
 Module `hrms` must be on. Split perms: `own_attendance`, `own_leave`, `approve_leave`, `manage_attendance`.
 
+Managers (`manage_attendance`) can view/export attendance for **everyone** (`all=1`) or **selected staff** (`userUnitIds=…`) from HRMS History. List/export accept `own_attendance` **or** `manage_attendance`.
+
 ### Search, home, reports, activity
 
 | Flow | UI | API |
@@ -396,7 +398,7 @@ Module `hrms` must be on. Split perms: `own_attendance`, `own_leave`, `approve_l
 | Reports | `features/reports/` | `GET /api/exports?type=...` (ExcelJS) |
 | Activity (audit log) | `features/activity/` | `GET /api/activity` · writes via `lib/audit` |
 
-Export types include cases, clients, employees, tasks, dak, accounts, appointments, fees-outstanding, and more (see `app/api/exports/route.ts`). All exports require **`reports.view`** first, then the domain `*.view` for that type.
+Export types include cases, clients, employees, tasks, dak, accounts, appointments, fees-outstanding, **attendance**, and more (see `app/api/exports/route.ts`). Most exports require **`reports.view`** first, then the domain `*.view`. Attendance uses `hrms.own_attendance` (self) or `hrms.manage_attendance` + `all=1` (office) so it works from the HRMS history tab without Reports access.
 
 ### Profile and reference data
 

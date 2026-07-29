@@ -295,24 +295,52 @@ export function ReportsPage({ user }: ReportsPageProps) {
           </Card>
         ) : null}
 
-        {isModuleEnabled("hrms") && can("hrms.view") ? (
+        {isModuleEnabled("hrms") &&
+        (can("hrms.view") ||
+          can("hrms.own_attendance") ||
+          can("hrms.manage_attendance")) ? (
           <Card>
             <CardContent className="flex h-full flex-col gap-4 p-4 sm:p-5">
               <div className="flex items-start gap-3">
                 <Users className="mt-0.5 size-5 text-navy" />
                 <div>
-                  <h2 className="font-semibold text-navy">Office presence</h2>
+                  <h2 className="font-semibold text-navy">Attendance</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
-                    Attendance and leave live on the HRMS board.
+                    {can("hrms.manage_attendance")
+                      ? "Export last 30 days for everyone. For selected staff, use HRMS → History."
+                      : "Export your check-in / check-out for the last 30 days."}
                   </p>
                 </div>
               </div>
-              <Button asChild type="button" variant="outline" className="mt-auto w-full">
-                <Link href="/hrms">
-                  <Users className="size-4" />
-                  Open HRMS
-                </Link>
-              </Button>
+              <div className="mt-auto flex flex-col gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  disabled={busy === "attendance"}
+                  onClick={() => {
+                    const from = istDateKey(
+                      new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+                    );
+                    const extra = can("hrms.manage_attendance")
+                      ? `from=${from}&to=${todayKey}&all=1`
+                      : `from=${from}&to=${todayKey}&mine=1`;
+                    void download(
+                      "attendance",
+                      "attendance.xlsx",
+                      extra
+                    );
+                  }}
+                >
+                  <Download className="size-4" />
+                  {busy === "attendance" ? "Preparing…" : "Download Excel"}
+                </Button>
+                <Button asChild type="button" variant="ghost" className="w-full">
+                  <Link href="/hrms?section=history">
+                    Open HRMS history
+                  </Link>
+                </Button>
+              </div>
             </CardContent>
           </Card>
         ) : null}

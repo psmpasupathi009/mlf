@@ -1,3 +1,4 @@
+import type { Hearing } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { writeAudit } from "@/lib/audit";
 import { normalizeMobile } from "@/lib/auth/mobile";
@@ -28,7 +29,12 @@ export type HearingSmsJobResult = {
   details: HearingSmsDetail[];
 };
 
-const CLOSED_CASE_STATUSES = new Set(["disposed", "withdrawn", "transferred", "archived"]);
+const CLOSED_CASE_STATUSES = new Set([
+  "disposed",
+  "withdrawn",
+  "transferred",
+  "archived",
+]);
 /** Cap per invocation so Vercel cron stays within maxDuration. */
 const BATCH_SIZE = 80;
 const SEND_CONCURRENCY = 5;
@@ -54,54 +60,23 @@ async function mapPool<T, R>(
   return results;
 }
 
-/**
- * Day-before hearing SMS to clients only (2Factor transactional).
- * Skips adjourned, already-sent, opted-out, and closed cases.
- * Processes up to BATCH_SIZE hearings per run (concurrent sends).
- */
-export async function runHearingSmsJob(): Promise<HearingSmsJobResult> {
-  const tomorrowKey = istAddCalendarDays(istDateKey(), 1);
-  const { start, end } = istDayBounds(tomorrowKey);
+type RowResult = {
+  sent: number;
+  failed: number;
+  skipped: number;
+  detail: HearingSmsDetail;
+};
 
-  const dueTotal = await prisma.hearing.count({
-    where: {
-      smsSentAt: null,
-      isAdjourned: false,
-      hearingDate: { gte: start, lte: end },
-    },
-  });
-
-  const dueHearings = await prisma.hearing.findMany({
-    where: {
-      smsSentAt: null,
-      isAdjourned: false,
-      hearingDate: { gte: start, lte: end },
-    },
-    orderBy: { hearingDate: "asc" },
-    take: BATCH_SIZE,
-  });
-
+async function processHearingSmsBatch(
+  dueHearings: Hearing[]
+): Promise<Omit<HearingSmsJobResult, "date" | "hasMore">> {
   let sent = 0;
   let failed = 0;
   let skipped = 0;
   const details: HearingSmsDetail[] = [];
-  const hasMore = dueTotal > dueHearings.length;
 
   if (dueHearings.length === 0) {
-    await writeAudit({
-      action: "cron.hearing_sms",
-      entity: "Hearing",
-      meta: { tomorrowKey, total: 0, sent: 0, failed: 0, skipped: 0, hasMore: false },
-    });
-    return {
-      date: tomorrowKey,
-      total: 0,
-      sent: 0,
-      failed: 0,
-      skipped: 0,
-      hasMore: false,
-      details: [],
-    };
+    return { total: 0, sent: 0, failed: 0, skipped: 0, details: [] };
   }
 
   const caseIds = Array.from(new Set(dueHearings.map((h) => h.caseId)));
@@ -129,13 +104,6 @@ export async function runHearingSmsJob(): Promise<HearingSmsJobResult> {
     },
   });
   const clientById = new Map(clients.map((c) => [c.id, c]));
-
-  type RowResult = {
-    sent: number;
-    failed: number;
-    skipped: number;
-    detail: HearingSmsDetail;
-  };
 
   const rowResults = await mapPool(
     dueHearings,
@@ -292,27 +260,103 @@ export async function runHearingSmsJob(): Promise<HearingSmsJobResult> {
     details.push(r.detail);
   }
 
+  return {
+    total: dueHearings.length,
+    sent,
+    failed,
+    skipped,
+    details,
+  };
+}
+
+/**
+ * Day-before hearing SMS to clients only (2Factor transactional).
+ * Skips adjourned, already-sent, opted-out, and closed cases.
+ * Processes up to BATCH_SIZE hearings per run (concurrent sends).
+ */
+export async function runHearingSmsJob(): Promise<HearingSmsJobResult> {
+  const tomorrowKey = istAddCalendarDays(istDateKey(), 1);
+  const { start, end } = istDayBounds(tomorrowKey);
+
+  const dueTotal = await prisma.hearing.count({
+    where: {
+      smsSentAt: null,
+      isAdjourned: false,
+      hearingDate: { gte: start, lte: end },
+    },
+  });
+
+  const dueHearings = await prisma.hearing.findMany({
+    where: {
+      smsSentAt: null,
+      isAdjourned: false,
+      hearingDate: { gte: start, lte: end },
+    },
+    orderBy: { hearingDate: "asc" },
+    take: BATCH_SIZE,
+  });
+
+  const hasMore = dueTotal > dueHearings.length;
+  const batch = await processHearingSmsBatch(dueHearings);
+
   await writeAudit({
     action: "cron.hearing_sms",
     entity: "Hearing",
     meta: {
       tomorrowKey,
-      total: dueHearings.length,
+      total: batch.total,
       dueTotal,
-      sent,
-      failed,
-      skipped,
+      sent: batch.sent,
+      failed: batch.failed,
+      skipped: batch.skipped,
       hasMore,
     },
   });
 
   return {
     date: tomorrowKey,
-    total: dueHearings.length,
-    sent,
-    failed,
-    skipped,
+    ...batch,
     hasMore,
-    details,
   };
+}
+
+/**
+ * Send client SMS for specific hearings (e.g. imported with tomorrow’s date
+ * after the nightly cron already ran). Claim-then-send; safe to call twice.
+ */
+export async function sendHearingSmsForUnitIds(
+  unitIds: string[]
+): Promise<Omit<HearingSmsJobResult, "date" | "hasMore">> {
+  const unique = [...new Set(unitIds.filter(Boolean))];
+  if (unique.length === 0) {
+    return { total: 0, sent: 0, failed: 0, skipped: 0, details: [] };
+  }
+
+  const dueHearings = await prisma.hearing.findMany({
+    where: {
+      unitId: { in: unique },
+      smsSentAt: null,
+      isAdjourned: false,
+    },
+    orderBy: { hearingDate: "asc" },
+    take: BATCH_SIZE,
+  });
+
+  const batch = await processHearingSmsBatch(dueHearings);
+
+  if (batch.total > 0) {
+    await writeAudit({
+      action: "hearing.sms_import_catchup",
+      entity: "Hearing",
+      meta: {
+        requested: unique.length,
+        total: batch.total,
+        sent: batch.sent,
+        failed: batch.failed,
+        skipped: batch.skipped,
+      },
+    });
+  }
+
+  return batch;
 }

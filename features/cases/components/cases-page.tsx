@@ -446,7 +446,7 @@ export function CasesPage({ user }: { user: PublicUser }) {
         title="Import hearings"
         endpoint="/api/hearings/import"
         sampleHref="/samples/hearings.sample.csv"
-        columnsHint="Required: caseUnitId, hearingDate (YYYY-MM-DD IST). Optional: purpose, notes."
+        columnsHint="Required: caseUnitId, hearingDate (YYYY-MM-DD IST). Optional: purpose, notes. Client SMS is automatic the day before each hearing; tomorrow’s dates also send on import if the nightly job already ran."
         onImported={load}
       />
     </section>

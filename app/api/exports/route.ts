@@ -2,7 +2,7 @@ import ExcelJS from "exceljs";
 import type { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { apiHandler, jsonFail } from "@/lib/api/response";
-import { requirePerm } from "@/lib/api/guard";
+import { requirePerm, requireUser } from "@/lib/api/guard";
 import { hasPermission } from "@/lib/rbac";
 import { prisma } from "@/lib/db/prisma";
 import { rateLimit } from "@/lib/rate-limit";
@@ -17,14 +17,17 @@ import {
   buildCaseListWhere,
   parseCaseListFilters,
 } from "@/features/cases/server/filters";
-import { istDateKey, istDayBounds } from "@/lib/utils/ist";
+import { istDateKey, istDayBounds, formatIstTime } from "@/lib/utils/ist";
 import { displayMobile } from "@/lib/auth/mobile";
 import { containsInsensitive } from "@/lib/db/search";
+import { isModuleEnabled } from "@/config/company/modules";
+import {
+  attendanceQueryScope,
+  isInvalidAttendanceDateRange,
+  parseAttendanceUserUnitIds,
+} from "@/features/hrms/lib/attendance-scope";
 
 export const GET = apiHandler(async (request) => {
-  const reportsGate = await requirePerm(request, "reports", "view");
-  if (!reportsGate.user) return reportsGate.response;
-
   const url = new URL(request.url);
   const type = url.searchParams.get("type") ?? "cases";
 
@@ -41,10 +44,116 @@ export const GET = apiHandler(async (request) => {
     );
   }
 
+  // Attendance can be exported from HRMS without reports.view;
+  // other export types still require the Reports module.
+  if (type !== "attendance") {
+    const reportsGate = await requirePerm(request, "reports", "view");
+    if (!reportsGate.user) return reportsGate.response;
+  }
+
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "MLF";
 
-  if (type === "cases") {
+  if (type === "attendance") {
+    if (!isModuleEnabled("hrms")) {
+      return jsonFail("FORBIDDEN", "This module is not available", 403);
+    }
+    const { user, response } = await requireUser(request);
+    if (!user) return response;
+
+    const [canOwn, canManage] = await Promise.all([
+      hasPermission(user.id, "hrms", "own_attendance"),
+      hasPermission(user.id, "hrms", "manage_attendance"),
+    ]);
+    if (!canOwn && !canManage) {
+      return jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403);
+    }
+
+    const from =
+      url.searchParams.get("from")?.trim() ||
+      istDateKey(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+    const to = url.searchParams.get("to")?.trim() || istDateKey();
+    if (isInvalidAttendanceDateRange(from, to)) {
+      return jsonFail("VALIDATION", "from must be on/before to", 400);
+    }
+
+    const all =
+      url.searchParams.get("all") === "1" ||
+      url.searchParams.get("all") === "true";
+    const mine =
+      url.searchParams.get("mine") === "1" ||
+      url.searchParams.get("mine") === "true";
+    const userUnitIds = parseAttendanceUserUnitIds(url.searchParams);
+
+    const scope = attendanceQueryScope({
+      canManage,
+      all,
+      mine,
+      userUnitIds,
+      userId: user.id,
+    });
+
+    const rows = await prisma.attendance.findMany({
+      where: {
+        ...scope,
+        date: { gte: from, lte: to },
+      },
+      orderBy: [{ date: "desc" }, { userUnitId: "asc" }],
+      take: 5000,
+    });
+
+    const unitIds = Array.from(new Set(rows.map((r) => r.userUnitId)));
+    const people = unitIds.length
+      ? await prisma.user.findMany({
+          where: { unitId: { in: unitIds } },
+          select: { unitId: true, name: true, mobile: true },
+        })
+      : [];
+    const personByUnit = new Map(people.map((p) => [p.unitId, p]));
+
+    const sheet = workbook.addWorksheet("Attendance");
+    sheet.columns = [
+      { header: "date", key: "date", width: 12 },
+      { header: "employeeUnitId", key: "employeeUnitId", width: 14 },
+      { header: "name", key: "name", width: 24 },
+      { header: "mobile", key: "mobile", width: 14 },
+      { header: "checkIn", key: "checkIn", width: 10 },
+      { header: "checkOut", key: "checkOut", width: 10 },
+      { header: "checkInAt", key: "checkInAt", width: 22 },
+      { header: "checkOutAt", key: "checkOutAt", width: 22 },
+      { header: "checkInLat", key: "checkInLat", width: 12 },
+      { header: "checkInLng", key: "checkInLng", width: 12 },
+      { header: "checkOutLat", key: "checkOutLat", width: 12 },
+      { header: "checkOutLng", key: "checkOutLng", width: 12 },
+      { header: "status", key: "status", width: 14 },
+      { header: "notes", key: "notes", width: 28 },
+    ];
+
+    for (const r of rows) {
+      const person = personByUnit.get(r.userUnitId);
+      const status = r.checkOutAt
+        ? "checked_out"
+        : r.checkInAt
+          ? "present"
+          : "—";
+      sheet.addRow({
+        date: r.date,
+        employeeUnitId: r.userUnitId,
+        name: person?.name ?? "",
+        mobile: person?.mobile ? displayMobile(person.mobile) : "",
+        checkIn: r.checkInAt ? formatIstTime(r.checkInAt) : "",
+        checkOut: r.checkOutAt ? formatIstTime(r.checkOutAt) : "",
+        checkInAt: r.checkInAt?.toISOString() ?? "",
+        checkOutAt: r.checkOutAt?.toISOString() ?? "",
+        checkInLat: r.checkInLat ?? "",
+        checkInLng: r.checkInLng ?? "",
+        checkOutLat: r.checkOutLat ?? "",
+        checkOutLng: r.checkOutLng ?? "",
+        status,
+        notes: r.notes ?? "",
+      });
+    }
+  } else if (type === "cases") {
     const { user, response } = await requirePerm(request, "cases", "view");
     if (!user) return response;
     const where = buildCaseListWhere(parseCaseListFilters(url.searchParams));

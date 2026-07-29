@@ -1,30 +1,50 @@
-import { apiHandler, jsonOkList, parsePagination } from "@/lib/api/response";
-import { requirePerm } from "@/lib/api/guard";
+import { apiHandler, jsonFail, jsonOkList, parsePagination } from "@/lib/api/response";
+import { requireUser } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
-import { hasPermission } from "@/lib/rbac";
+import { hasPermission, requireModuleEnabled } from "@/lib/rbac";
 import { toAttendanceSummary } from "@/features/hrms/server/serialize";
+import {
+  attendanceQueryScope,
+  isInvalidAttendanceDateRange,
+  parseAttendanceUserUnitIds,
+} from "@/features/hrms/lib/attendance-scope";
 
 export const GET = apiHandler(async (request) => {
-  const { user, response } = await requirePerm(request, "hrms", "own_attendance");
+  const modFail = requireModuleEnabled("hrms");
+  if (modFail) return modFail;
+
+  const { user, response } = await requireUser(request);
   if (!user) return response;
+
+  const [canOwn, canManage] = await Promise.all([
+    hasPermission(user.id, "hrms", "own_attendance"),
+    hasPermission(user.id, "hrms", "manage_attendance"),
+  ]);
+  if (!canOwn && !canManage) {
+    return jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403);
+  }
 
   const { searchParams } = new URL(request.url);
   const { page, pageSize, skip } = parsePagination(searchParams);
-  const userUnitId = searchParams.get("userUnitId")?.trim();
-  const from = searchParams.get("from")?.trim();
-  const to = searchParams.get("to")?.trim();
-  const all = searchParams.get("all") === "1" || searchParams.get("all") === "true";
-  const mine = searchParams.get("mine") === "1" || searchParams.get("mine") === "true";
+  const from = searchParams.get("from")?.trim() || undefined;
+  const to = searchParams.get("to")?.trim() || undefined;
+  const all =
+    searchParams.get("all") === "1" || searchParams.get("all") === "true";
+  const mine =
+    searchParams.get("mine") === "1" || searchParams.get("mine") === "true";
+  const userUnitIds = parseAttendanceUserUnitIds(searchParams);
 
-  const canManage = await hasPermission(user.id, "hrms", "manage_attendance");
+  if (isInvalidAttendanceDateRange(from, to)) {
+    return jsonFail("VALIDATION", "from must be on/before to", 400);
+  }
 
-  // Default to self. Managers may query one person (userUnitId) or everyone (all=1).
-  const scope =
-    canManage && all && !mine
-      ? {}
-      : canManage && userUnitId && !mine
-        ? { userUnitId }
-        : { userId: user.id };
+  const scope = attendanceQueryScope({
+    canManage,
+    all,
+    mine,
+    userUnitIds,
+    userId: user.id,
+  });
 
   const where = {
     ...scope,
@@ -39,7 +59,12 @@ export const GET = apiHandler(async (request) => {
   };
 
   const [rows, total] = await Promise.all([
-    prisma.attendance.findMany({ where, orderBy: { date: "desc" }, skip, take: pageSize }),
+    prisma.attendance.findMany({
+      where,
+      orderBy: [{ date: "desc" }, { userUnitId: "asc" }],
+      skip,
+      take: pageSize,
+    }),
     prisma.attendance.count({ where }),
   ]);
 
