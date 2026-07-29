@@ -14,7 +14,7 @@ flowchart LR
   env[".env Atlas DATABASE_URL"] --> schema["prisma/schema.prisma"]
   schema -->|"prisma generate"| client["@prisma/client"]
   client --> singleton["lib/db/prisma.ts"]
-  singleton --> apis["app/api/v1/**"]
+  singleton --> apis["app/api/**"]
   singleton --> libs["lib/**"]
   singleton --> scripts["scripts/*.ts / prisma/seed.ts"]
 ```
@@ -106,21 +106,21 @@ App code imports `prisma` from `@/lib/db/prisma`. Seed / ping scripts may constr
 
 ### Feature → Prisma map
 
-- **Auth / users** — `User`, `OtpSession`, `ConsumedOtpProof`, `RateLimit` via `app/api/v1/auth/**`, session helpers under `lib/auth/` (access JWT cookie only; 7-day TTL — no refresh tokens)
-- **Employees / permissions** — `User`, `RolePermission`, `AuditLog` via `app/api/v1/employees/**`, `app/api/v1/permissions/**`
-- **Clients / cases / hearings** — `Client`, `Case`, `Hearing` via `app/api/v1/clients/**`, `app/api/v1/cases/**`, diary routes
-- **Appointments / advocates** — `Appointment`, `AdvocateWeeklyHours`, `AdvocateTimeBlock` via `app/api/v1/appointments/**`, `app/api/v1/advocates/**`
-- **Accounts (cash)** — `CashPayment` (+ related `Client` / `Case`) via `app/api/v1/accounts/**`
-- **Documents** — `Document` via `app/api/v1/documents/**`
-- **Office dak / tasks / holidays** — `DakEntry`, `OfficeTask`, `OfficeHoliday` via `app/api/v1/dak/**`, `app/api/v1/tasks/**`, `app/api/v1/hrms/holidays/**`
-- **HRMS** — `Attendance`, `LeaveRequest` via `app/api/v1/hrms/**`
-- **Notifications** — `Notification` via `app/api/v1/notifications/**`
-- **Dashboard / search / exports** — aggregate reads across models via `app/api/v1/dashboard/**`, `app/api/v1/search/**`, `app/api/v1/exports/**`
+- **Auth / users** — `User`, `OtpSession`, `ConsumedOtpProof`, `RateLimit` via `app/api/auth/**`, session helpers under `lib/auth/` (access JWT cookie only; 7-day TTL — no refresh tokens)
+- **Employees / permissions** — `User`, `RolePermission`, `AuditLog` via `app/api/employees/**`, `app/api/permissions/**`
+- **Clients / cases / hearings** — `Client`, `Case`, `Hearing` via `app/api/clients/**`, `app/api/cases/**`, diary routes
+- **Appointments / advocates** — `Appointment`, `AdvocateWeeklyHours`, `AdvocateTimeBlock` via `app/api/appointments/**`, `app/api/advocates/**`
+- **Accounts (cash)** — `CashPayment` (+ related `Client` / `Case`) via `app/api/accounts/**`
+- **Documents** — `Document` via `app/api/documents/**`
+- **Office dak / tasks / holidays** — `DakEntry`, `OfficeTask`, `OfficeHoliday` via `app/api/dak/**`, `app/api/tasks/**`, `app/api/hrms/holidays/**`
+- **HRMS** — `Attendance`, `LeaveRequest` via `app/api/hrms/**`
+- **Notifications** — `Notification` via `app/api/notifications/**`
+- **Dashboard / search / exports** — aggregate reads across models via `app/api/dashboard/**`, `app/api/search/**`, `app/api/exports/**`
 - **Scripts** — [`prisma/seed.ts`](../prisma/seed.ts), [`scripts/db-ping.ts`](../scripts/db-ping.ts), [`scripts/full-audit.ts`](../scripts/full-audit.ts) (own client or shared helpers)
 
 ### Usage snippets
 
-From [`app/api/v1/notifications/[unitId]/read/route.ts`](../app/api/v1/notifications/[unitId]/read/route.ts):
+From [`app/api/notifications/[unitId]/read/route.ts`](../app/api/notifications/[unitId]/read/route.ts):
 
 ```ts
 import { prisma } from "@/lib/db/prisma";
@@ -130,7 +130,7 @@ const item = unitId
   : null;
 ```
 
-From accounts create ([`app/api/v1/accounts/route.ts`](../app/api/v1/accounts/route.ts)):
+From accounts create ([`app/api/accounts/route.ts`](../app/api/accounts/route.ts)):
 
 ```ts
 import { prisma } from "@/lib/db/prisma";

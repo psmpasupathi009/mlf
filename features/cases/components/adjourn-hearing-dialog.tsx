@@ -44,7 +44,7 @@ export function AdjournHearingDialog({
     }
     setBusy(true);
     const { ok, data } = await apiFetch(
-      `/api/v1/hearings/${hearingUnitId}/adjourn`,
+      `/api/hearings/${hearingUnitId}/adjourn`,
       {
         method: "POST",
         json: {

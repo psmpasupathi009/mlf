@@ -100,7 +100,7 @@ export function LoginForm() {
       status?: string;
       message?: string;
       error?: string;
-    }>("/api/v1/auth/check-mobile", { mobile });
+    }>("/api/auth/check-mobile", { mobile });
     setLoading(false);
 
     if (!ok) {
@@ -153,7 +153,7 @@ export function LoginForm() {
     setLoading(true);
     setError("");
     const { ok, data } = await authFetch<{ error?: string; message?: string }>(
-      "/api/v1/auth/send-otp",
+      "/api/auth/send-otp",
       { mobile, purpose }
     );
     setLoading(false);
@@ -176,7 +176,7 @@ export function LoginForm() {
     const { ok, data } = await authFetch<{
       otpProofToken?: string;
       error?: string;
-    }>("/api/v1/auth/verify-otp", { mobile, otp, purpose });
+    }>("/api/auth/verify-otp", { mobile, otp, purpose });
     setLoading(false);
 
     if (!ok || !data.otpProofToken) {
@@ -197,7 +197,7 @@ export function LoginForm() {
     const { ok, status, data } = await authFetch<{
       error?: string;
       code?: string;
-    }>("/api/v1/auth/login", { mobile, pin });
+    }>("/api/auth/login", { mobile, pin });
     setLoading(false);
 
     if (!ok) {
@@ -235,7 +235,7 @@ export function LoginForm() {
     setLoading(true);
     setError("");
     const { ok, data } = await authFetch<{ error?: string }>(
-      "/api/v1/auth/setup-pin",
+      "/api/auth/setup-pin",
       { pin, confirmPin, otpProofToken }
     );
     setLoading(false);
@@ -265,7 +265,7 @@ export function LoginForm() {
     setLoading(true);
     setError("");
     const { ok, data } = await authFetch<{ error?: string }>(
-      "/api/v1/auth/forgot-pin/reset",
+      "/api/auth/forgot-pin/reset",
       { pin, confirmPin, otpProofToken }
     );
     setLoading(false);

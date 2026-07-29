@@ -257,7 +257,7 @@ export function CaseFormDialog({
     };
 
     const { ok, data } = await apiFetch(
-      isEdit ? `/api/v1/cases/${caseItem!.unitId}` : "/api/v1/cases",
+      isEdit ? `/api/cases/${caseItem!.unitId}` : "/api/cases",
       { method: isEdit ? "PATCH" : "POST", json: payload }
     );
     setBusy(false);

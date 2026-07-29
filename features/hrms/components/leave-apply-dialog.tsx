@@ -59,7 +59,7 @@ export function LeaveApplyDialog({
       return;
     }
     setBusy(true);
-    const { ok, data } = await apiFetch("/api/v1/hrms/leave", {
+    const { ok, data } = await apiFetch("/api/hrms/leave", {
       method: "POST",
       json: { fromDate, toDate, reason: reason || undefined },
     });

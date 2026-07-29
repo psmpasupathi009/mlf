@@ -48,7 +48,7 @@ async function fetchMetaPage(
   });
   if (query.trim()) q.set("q", query.trim());
   const { ok, data } = await apiFetch<MetaPage>(
-    `/api/v1/courts/meta?${q.toString()}`
+    `/api/courts/meta?${q.toString()}`
   );
   if (!ok || !data || typeof data !== "object") {
     throw new Error("Failed to load court options");

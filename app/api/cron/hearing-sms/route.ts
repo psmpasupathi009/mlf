@@ -34,7 +34,7 @@ function authorizeCron(request: Request): Response | null {
 
 /**
  * Day-before hearing SMS reminders (IST).
- * Vercel Cron: GET /api/v1/cron/hearing-sms
+ * Vercel Cron: GET /api/cron/hearing-sms
  *   (Authorization: Bearer <CRON_SECRET> or x-cron-secret)
  * Manual / external: POST with the same header.
  * Query-string secrets are rejected (log / Referer leak risk).

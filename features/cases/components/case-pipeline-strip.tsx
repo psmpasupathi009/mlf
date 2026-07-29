@@ -65,7 +65,7 @@ export function CasePipelineStrip({
 
     setBusy(true);
     const { ok, data } = await apiFetch<{ case: CaseSummary }>(
-      `/api/v1/cases/${caseItem.unitId}/status`,
+      `/api/cases/${caseItem.unitId}/status`,
       { method: "PATCH", json: { status: next } }
     );
     setBusy(false);

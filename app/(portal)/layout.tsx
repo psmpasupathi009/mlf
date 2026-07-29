@@ -34,7 +34,7 @@ export default async function PortalLayout({
 
   if (!user) {
     // Clears leftover access JWT (e.g. deactivated user) then → /login
-    redirect("/api/v1/auth/session-expired");
+    redirect("/api/auth/session-expired");
   }
 
   return <AppShell user={user}>{children}</AppShell>;

@@ -158,20 +158,20 @@ async function main() {
   const todayYmd = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
 
   // ── AUTH FLOW ──
-  const check = await req(jar, "POST", "/api/v1/auth/check-mobile", {
+  const check = await req(jar, "POST", "/api/auth/check-mobile", {
     mobile: user.mobile,
   });
   push({
     module: "Auth",
     method: "POST",
-    path: "/api/v1/auth/check-mobile",
+    path: "/api/auth/check-mobile",
     purpose: "Lookup mobile; decide PIN vs OTP setup path",
     status: check.res.ok ? "PASS" : "FAIL",
     detail: `HTTP ${check.res.status}`,
     kind: "flow",
   });
 
-  const login = await req(jar, "POST", "/api/v1/auth/login", {
+  const login = await req(jar, "POST", "/api/auth/login", {
     mobile: user.mobile,
     pin: PIN,
   });
@@ -179,7 +179,7 @@ async function main() {
   push({
     module: "Auth",
     method: "POST",
-    path: "/api/v1/auth/login",
+    path: "/api/auth/login",
     purpose: "Authenticate with mobile + PIN; set session cookies",
     status: loggedIn ? "PASS" : "FAIL",
     detail: `HTTP ${login.res.status}${msg(login.json) ? ` — ${msg(login.json)}` : ""}`,
@@ -193,13 +193,13 @@ async function main() {
     throw new Error("Login failed — aborting audit");
   }
 
-  await testApi(jar, "Auth", "GET", "/api/v1/auth/me", "Current user + permissions");
+  await testApi(jar, "Auth", "GET", "/api/auth/me", "Current user + permissions");
 
   // OTP endpoints — skip live SMS (needs 2Factor)
   push({
     module: "Auth",
     method: "POST",
-    path: "/api/v1/auth/send-otp",
+    path: "/api/auth/send-otp",
     purpose: "Send OTP for setup / forgot-PIN (2Factor SMS)",
     status: process.env.TWOFACTOR_API_KEY ? "SKIP" : "SKIP",
     detail: "Skipped live SMS to avoid cost/lockout",
@@ -208,7 +208,7 @@ async function main() {
   push({
     module: "Auth",
     method: "POST",
-    path: "/api/v1/auth/verify-otp",
+    path: "/api/auth/verify-otp",
     purpose: "Verify OTP proof for setup / forgot-PIN",
     status: "SKIP",
     detail: "Depends on send-otp",
@@ -217,7 +217,7 @@ async function main() {
   push({
     module: "Auth",
     method: "POST",
-    path: "/api/v1/auth/setup-pin",
+    path: "/api/auth/setup-pin",
     purpose: "First-time PIN setup after OTP",
     status: "SKIP",
     detail: "Admin already has PIN",
@@ -226,7 +226,7 @@ async function main() {
   push({
     module: "Auth",
     method: "POST",
-    path: "/api/v1/auth/forgot-pin/reset",
+    path: "/api/auth/forgot-pin/reset",
     purpose: "Reset PIN after OTP proof",
     status: "SKIP",
     detail: "Would change live PIN",
@@ -236,32 +236,32 @@ async function main() {
     jar,
     "Auth",
     "GET",
-    "/api/v1/auth/session-expired",
+    "/api/auth/session-expired",
     "Session-expired landing / clear hint"
   );
 
   // ── DASHBOARD / SEARCH / META ──
-  await testApi(jar, "Dashboard", "GET", "/api/v1/dashboard/summary", "Home day-board summary stats");
-  await testApi(jar, "Search", "GET", "/api/v1/search?q=smoke", "Global search across entities");
-  await testApi(jar, "Locations", "GET", "/api/v1/locations/meta", "State/district/city metadata");
-  await testApi(jar, "Courts", "GET", "/api/v1/courts/meta", "Court complex metadata");
+  await testApi(jar, "Dashboard", "GET", "/api/dashboard/summary", "Home day-board summary stats");
+  await testApi(jar, "Search", "GET", "/api/search?q=smoke", "Global search across entities");
+  await testApi(jar, "Locations", "GET", "/api/locations/meta", "State/district/city metadata");
+  await testApi(jar, "Courts", "GET", "/api/courts/meta", "Court complex metadata");
   await testApi(
     jar,
     "Courts",
     "GET",
-    "/api/v1/courts?state=Tamil%20Nadu&district=Erode",
+    "/api/courts?state=Tamil%20Nadu&district=Erode",
     "List courts for location"
   );
-  await testApi(jar, "Advocates", "GET", "/api/v1/advocates", "List advocates for assignment");
+  await testApi(jar, "Advocates", "GET", "/api/advocates", "List advocates for assignment");
 
   // ── CLIENTS ──
-  await testApi(jar, "Clients", "GET", "/api/v1/clients", "List clients");
+  await testApi(jar, "Clients", "GET", "/api/clients", "List clients");
   const clientMobile = `98${stamp}${stamp.slice(0, 2)}`.slice(0, 10);
   const clientCreate = await testApi(
     jar,
     "Clients",
     "POST",
-    "/api/v1/clients",
+    "/api/clients",
     "Create client intake record",
     {
       name: `Audit Client ${stamp}`,
@@ -279,14 +279,14 @@ async function main() {
       jar,
       "Clients",
       "GET",
-      `/api/v1/clients/${clientUnitId}`,
+      `/api/clients/${clientUnitId}`,
       "Client detail"
     );
     await testApi(
       jar,
       "Clients",
       "PATCH",
-      `/api/v1/clients/${clientUnitId}`,
+      `/api/clients/${clientUnitId}`,
       "Update client",
       { notes: "audit patch" }
     );
@@ -295,14 +295,14 @@ async function main() {
     jar,
     "Clients",
     "POST",
-    "/api/v1/clients/import",
+    "/api/clients/import",
     "CSV import clients (dry-run)",
     { dryRun: true, rows: [] },
     (s) => s >= 200 && s < 500
   );
 
   // ── CASES ──
-  await testApi(jar, "Cases", "GET", "/api/v1/cases", "List cases");
+  await testApi(jar, "Cases", "GET", "/api/cases", "List cases");
   let caseUnitId: string | undefined;
   let hearingUnitId: string | undefined;
   if (clientUnitId) {
@@ -310,7 +310,7 @@ async function main() {
       jar,
       "Cases",
       "POST",
-      "/api/v1/cases",
+      "/api/cases",
       "Open / register a case",
       {
         clientUnitId,
@@ -330,12 +330,12 @@ async function main() {
     );
     caseUnitId = pick(caseCreate.json, "case");
     if (caseUnitId) {
-      await testApi(jar, "Cases", "GET", `/api/v1/cases/${caseUnitId}`, "Case detail");
+      await testApi(jar, "Cases", "GET", `/api/cases/${caseUnitId}`, "Case detail");
       await testApi(
         jar,
         "Cases",
         "PATCH",
-        `/api/v1/cases/${caseUnitId}`,
+        `/api/cases/${caseUnitId}`,
         "Update case fields",
         { stage: "Audit stage" }
       );
@@ -343,7 +343,7 @@ async function main() {
         jar,
         "Cases",
         "PATCH",
-        `/api/v1/cases/${caseUnitId}/status`,
+        `/api/cases/${caseUnitId}/status`,
         "Pipeline status change",
         { status: "active" },
         (s, j) => accept(s, j) || s === 400
@@ -352,7 +352,7 @@ async function main() {
         jar,
         "Cases",
         "PATCH",
-        `/api/v1/cases/${caseUnitId}/checklist`,
+        `/api/cases/${caseUnitId}/checklist`,
         "Filing checklist update",
         { filingChecklist: { vakalatnama: true } },
         (s) => s >= 200 && s < 500
@@ -361,7 +361,7 @@ async function main() {
         jar,
         "Cases",
         "POST",
-        `/api/v1/cases/${caseUnitId}/hearings`,
+        `/api/cases/${caseUnitId}/hearings`,
         "Add hearing date to case",
         { hearingDate: ymd, purpose: "Audit hearing" }
       );
@@ -372,7 +372,7 @@ async function main() {
     jar,
     "Cases",
     "POST",
-    "/api/v1/cases/import",
+    "/api/cases/import",
     "CSV import cases (dry-run)",
     { dryRun: true, rows: [] },
     (s) => s >= 200 && s < 500
@@ -381,7 +381,7 @@ async function main() {
     jar,
     "Hearings",
     "POST",
-    "/api/v1/hearings/import",
+    "/api/hearings/import",
     "CSV import hearings (dry-run)",
     { dryRun: true, rows: [] },
     (s) => s >= 200 && s < 500
@@ -391,7 +391,7 @@ async function main() {
       jar,
       "Hearings",
       "POST",
-      `/api/v1/hearings/${hearingUnitId}/adjourn`,
+      `/api/hearings/${hearingUnitId}/adjourn`,
       "Adjourn hearing to a later date",
       {
         nextHearingDate: (() => {
@@ -406,7 +406,7 @@ async function main() {
     push({
       module: "Hearings",
       method: "POST",
-      path: "/api/v1/hearings/[unitId]/adjourn",
+      path: "/api/hearings/[unitId]/adjourn",
       purpose: "Adjourn hearing to a later date",
       status: "SKIP",
       detail: "No hearing created",
@@ -415,18 +415,18 @@ async function main() {
   }
 
   // ── DIARY ──
-  await testApi(jar, "Diary", "GET", `/api/v1/diary?date=${ymd}`, "Day board hearings/appointments/tasks");
+  await testApi(jar, "Diary", "GET", `/api/diary?date=${ymd}`, "Day board hearings/appointments/tasks");
   await testApi(
     jar,
     "Diary",
     "GET",
-    "/api/v1/diary/tomorrow-notify",
+    "/api/diary/tomorrow-notify",
     "Tomorrow’s board for client call / SMS prep"
   );
   push({
     module: "Diary",
     method: "POST",
-    path: "/api/v1/diary/send-hearing-sms",
+    path: "/api/diary/send-hearing-sms",
     purpose: "Send client hearing SMS reminders",
     status: "SKIP",
     detail: "Skipped live SMS",
@@ -434,7 +434,7 @@ async function main() {
   });
 
   // ── DOCUMENTS ──
-  await testApi(jar, "Documents", "GET", "/api/v1/documents", "List documents");
+  await testApi(jar, "Documents", "GET", "/api/documents", "List documents");
   let docUnitId: string | undefined;
   if (caseUnitId && clientUnitId) {
     const form = new FormData();
@@ -447,12 +447,12 @@ async function main() {
     form.append("docType", "other");
     form.append("caseUnitId", caseUnitId);
     form.append("clientUnitId", clientUnitId);
-    const up = await req(jar, "POST", "/api/v1/documents", form);
+    const up = await req(jar, "POST", "/api/documents", form);
     docUnitId = pick(up.json, "document");
     push({
       module: "Documents",
       method: "POST",
-      path: "/api/v1/documents",
+      path: "/api/documents",
       purpose: "Upload case/client document (PDF/JPEG/PNG/WebP)",
       status: accept(up.res.status, up.json) ? "PASS" : "FAIL",
       detail: `HTTP ${up.res.status}${msg(up.json) ? ` — ${msg(up.json)}` : ""}`,
@@ -463,7 +463,7 @@ async function main() {
         jar,
         "Documents",
         "GET",
-        `/api/v1/documents/${docUnitId}/download`,
+        `/api/documents/${docUnitId}/download`,
         "Download document bytes",
         undefined,
         (s) => s >= 200 && s < 400
@@ -471,7 +471,7 @@ async function main() {
       push({
         module: "Documents",
         method: "DELETE",
-        path: `/api/v1/documents/${docUnitId}`,
+        path: `/api/documents/${docUnitId}`,
         purpose: "Delete document metadata + file",
         status: "SKIP",
         detail: "Kept for audit evidence",
@@ -481,14 +481,14 @@ async function main() {
   }
 
   // ── ACCOUNTS ──
-  await testApi(jar, "Accounts", "GET", "/api/v1/accounts", "List cash payments");
+  await testApi(jar, "Accounts", "GET", "/api/accounts", "List cash payments");
   let paymentUnitId: string | undefined;
   if (clientUnitId) {
     const pay = await testApi(
       jar,
       "Accounts",
       "POST",
-      "/api/v1/accounts",
+      "/api/accounts",
       "Create cash payment / receipt",
       {
         clientUnitId,
@@ -506,21 +506,21 @@ async function main() {
         jar,
         "Accounts",
         "GET",
-        `/api/v1/accounts/${paymentUnitId}`,
+        `/api/accounts/${paymentUnitId}`,
         "Payment detail"
       );
       await testApi(
         jar,
         "Accounts",
         "PATCH",
-        `/api/v1/accounts/${paymentUnitId}`,
+        `/api/accounts/${paymentUnitId}`,
         "Update payment",
         { notes: "audit payment patched" }
       );
       push({
         module: "Accounts",
         method: "POST",
-        path: `/api/v1/accounts/${paymentUnitId}/void`,
+        path: `/api/accounts/${paymentUnitId}/void`,
         purpose: "Void a payment with reason",
         status: "SKIP",
         detail: "Skipped destructive void",
@@ -532,17 +532,17 @@ async function main() {
     jar,
     "Accounts",
     "POST",
-    "/api/v1/accounts/import",
+    "/api/accounts/import",
     "CSV import payments (dry-run)",
     { dryRun: true, rows: [] },
     (s) => s >= 200 && s < 500
   );
 
   // ── APPOINTMENTS / AVAILABILITY ──
-  await testApi(jar, "Appointments", "GET", "/api/v1/appointments", "List appointments");
+  await testApi(jar, "Appointments", "GET", "/api/appointments", "List appointments");
 
   // Prefer a real advocate from the office list (admin-only users are not bookable).
-  const advocatesRes = await req(jar, "GET", "/api/v1/advocates?pageSize=5");
+  const advocatesRes = await req(jar, "GET", "/api/advocates?pageSize=5");
   const advocateRows =
     (
       advocatesRes.json as {
@@ -557,7 +557,7 @@ async function main() {
   push({
     module: "Advocates",
     method: "GET",
-    path: "/api/v1/advocates",
+    path: "/api/advocates",
     purpose: "List bookable advocates for appointment form",
     status: advocatesRes.res.ok && advocateMobile ? "PASS" : advocatesRes.res.ok ? "WARN" : "FAIL",
     detail: advocatesRes.res.ok
@@ -572,7 +572,7 @@ async function main() {
     jar,
     "Appointments",
     "POST",
-    "/api/v1/appointments",
+    "/api/appointments",
     "Book consultation appointment",
     {
       advocateMobile: advocateMobile || user.mobile.replace(/\D/g, "").slice(-10),
@@ -591,13 +591,13 @@ async function main() {
       jar,
       "Appointments",
       "GET",
-      `/api/v1/appointments/${apptUnitId}`,
+      `/api/appointments/${apptUnitId}`,
       "Appointment detail"
     );
     push({
       module: "Appointments",
       method: "POST",
-      path: `/api/v1/appointments/${apptUnitId}/convert-case`,
+      path: `/api/appointments/${apptUnitId}/convert-case`,
       purpose: "Convert appointment into a case",
       status: "SKIP",
       detail: "Skipped to avoid duplicate case noise",
@@ -609,8 +609,8 @@ async function main() {
     "Appointments",
     "GET",
     advocateMobile
-      ? `/api/v1/appointments/availability?date=${ymd}&advocateMobile=${advocateMobile}`
-      : `/api/v1/appointments/availability?date=${ymd}`,
+      ? `/api/appointments/availability?date=${ymd}&advocateMobile=${advocateMobile}`
+      : `/api/appointments/availability?date=${ymd}`,
     "Slot availability for a day",
     undefined,
     (s, j) =>
@@ -620,33 +620,33 @@ async function main() {
     jar,
     "Availability",
     "GET",
-    "/api/v1/advocates/availability/hours",
+    "/api/advocates/availability/hours",
     "Weekly working hours"
   );
   await testApi(
     jar,
     "Availability",
     "GET",
-    "/api/v1/advocates/availability/blocks",
+    "/api/advocates/availability/blocks",
     "Time blocks / leave from calendar"
   );
   await testApi(
     jar,
     "Appointments",
     "POST",
-    "/api/v1/appointments/import",
+    "/api/appointments/import",
     "CSV import appointments (dry-run)",
     { dryRun: true, rows: [] },
     (s) => s >= 200 && s < 500
   );
 
   // ── HRMS ──
-  await testApi(jar, "HRMS", "GET", "/api/v1/hrms/attendance", "Own attendance history");
+  await testApi(jar, "HRMS", "GET", "/api/hrms/attendance", "Own attendance history");
   await testApi(
     jar,
     "HRMS",
     "POST",
-    "/api/v1/hrms/attendance/check-in",
+    "/api/hrms/attendance/check-in",
     "Daily check-in",
     { notes: "audit", latitude: 11.341, longitude: 77.7172, accuracy: 25 }
   );
@@ -654,18 +654,18 @@ async function main() {
     jar,
     "HRMS",
     "POST",
-    "/api/v1/hrms/attendance/check-out",
+    "/api/hrms/attendance/check-out",
     "Daily check-out",
     { notes: "audit", latitude: 11.341, longitude: 77.7172, accuracy: 25 },
     (s, j) => accept(s, j) || s === 409
   );
-  await testApi(jar, "HRMS", "GET", "/api/v1/hrms/presence", "Office presence board");
-  await testApi(jar, "HRMS", "GET", "/api/v1/hrms/leave", "List leave requests");
+  await testApi(jar, "HRMS", "GET", "/api/hrms/presence", "Office presence board");
+  await testApi(jar, "HRMS", "GET", "/api/hrms/leave", "List leave requests");
   await testApi(
     jar,
     "HRMS",
     "POST",
-    "/api/v1/hrms/leave",
+    "/api/hrms/leave",
     "Apply for leave",
     {
       fromDate: (() => {
@@ -682,11 +682,11 @@ async function main() {
     },
     (s, j) => accept(s, j) || s === 409
   );
-  await testApi(jar, "HRMS", "GET", "/api/v1/hrms/holidays", "Office holidays list");
+  await testApi(jar, "HRMS", "GET", "/api/hrms/holidays", "Office holidays list");
   push({
     module: "HRMS",
     method: "POST",
-    path: "/api/v1/hrms/leave/[unitId]/decide",
+    path: "/api/hrms/leave/[unitId]/decide",
     purpose: "Approve/reject leave",
     status: "SKIP",
     detail: "Skipped mutating leave decision",
@@ -695,7 +695,7 @@ async function main() {
   push({
     module: "HRMS",
     method: "POST",
-    path: "/api/v1/hrms/leave/[unitId]/cancel",
+    path: "/api/hrms/leave/[unitId]/cancel",
     purpose: "Cancel own leave request",
     status: "SKIP",
     detail: "Skipped",
@@ -703,12 +703,12 @@ async function main() {
   });
 
   // ── DAK / TASKS ──
-  await testApi(jar, "Dak", "GET", "/api/v1/dak", "Postal / dak register list");
+  await testApi(jar, "Dak", "GET", "/api/dak", "Postal / dak register list");
   const dak = await testApi(
     jar,
     "Dak",
     "POST",
-    "/api/v1/dak",
+    "/api/dak",
     "Register incoming/outgoing dak",
     {
       direction: "in",
@@ -721,7 +721,7 @@ async function main() {
   );
   const dakUnitId = pick(dak.json, "dak");
   if (dakUnitId) {
-    await testApi(jar, "Dak", "PATCH", `/api/v1/dak/${dakUnitId}`, "Update dak entry", {
+    await testApi(jar, "Dak", "PATCH", `/api/dak/${dakUnitId}`, "Update dak entry", {
       notes: "patched",
     });
   }
@@ -729,18 +729,18 @@ async function main() {
     jar,
     "Dak",
     "POST",
-    "/api/v1/dak/import",
+    "/api/dak/import",
     "CSV import dak (dry-run)",
     { dryRun: true, rows: [] },
     (s) => s >= 200 && s < 500
   );
 
-  await testApi(jar, "Tasks", "GET", "/api/v1/tasks", "Work allotment list");
+  await testApi(jar, "Tasks", "GET", "/api/tasks", "Work allotment list");
   const task = await testApi(
     jar,
     "Tasks",
     "POST",
-    "/api/v1/tasks",
+    "/api/tasks",
     "Create office task / allotment",
     {
       title: `Audit task ${stamp}`,
@@ -753,7 +753,7 @@ async function main() {
   );
   const taskUnitId = pick(task.json, "task");
   if (taskUnitId) {
-    await testApi(jar, "Tasks", "PATCH", `/api/v1/tasks/${taskUnitId}`, "Update task", {
+    await testApi(jar, "Tasks", "PATCH", `/api/tasks/${taskUnitId}`, "Update task", {
       status: "done",
     });
   }
@@ -761,25 +761,25 @@ async function main() {
     jar,
     "Tasks",
     "POST",
-    "/api/v1/tasks/import",
+    "/api/tasks/import",
     "CSV import tasks (dry-run)",
     { dryRun: true, rows: [] },
     (s) => s >= 200 && s < 500
   );
 
   // ── EMPLOYEES / PERMISSIONS / PROFILE ──
-  await testApi(jar, "Employees", "GET", "/api/v1/employees", "Staff directory");
+  await testApi(jar, "Employees", "GET", "/api/employees", "Staff directory");
   await testApi(
     jar,
     "Employees",
     "GET",
-    `/api/v1/employees/${user.unitId}`,
+    `/api/employees/${user.unitId}`,
     "Employee detail"
   );
   push({
     module: "Employees",
     method: "POST",
-    path: "/api/v1/employees/[unitId]/deactivate",
+    path: "/api/employees/[unitId]/deactivate",
     purpose: "Deactivate employee login",
     status: "SKIP",
     detail: "Destructive — skipped",
@@ -788,7 +788,7 @@ async function main() {
   push({
     module: "Employees",
     method: "POST",
-    path: "/api/v1/employees/[unitId]/reactivate",
+    path: "/api/employees/[unitId]/reactivate",
     purpose: "Reactivate employee",
     status: "SKIP",
     detail: "Destructive pair — skipped",
@@ -797,7 +797,7 @@ async function main() {
   push({
     module: "Employees",
     method: "POST",
-    path: "/api/v1/employees/[unitId]/force-reset-pin",
+    path: "/api/employees/[unitId]/force-reset-pin",
     purpose: "Force clear PIN so user re-setup via OTP",
     status: "SKIP",
     detail: "Would lock out admin — skipped",
@@ -807,7 +807,7 @@ async function main() {
     jar,
     "Employees",
     "POST",
-    "/api/v1/employees/import",
+    "/api/employees/import",
     "CSV import employees (dry-run)",
     { dryRun: true, rows: [] },
     (s) => s >= 200 && s < 500
@@ -816,24 +816,24 @@ async function main() {
     jar,
     "Permissions",
     "GET",
-    "/api/v1/permissions/matrix",
+    "/api/permissions/matrix",
     "RBAC permission matrix"
   );
   await testApi(
     jar,
     "Permissions",
     "POST",
-    "/api/v1/permissions/preview",
+    "/api/permissions/preview",
     "Preview effective perms for roles",
     { roles: ["admin"] },
     (s) => s >= 200 && s < 500
   );
-  await testApi(jar, "Profile", "GET", "/api/v1/profile", "Own profile");
+  await testApi(jar, "Profile", "GET", "/api/profile", "Own profile");
   await testApi(
     jar,
     "Profile",
     "PATCH",
-    "/api/v1/profile",
+    "/api/profile",
     "Update own profile fields",
     {
       name: user.name?.trim() || "Audit Admin",
@@ -845,33 +845,33 @@ async function main() {
     jar,
     "Users",
     "GET",
-    `/api/v1/users/${user.unitId}/photo`,
+    `/api/users/${user.unitId}/photo`,
     "Employee photo (or placeholder)",
     undefined,
     (s) => s === 200 || s === 404 || s === 204
   );
 
   // ── NOTIFICATIONS / EXPORTS / CRON / OFFICE ──
-  await testApi(jar, "Notifications", "GET", "/api/v1/notifications", "Notification inbox");
+  await testApi(jar, "Notifications", "GET", "/api/notifications", "Notification inbox");
   await testApi(
     jar,
     "Notifications",
     "GET",
-    "/api/v1/notifications/unread-count",
+    "/api/notifications/unread-count",
     "Unread badge count"
   );
   await testApi(
     jar,
     "Notifications",
     "POST",
-    "/api/v1/notifications/read-all",
+    "/api/notifications/read-all",
     "Mark all notifications read",
     {}
   );
   push({
     module: "Notifications",
     method: "GET",
-    path: "/api/v1/notifications/stream",
+    path: "/api/notifications/stream",
     purpose: "SSE live notification stream",
     status: "SKIP",
     detail: "Long-lived stream — not exercised in batch audit",
@@ -881,7 +881,7 @@ async function main() {
     jar,
     "Exports",
     "GET",
-    "/api/v1/exports?type=clients",
+    "/api/exports?type=clients",
     "Excel export clients",
     undefined,
     (s) => s >= 200 && s < 400
@@ -890,7 +890,7 @@ async function main() {
     jar,
     "Exports",
     "GET",
-    "/api/v1/exports?type=cases",
+    "/api/exports?type=cases",
     "Excel export cases",
     undefined,
     (s) => s >= 200 && s < 400
@@ -899,18 +899,18 @@ async function main() {
     jar,
     "Office",
     "GET",
-    "/api/v1/office-files/address-and-mail",
+    "/api/office-files/address-and-mail",
     "Signed office PDF download",
     undefined,
     (s) => s === 200 || s === 404
   );
 
   // Cron without secret should fail closed
-  const cron = await req(new Map(), "GET", "/api/v1/cron/hearing-sms");
+  const cron = await req(new Map(), "GET", "/api/cron/hearing-sms");
   push({
     module: "Cron",
     method: "GET",
-    path: "/api/v1/cron/hearing-sms",
+    path: "/api/cron/hearing-sms",
     purpose: "Day-before hearing SMS job (Vercel cron)",
     status: cron.res.status === 401 || cron.res.status === 403 ? "PASS" : cron.res.status === 500 ? "WARN" : "FAIL",
     detail: `Unauth call HTTP ${cron.res.status} (expect 401/403)`,
@@ -989,7 +989,7 @@ async function main() {
   }
 
   // Logout last
-  await testApi(jar, "Auth", "POST", "/api/v1/auth/logout", "Clear session cookies", {});
+  await testApi(jar, "Auth", "POST", "/api/auth/logout", "Clear session cookies", {});
 
   const summary = {
     generatedAt: new Date().toISOString(),

@@ -184,7 +184,7 @@ export function AccountsPage({ user }: { user: PublicUser }) {
     params.set("page", String(page));
     params.set("pageSize", String(pageSize));
     const { ok, data } = await apiFetch<ListResponse>(
-      `/api/v1/accounts?${params.toString()}`
+      `/api/accounts?${params.toString()}`
     );
     setLoading(false);
     if (!ok) {
@@ -254,7 +254,7 @@ export function AccountsPage({ user }: { user: PublicUser }) {
     const params = filterParams();
     params.set("type", "accounts");
     const result = await apiDownload(
-      `/api/v1/exports?${params.toString()}`,
+      `/api/exports?${params.toString()}`,
       "accounts-audit.xlsx"
     );
     setExporting(false);
@@ -464,7 +464,7 @@ export function AccountsPage({ user }: { user: PublicUser }) {
         open={importOpen}
         onOpenChange={setImportOpen}
         title="Import cash entries"
-        endpoint="/api/v1/accounts/import"
+        endpoint="/api/accounts/import"
         sampleHref="/samples/payments.sample.csv"
         columnsHint="Need clientUnitId or clientMobile, amount, type (advance/partial/full/consultation/court_fee/stamp/copying/travel/clerkage/other), status (pending/paid). caseUnitId optional. Notes required for other."
         onImported={load}

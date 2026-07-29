@@ -94,11 +94,11 @@ export function OfficeHolidayDialog({
       notes: notes.trim() || undefined,
     };
     const { ok, data } = editing
-      ? await apiFetch(`/api/v1/hrms/holidays/${editing.unitId}`, {
+      ? await apiFetch(`/api/hrms/holidays/${editing.unitId}`, {
           method: "PATCH",
           json: payload,
         })
-      : await apiFetch("/api/v1/hrms/holidays", {
+      : await apiFetch("/api/hrms/holidays", {
           method: "POST",
           json: payload,
         });

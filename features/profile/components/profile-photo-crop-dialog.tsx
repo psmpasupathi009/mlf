@@ -115,7 +115,7 @@ export function ProfilePhotoCropDialog({
       const form = new FormData();
       form.set("file", blob, "avatar.jpg");
       const { ok, data } = await apiFetch<{ user: PublicUser }>(
-        "/api/v1/profile/photo",
+        "/api/profile/photo",
         { method: "POST", body: form }
       );
       if (!ok) {

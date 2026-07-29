@@ -176,7 +176,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
     }
 
     const { ok, data } = await apiFetch<ListResponse>(
-      `/api/v1/appointments?${params.toString()}`
+      `/api/appointments?${params.toString()}`
     );
     setLoading(false);
     if (!ok) {
@@ -261,7 +261,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
     if (!okConfirm) return;
 
     setActionBusy(unitId);
-    const { ok, data } = await apiFetch(`/api/v1/appointments/${unitId}`, {
+    const { ok, data } = await apiFetch(`/api/appointments/${unitId}`, {
       method: "PATCH",
       json: { status: "cancelled" },
     });
@@ -278,7 +278,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
 
   async function handleComplete(unitId: string) {
     setActionBusy(unitId);
-    const { ok, data } = await apiFetch(`/api/v1/appointments/${unitId}`, {
+    const { ok, data } = await apiFetch(`/api/appointments/${unitId}`, {
       method: "PATCH",
       json: { status: "completed" },
     });
@@ -307,7 +307,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
     const { ok, data } = await apiFetch<{
       case: CaseSummary;
       appointment: AppointmentSummary;
-    }>(`/api/v1/appointments/${a.unitId}/convert-case`, { method: "POST" });
+    }>(`/api/appointments/${a.unitId}/convert-case`, { method: "POST" });
     setActionBusy(null);
     if (!ok) {
       toast.error(
@@ -359,7 +359,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                   params.set("from", new Date().toISOString());
                 }
                 const result = await apiDownload(
-                  `/api/v1/exports?${params.toString()}`,
+                  `/api/exports?${params.toString()}`,
                   "appointments.xlsx"
                 );
                 if (!result.ok) toast.error(result.error ?? "Export failed");
@@ -735,7 +735,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
         open={importOpen}
         onOpenChange={setImportOpen}
         title="Import appointments"
-        endpoint="/api/v1/appointments/import"
+        endpoint="/api/appointments/import"
         sampleHref="/samples/appointments.sample.csv"
         columnsHint="Required: title, scheduledAt (ISO), advocateMobile. Optional: clientUnitId or clientMobile, caseUnitId, durationMin, mode, location, notes. Slot clash checks are skipped on bulk import."
         onImported={load}

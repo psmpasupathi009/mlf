@@ -29,7 +29,8 @@ function getSecret(): Uint8Array {
 }
 
 export async function signAccessToken(input: {
-  userId: string;
+  /** Public employee unitId (EMP-#####) — never Mongo ObjectId. */
+  unitId: string;
   mobile: string;
   roles: UserRole[];
 }): Promise<string> {
@@ -39,7 +40,7 @@ export async function signAccessToken(input: {
     typ: "access",
   })
     .setProtectedHeader({ alg: "HS256" })
-    .setSubject(input.userId)
+    .setSubject(input.unitId)
     .setIssuedAt()
     .setExpirationTime(ACCESS_TTL)
     .sign(getSecret());

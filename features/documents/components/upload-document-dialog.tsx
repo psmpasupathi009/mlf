@@ -108,7 +108,7 @@ export function UploadDocumentDialog({
     if (clientUnitId) form.set("clientUnitId", clientUnitId);
 
     setBusy(true);
-    const { ok, data } = await apiFetch("/api/v1/documents", {
+    const { ok, data } = await apiFetch("/api/documents", {
       method: "POST",
       body: form,
     });

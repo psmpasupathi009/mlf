@@ -8,7 +8,7 @@ import { authFetch, getErrorMessage } from "@/lib/api/client";
 export async function performLogout(
   router: ReturnType<typeof useRouter>
 ): Promise<void> {
-  const { ok, data } = await authFetch("/api/v1/auth/logout", {});
+  const { ok, data } = await authFetch("/api/auth/logout", {});
   if (!ok) {
     toast.error(getErrorMessage(data, "Logout failed"));
   } else {

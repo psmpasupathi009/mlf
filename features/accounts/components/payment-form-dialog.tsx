@@ -141,7 +141,7 @@ export function PaymentFormDialog({
 
     setBusy(true);
     if (isEdit && payment) {
-      const { ok, data } = await apiFetch(`/api/v1/accounts/${payment.unitId}`, {
+      const { ok, data } = await apiFetch(`/api/accounts/${payment.unitId}`, {
         method: "PATCH",
         json: {
           type,
@@ -160,7 +160,7 @@ export function PaymentFormDialog({
       }
       toast.success("Cash entry updated");
     } else {
-      const { ok, data } = await apiFetch("/api/v1/accounts", {
+      const { ok, data } = await apiFetch("/api/accounts", {
         method: "POST",
         json: {
           clientUnitId: client!.unitId,

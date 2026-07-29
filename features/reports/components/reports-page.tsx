@@ -36,7 +36,7 @@ export function ReportsPage({ user }: ReportsPageProps) {
     const qs = extra
       ? `type=${encodeURIComponent(type)}&${extra}`
       : `type=${encodeURIComponent(type)}`;
-    const result = await apiDownload(`/api/v1/exports?${qs}`, filename);
+    const result = await apiDownload(`/api/exports?${qs}`, filename);
     setBusy(null);
     if (!result.ok) {
       toast.error(result.error ?? "Download failed");

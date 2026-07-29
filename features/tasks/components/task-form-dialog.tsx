@@ -124,11 +124,11 @@ export function TaskFormDialog({
     };
 
     const res = isEdit
-      ? await apiFetch(`/api/v1/tasks/${task!.unitId}`, {
+      ? await apiFetch(`/api/tasks/${task!.unitId}`, {
           method: "PATCH",
           json: body,
         })
-      : await apiFetch("/api/v1/tasks", {
+      : await apiFetch("/api/tasks", {
           method: "POST",
           json: { ...body, status: "open" },
         });

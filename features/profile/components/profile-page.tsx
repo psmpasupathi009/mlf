@@ -48,7 +48,7 @@ export function ProfilePage({ user: initial }: { user: PublicUser }) {
     }
     setBusy(true);
     const { ok, data } = await apiFetch<{ user: PublicUser }>(
-      "/api/v1/profile",
+      "/api/profile",
       {
         method: "PATCH",
         json: {
@@ -77,7 +77,7 @@ export function ProfilePage({ user: initial }: { user: PublicUser }) {
   async function handleRemovePhoto() {
     setBusy(true);
     const { ok, data } = await apiFetch<{ user: PublicUser }>(
-      "/api/v1/profile/photo",
+      "/api/profile/photo",
       { method: "DELETE" }
     );
     setBusy(false);
@@ -205,7 +205,7 @@ export function ProfilePage({ user: initial }: { user: PublicUser }) {
               Staff address book (signed-in download only).
             </p>
             <a
-              href="/api/v1/office-files/address-and-mail"
+              href="/api/office-files/address-and-mail"
               className="mt-2 inline-flex text-sm font-medium text-navy underline-offset-2 hover:underline"
               target="_blank"
               rel="noreferrer"

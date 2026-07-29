@@ -98,7 +98,7 @@ export function PaymentDetailDrawer({
     if (!unitId) return;
     setLoading(true);
     const { ok, data } = await apiFetch<DetailResponse>(
-      `/api/v1/accounts/${unitId}`
+      `/api/accounts/${unitId}`
     );
     setLoading(false);
     if (!ok) {
@@ -129,7 +129,7 @@ export function PaymentDetailDrawer({
   async function confirmMarkPaid() {
     if (!payment || !markPaidOn) return;
     setMarkingPaid(true);
-    const { ok, data } = await apiFetch(`/api/v1/accounts/${payment.unitId}`, {
+    const { ok, data } = await apiFetch(`/api/accounts/${payment.unitId}`, {
       method: "PATCH",
       json: { status: "paid", paidOn: markPaidOn },
     });
@@ -379,7 +379,7 @@ export function PaymentDetailDrawer({
                             {r.title}
                           </span>
                           <a
-                            href={`/api/v1/documents/${r.unitId}/download`}
+                            href={`/api/documents/${r.unitId}/download`}
                             className="shrink-0 text-xs font-medium text-navy underline-offset-2 hover:underline"
                           >
                             Download

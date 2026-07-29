@@ -61,7 +61,7 @@ export function PermissionsMatrixPage({ user }: { user: PublicUser }) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { ok, data } = await apiFetch<MatrixResponse>("/api/v1/permissions/matrix");
+    const { ok, data } = await apiFetch<MatrixResponse>("/api/permissions/matrix");
     setLoading(false);
     if (!ok) {
       toast.error(getErrorMessage(data as Record<string, unknown>, "Failed to load matrix"));
@@ -148,7 +148,7 @@ export function PermissionsMatrixPage({ user }: { user: PublicUser }) {
         allowed: role === "admin" ? true : Boolean(grid[cellKey(role, module, action)]),
       }))
     );
-    const { ok, data } = await apiFetch("/api/v1/permissions/matrix", {
+    const { ok, data } = await apiFetch("/api/permissions/matrix", {
       method: "PUT",
       json: { rows },
     });

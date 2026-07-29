@@ -27,7 +27,7 @@ export function ClientPicker({
       query: string;
       page: number;
       pageSize: number;
-    }) => fetchPagedList<ClientSummary>("/api/v1/clients", { query, page, pageSize }),
+    }) => fetchPagedList<ClientSummary>("/api/clients", { query, page, pageSize }),
     []
   );
 

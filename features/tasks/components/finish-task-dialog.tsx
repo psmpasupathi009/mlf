@@ -47,7 +47,7 @@ export function FinishTaskDialog({
     if (!task) return;
     setError("");
     setBusy(true);
-    const res = await apiFetch(`/api/v1/tasks/${task.unitId}`, {
+    const res = await apiFetch(`/api/tasks/${task.unitId}`, {
       method: "PATCH",
       json: {
         status: "done",

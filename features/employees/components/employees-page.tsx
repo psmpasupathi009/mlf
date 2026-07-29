@@ -86,7 +86,7 @@ export function EmployeesPage({ user }: { user: PublicUser }) {
     if (debouncedSearch) params.set("q", debouncedSearch);
     if (statusFilter !== "all") params.set("status", statusFilter);
     if (roleFilter !== "all") params.set("role", roleFilter);
-    const { ok, data } = await apiFetch<ListResponse>(`/api/v1/employees?${params.toString()}`);
+    const { ok, data } = await apiFetch<ListResponse>(`/api/employees?${params.toString()}`);
     setLoading(false);
     if (!ok) {
       toast.error(getErrorMessage(data as Record<string, unknown>, "Failed to load employees"));
@@ -105,7 +105,7 @@ export function EmployeesPage({ user }: { user: PublicUser }) {
 
   async function handleAction(unitId: string, action: "deactivate" | "reactivate" | "force-reset-pin") {
     setActionBusyId(unitId);
-    const { ok, data } = await apiFetch(`/api/v1/employees/${unitId}/${action}`, { method: "POST" });
+    const { ok, data } = await apiFetch(`/api/employees/${unitId}/${action}`, { method: "POST" });
     setActionBusyId(null);
     if (!ok) {
       toast.error(getErrorMessage(data as Record<string, unknown>, "Action failed"));
@@ -136,7 +136,7 @@ export function EmployeesPage({ user }: { user: PublicUser }) {
               variant="outline"
               onClick={async () => {
                 const result = await apiDownload(
-                  "/api/v1/exports?type=employees",
+                  "/api/exports?type=employees",
                   "employees.xlsx"
                 );
                 if (!result.ok) toast.error(result.error ?? "Export failed");
@@ -376,7 +376,7 @@ export function EmployeesPage({ user }: { user: PublicUser }) {
         open={importOpen}
         onOpenChange={setImportOpen}
         title="Import employees"
-        endpoint="/api/v1/employees/import"
+        endpoint="/api/employees/import"
         sampleHref="/samples/employees.sample.csv"
         columnsHint="Required: mobile, name, designation (job title). Roles are assigned from designation defaults."
         onImported={load}

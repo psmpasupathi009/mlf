@@ -81,7 +81,7 @@ export async function issueAuthTokens(user: AuthUser): Promise<{
   user: PublicUser;
 }> {
   const accessToken = await signAccessToken({
-    userId: user.id,
+    unitId: user.unitId,
     mobile: user.mobile,
     roles: user.roles,
   });
@@ -145,11 +145,27 @@ export async function getAccessPayloadFromRequest(
   return verifyAccessToken(cookieToken);
 }
 
+/** True for legacy JWT subjects that still carry a Mongo ObjectId. */
+function isLegacyObjectIdSub(sub: string): boolean {
+  return /^[a-f\d]{24}$/i.test(sub);
+}
+
+/**
+ * Resolve user from JWT `sub` (unitId). Falls back to Mongo ObjectId for
+ * cookies issued before the unitId migration.
+ */
+export async function findUserByAccessSub(sub: string) {
+  const byUnit = await prisma.user.findUnique({ where: { unitId: sub } });
+  if (byUnit) return byUnit;
+  if (!isLegacyObjectIdSub(sub)) return null;
+  return prisma.user.findUnique({ where: { id: sub } });
+}
+
 export async function getCurrentUser(request: Request): Promise<User | null> {
   const payload = await getAccessPayloadFromRequest(request);
   if (!payload?.sub) return null;
 
-  const user = await prisma.user.findUnique({ where: { id: payload.sub } });
+  const user = await findUserByAccessSub(payload.sub);
   if (!user || !user.isActive) return null;
   return user;
 }

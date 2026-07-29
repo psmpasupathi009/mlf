@@ -1,10 +1,10 @@
 import { cache } from "react";
 import { cookies } from "next/headers";
-import { prisma } from "@/lib/db/prisma";
 import { withDbRetry } from "@/lib/db/unreachable";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import {
   ACCESS_COOKIE,
+  findUserByAccessSub,
   toPublicUser,
   type PublicUser,
 } from "@/lib/auth/session";
@@ -23,25 +23,21 @@ export const getSessionUser = cache(async (): Promise<PublicUser | null> => {
   if (!payload?.sub) return null;
 
   return withDbRetry(async () => {
-    const user = await prisma.user.findUnique({
-      where: { id: payload.sub },
-      select: {
-        id: true,
-        unitId: true,
-        mobile: true,
-        roles: true,
-        name: true,
-        designation: true,
-        email: true,
-        address: true,
-        photoKey: true,
-        isActive: true,
-      },
-    });
-
+    const user = await findUserByAccessSub(payload.sub);
     if (!user || !user.isActive) return null;
 
     // Permissions also hit Mongo — keep inside the retry boundary.
-    return toPublicUser(user);
+    return toPublicUser({
+      id: user.id,
+      unitId: user.unitId,
+      mobile: user.mobile,
+      roles: user.roles,
+      name: user.name,
+      designation: user.designation,
+      email: user.email,
+      address: user.address,
+      photoKey: user.photoKey,
+      isActive: user.isActive,
+    });
   });
 });

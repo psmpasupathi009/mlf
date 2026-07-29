@@ -157,7 +157,7 @@ export function DiaryPage({ user }: { user: PublicUser }) {
 
   async function reloadTomorrowNotify() {
     const res = await apiFetch<TomorrowNotifyResponse>(
-      "/api/v1/diary/tomorrow-notify"
+      "/api/diary/tomorrow-notify"
     );
     if (res.ok) setTomorrowNotify(res.data);
   }
@@ -176,7 +176,7 @@ export function DiaryPage({ user }: { user: PublicUser }) {
       const params = new URLSearchParams({ date });
       if (advocateFilter) params.set("advocateMobile", advocateFilter);
       const res = await apiFetch<DiaryResponse>(
-        `/api/v1/diary?${params.toString()}`
+        `/api/diary?${params.toString()}`
       );
       if (cancelled) return;
       setLoading(false);
@@ -205,7 +205,7 @@ export function DiaryPage({ user }: { user: PublicUser }) {
     (async () => {
       setTomorrowLoading(true);
       const res = await apiFetch<TomorrowNotifyResponse>(
-        "/api/v1/diary/tomorrow-notify"
+        "/api/diary/tomorrow-notify"
       );
       if (cancelled) return;
       setTomorrowLoading(false);
@@ -230,7 +230,7 @@ export function DiaryPage({ user }: { user: PublicUser }) {
     const params = new URLSearchParams({ date });
     if (advocateFilter) params.set("advocateMobile", advocateFilter);
     const res = await apiFetch<DiaryResponse>(
-      `/api/v1/diary?${params.toString()}`
+      `/api/diary?${params.toString()}`
     );
     setLoading(false);
     if (!res.ok) {
@@ -254,7 +254,7 @@ export function DiaryPage({ user }: { user: PublicUser }) {
       sent: number;
       failed: number;
       skipped: number;
-    }>("/api/v1/diary/send-hearing-sms", { method: "POST" });
+    }>("/api/diary/send-hearing-sms", { method: "POST" });
     setSmsSending(false);
     if (!res.ok) {
       toast.error(

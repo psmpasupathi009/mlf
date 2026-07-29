@@ -114,7 +114,7 @@ export function TasksPage({ user }: { user: PublicUser }) {
     if (debouncedSearch) params.set("q", debouncedSearch);
 
     const { ok, data } = await apiFetch<ListResponse>(
-      `/api/v1/tasks?${params.toString()}`
+      `/api/tasks?${params.toString()}`
     );
     setLoading(false);
     if (!ok) {
@@ -143,7 +143,7 @@ export function TasksPage({ user }: { user: PublicUser }) {
       status: "done",
     });
     const { ok, data } = await apiFetch<ListResponse>(
-      `/api/v1/tasks?${params.toString()}`
+      `/api/tasks?${params.toString()}`
     );
     if (!ok) return;
     setDoneRows((data as unknown as ListResponse).data ?? []);
@@ -162,7 +162,7 @@ export function TasksPage({ user }: { user: PublicUser }) {
 
   async function cancelTask(task: OfficeTaskSummary) {
     setBusyId(task.unitId);
-    const res = await apiFetch(`/api/v1/tasks/${task.unitId}`, {
+    const res = await apiFetch(`/api/tasks/${task.unitId}`, {
       method: "PATCH",
       json: { status: "cancelled" },
     });
@@ -210,7 +210,7 @@ export function TasksPage({ user }: { user: PublicUser }) {
                 if (status !== "all") params.set("status", status);
                 if (debouncedSearch) params.set("q", debouncedSearch);
                 const result = await apiDownload(
-                  `/api/v1/exports?${params.toString()}`,
+                  `/api/exports?${params.toString()}`,
                   "tasks.xlsx"
                 );
                 if (!result.ok) toast.error(result.error ?? "Export failed");
@@ -552,7 +552,7 @@ export function TasksPage({ user }: { user: PublicUser }) {
         open={importOpen}
         onOpenChange={setImportOpen}
         title="Import work allotment"
-        endpoint="/api/v1/tasks/import"
+        endpoint="/api/tasks/import"
         sampleHref="/samples/tasks.sample.csv"
         columnsHint={`Required: title, workDate (YYYY-MM-DD). Optional: assigneeUnitId, caseUnitId, kind (default allotment), dueDate, notes. Prefill workDate as ${workDate} for today’s board.`}
         onImported={refresh}

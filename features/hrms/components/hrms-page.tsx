@@ -150,7 +150,7 @@ export function HrmsPage({ user }: { user: PublicUser }) {
         tasks.push(
           (async () => {
             const attRes = await apiFetch<AttendanceList>(
-              `/api/v1/hrms/attendance?mine=1&from=${today}&to=${today}&pageSize=1`
+              `/api/hrms/attendance?mine=1&from=${today}&to=${today}&pageSize=1`
             );
             if (attRes.ok) {
               const rows =
@@ -172,7 +172,7 @@ export function HrmsPage({ user }: { user: PublicUser }) {
         tasks.push(
           (async () => {
             const leaveRes = await apiFetch<LeaveList>(
-              "/api/v1/hrms/leave?mine=1&pageSize=50"
+              "/api/hrms/leave?mine=1&pageSize=50"
             );
             if (leaveRes.ok) {
               setMyLeave((leaveRes.data as unknown as LeaveList).data ?? []);
@@ -192,7 +192,7 @@ export function HrmsPage({ user }: { user: PublicUser }) {
         tasks.push(
           (async () => {
             const res = await apiFetch<PresenceBoard>(
-              `/api/v1/hrms/presence?date=${today}`
+              `/api/hrms/presence?date=${today}`
             );
             if (res.ok) {
               setPresence(res.data as unknown as PresenceBoard);
@@ -214,7 +214,7 @@ export function HrmsPage({ user }: { user: PublicUser }) {
             const from = istAddCalendarDays(today, -90);
             const to = istAddCalendarDays(today, 365);
             const res = await apiFetch<HolidayList>(
-              `/api/v1/hrms/holidays?from=${from}&to=${to}&pageSize=50`
+              `/api/hrms/holidays?from=${from}&to=${to}&pageSize=50`
             );
             if (res.ok) {
               setHolidays((res.data as unknown as HolidayList).data ?? []);
@@ -228,10 +228,10 @@ export function HrmsPage({ user }: { user: PublicUser }) {
           (async () => {
             const [pendingRes, decidedRes] = await Promise.all([
               apiFetch<LeaveList>(
-                "/api/v1/hrms/leave?status=pending&pageSize=50"
+                "/api/hrms/leave?status=pending&pageSize=50"
               ),
               apiFetch<LeaveList>(
-                "/api/v1/hrms/leave?status=decided&pageSize=50"
+                "/api/hrms/leave?status=decided&pageSize=50"
               ),
             ]);
             if (pendingRes.ok) {
@@ -266,7 +266,7 @@ export function HrmsPage({ user }: { user: PublicUser }) {
     setHistoryLoading(true);
     try {
       const res = await apiFetch<AttendanceList>(
-        `/api/v1/hrms/attendance?mine=1&from=${historyRange.from}&to=${historyRange.to}&pageSize=50`
+        `/api/hrms/attendance?mine=1&from=${historyRange.from}&to=${historyRange.to}&pageSize=50`
       );
       if (!res.ok) {
         toast.error(
@@ -325,7 +325,7 @@ export function HrmsPage({ user }: { user: PublicUser }) {
     }
     setDeletingHolidayId(holiday.unitId);
     const { ok, data } = await apiFetch(
-      `/api/v1/hrms/holidays/${holiday.unitId}`,
+      `/api/hrms/holidays/${holiday.unitId}`,
       { method: "DELETE" }
     );
     setDeletingHolidayId(null);
@@ -346,7 +346,7 @@ export function HrmsPage({ user }: { user: PublicUser }) {
     setCheckBusy(true);
     try {
       const loc = await getAttendanceLocation();
-      const { ok, data } = await apiFetch("/api/v1/hrms/attendance/check-in", {
+      const { ok, data } = await apiFetch("/api/hrms/attendance/check-in", {
         method: "POST",
         json: {
           notes: checkInNotes.trim() || undefined,
@@ -378,7 +378,7 @@ export function HrmsPage({ user }: { user: PublicUser }) {
     setCheckBusy(true);
     try {
       const loc = await getAttendanceLocation();
-      const { ok, data } = await apiFetch("/api/v1/hrms/attendance/check-out", {
+      const { ok, data } = await apiFetch("/api/hrms/attendance/check-out", {
         method: "POST",
         json: {
           latitude: loc.latitude,
@@ -410,7 +410,7 @@ export function HrmsPage({ user }: { user: PublicUser }) {
     if (!cancelTarget) return;
     setCancelBusyId(cancelTarget.unitId);
     const { ok, data } = await apiFetch(
-      `/api/v1/hrms/leave/${cancelTarget.unitId}/cancel`,
+      `/api/hrms/leave/${cancelTarget.unitId}/cancel`,
       { method: "POST" }
     );
     setCancelBusyId(null);
@@ -427,7 +427,7 @@ export function HrmsPage({ user }: { user: PublicUser }) {
 
   async function handleApprove(unitId: string) {
     setDeciding(true);
-    const { ok, data } = await apiFetch(`/api/v1/hrms/leave/${unitId}/decide`, {
+    const { ok, data } = await apiFetch(`/api/hrms/leave/${unitId}/decide`, {
       method: "POST",
       json: { decision: "approved" },
     });
@@ -451,7 +451,7 @@ export function HrmsPage({ user }: { user: PublicUser }) {
     }
     setDeciding(true);
     const { ok, data } = await apiFetch(
-      `/api/v1/hrms/leave/${rejectTarget.unitId}/decide`,
+      `/api/hrms/leave/${rejectTarget.unitId}/decide`,
       {
         method: "POST",
         json: { decision: "rejected", rejectReason: reason },

@@ -33,7 +33,7 @@ function buildListUrl(page: number, filter: InboxFilter): string {
   } else if (filter !== "all") {
     params.set("category", filter);
   }
-  return `/api/v1/notifications?${params.toString()}`;
+  return `/api/notifications?${params.toString()}`;
 }
 
 export function useNotificationsInbox(filter: InboxFilter, page: number) {
@@ -55,7 +55,7 @@ export function useNotificationsInbox(filter: InboxFilter, page: number) {
 
   const refreshUnread = useCallback(async () => {
     const countRes = await apiFetch<UnreadEnvelope>(
-      "/api/v1/notifications/unread-count"
+      "/api/notifications/unread-count"
     );
     if (countRes.ok && typeof countRes.data?.unread === "number") {
       setUnread(countRes.data.unread);
@@ -66,7 +66,7 @@ export function useNotificationsInbox(filter: InboxFilter, page: number) {
     setLoading(true);
     const [listRes, countRes] = await Promise.all([
       apiFetch<ListEnvelope>(buildListUrl(pageRef.current, filterRef.current)),
-      apiFetch<UnreadEnvelope>("/api/v1/notifications/unread-count"),
+      apiFetch<UnreadEnvelope>("/api/notifications/unread-count"),
     ]);
 
     if (listRes.ok && listRes.data && typeof listRes.data === "object") {
@@ -89,7 +89,7 @@ export function useNotificationsInbox(filter: InboxFilter, page: number) {
       if (marking.current.has(unitId)) return true;
       marking.current.add(unitId);
       try {
-        const { ok } = await apiFetch(`/api/v1/notifications/${unitId}/read`, {
+        const { ok } = await apiFetch(`/api/notifications/${unitId}/read`, {
           method: "PATCH",
         });
         if (!ok) return false;
@@ -123,7 +123,7 @@ export function useNotificationsInbox(filter: InboxFilter, page: number) {
   );
 
   const markAllRead = useCallback(async () => {
-    const { ok } = await apiFetch("/api/v1/notifications/read-all", {
+    const { ok } = await apiFetch("/api/notifications/read-all", {
       method: "POST",
     });
     if (!ok) return false;
@@ -190,7 +190,7 @@ export function useNotificationsInbox(filter: InboxFilter, page: number) {
 
     const connect = () => {
       if (closed) return;
-      es = new EventSource("/api/v1/notifications/stream", {
+      es = new EventSource("/api/notifications/stream", {
         withCredentials: true,
       });
 

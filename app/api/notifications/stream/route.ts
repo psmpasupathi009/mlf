@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * Server-Sent Events stream for the current user's notifications.
- * Client: new EventSource("/api/v1/notifications/stream")
+ * Client: new EventSource("/api/notifications/stream")
  */
 export async function GET(request: Request) {
   const { user, response } = await requireUser(request);

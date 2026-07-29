@@ -187,7 +187,7 @@ export function AvailabilityPage({ user }: { user: PublicUser }) {
       const { ok, data } = await apiFetch<{
         usingDefaults: boolean;
         days: HoursDay[];
-      }>(`/api/v1/advocates/availability/hours${q}`);
+      }>(`/api/advocates/availability/hours${q}`);
       if (seq !== loadSeq.current) return;
       if (!ok || !data || typeof data !== "object") {
         toast.error("Could not load working hours");
@@ -206,7 +206,7 @@ export function AvailabilityPage({ user }: { user: PublicUser }) {
       const params = new URLSearchParams({ pageSize: "50" });
       if (unitId !== user.unitId) params.set("userUnitId", unitId);
       const { ok, data } = await apiFetch<{ data: TimeAwayBlock[] }>(
-        `/api/v1/advocates/availability/blocks?${params.toString()}`
+        `/api/advocates/availability/blocks?${params.toString()}`
       );
       if (seq !== loadSeq.current) return;
       if (!ok || !data || typeof data !== "object") {
@@ -307,7 +307,7 @@ export function AvailabilityPage({ user }: { user: PublicUser }) {
     }));
 
     setSavingHours(true);
-    const { ok, data } = await apiFetch("/api/v1/advocates/availability/hours", {
+    const { ok, data } = await apiFetch("/api/advocates/availability/hours", {
       method: "PUT",
       json: {
         userUnitId: targetUnitId === user.unitId ? undefined : targetUnitId,
@@ -371,7 +371,7 @@ export function AvailabilityPage({ user }: { user: PublicUser }) {
     setBlockBusy(true);
     if (editingBlock) {
       const { ok, data } = await apiFetch(
-        `/api/v1/advocates/availability/blocks/${editingBlock.unitId}`,
+        `/api/advocates/availability/blocks/${editingBlock.unitId}`,
         {
           method: "PATCH",
           json: {
@@ -395,7 +395,7 @@ export function AvailabilityPage({ user }: { user: PublicUser }) {
       toast.success(`${label} updated`);
     } else {
       const { ok, data } = await apiFetch(
-        "/api/v1/advocates/availability/blocks",
+        "/api/advocates/availability/blocks",
         {
           method: "POST",
           json: {
@@ -437,7 +437,7 @@ export function AvailabilityPage({ user }: { user: PublicUser }) {
     if (!okConfirm) return;
 
     const { ok, data } = await apiFetch(
-      `/api/v1/advocates/availability/blocks/${unitId}`,
+      `/api/advocates/availability/blocks/${unitId}`,
       { method: "DELETE" }
     );
     if (!ok) {

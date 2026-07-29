@@ -71,7 +71,7 @@ async function waitForServer(timeoutMs = 60_000) {
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     try {
-      const r = await fetch(`${BASE}/api/v1/auth/check-mobile`, {
+      const r = await fetch(`${BASE}/api/auth/check-mobile`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mobile: "9000000000" }),
@@ -107,7 +107,7 @@ async function main() {
   await waitForServer();
 
   // 1. Login endpoint reachable + rejects bad PIN (no lock risk: wrong format/short)
-  const badLogin = await fetch(`${BASE}/api/v1/auth/login`, {
+  const badLogin = await fetch(`${BASE}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ mobile: user.mobile, pin: "0000" }),
@@ -123,7 +123,7 @@ async function main() {
   const tokens = await issueAuthTokens(user as unknown as AuthUser);
   const token = tokens.accessToken;
 
-  const me = await api(token, "GET", "/api/v1/auth/me");
+  const me = await api(token, "GET", "/api/auth/me");
   results.push({
     step: "1b. Authenticated session (/me)",
     ok: me.res.ok,
@@ -134,7 +134,7 @@ async function main() {
   // 2. Add client
   const stamp = Date.now().toString().slice(-6);
   const clientMobile = `98${stamp}${stamp.slice(0, 2)}`.slice(0, 10);
-  const clientRes = await api(token, "POST", "/api/v1/clients", {
+  const clientRes = await api(token, "POST", "/api/clients", {
     name: `Smoke Test Client ${stamp}`,
     mobile: clientMobile,
     state: "Tamil Nadu",
@@ -158,7 +158,7 @@ async function main() {
   }
 
   // 3. Open case
-  const caseRes = await api(token, "POST", "/api/v1/cases", {
+  const caseRes = await api(token, "POST", "/api/cases", {
     clientUnitId,
     state: "Tamil Nadu",
     district: "Erode",
@@ -187,7 +187,7 @@ async function main() {
     throw new Error("Case create failed — aborting");
   }
 
-  const caseGet = await api(token, "GET", `/api/v1/cases/${caseUnitId}`);
+  const caseGet = await api(token, "GET", `/api/cases/${caseUnitId}`);
   results.push({
     step: "3b. Open case detail",
     ok: caseGet.res.ok,
@@ -205,7 +205,7 @@ async function main() {
   const hearingRes = await api(
     token,
     "POST",
-    `/api/v1/cases/${caseUnitId}/hearings`,
+    `/api/cases/${caseUnitId}/hearings`,
     {
       hearingDate,
       purpose: "Smoke check hearing",
@@ -219,7 +219,7 @@ async function main() {
   });
 
   // 5. Diary
-  const diaryRes = await api(token, "GET", `/api/v1/diary?date=${hearingDate}`);
+  const diaryRes = await api(token, "GET", `/api/diary?date=${hearingDate}`);
   results.push({
     step: "5. Check diary",
     ok: diaryRes.res.ok,
@@ -240,7 +240,7 @@ async function main() {
   form.append("caseUnitId", caseUnitId);
   form.append("clientUnitId", clientUnitId);
   form.append("notes", "Automated confidence check");
-  const docRes = await api(token, "POST", "/api/v1/documents", form);
+  const docRes = await api(token, "POST", "/api/documents", form);
   results.push({
     step: "6. Upload document",
     ok: okish(docRes.res.status, docRes.json),
@@ -248,7 +248,7 @@ async function main() {
   });
 
   // 7. Payment
-  const payRes = await api(token, "POST", "/api/v1/accounts", {
+  const payRes = await api(token, "POST", "/api/accounts", {
     clientUnitId,
     caseUnitId,
     type: "advance",
@@ -264,7 +264,7 @@ async function main() {
   });
 
   // 8. HRMS check-in (409 already checked-in / holiday / leave = acceptable)
-  const hrmsRes = await api(token, "POST", "/api/v1/hrms/attendance/check-in", {
+  const hrmsRes = await api(token, "POST", "/api/hrms/attendance/check-in", {
     notes: "Smoke confidence check",
     latitude: 11.341,
     longitude: 77.7172,

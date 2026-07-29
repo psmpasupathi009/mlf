@@ -66,7 +66,7 @@ export function GlobalSearch() {
     setLoading(true);
     void (async () => {
       const { ok, data } = await apiFetch<SearchResult>(
-        `/api/v1/search?q=${encodeURIComponent(query)}`
+        `/api/search?q=${encodeURIComponent(query)}`
       );
       if (cancelled) return;
       setLoading(false);

@@ -113,11 +113,11 @@ export function DakFormDialog({ open, onOpenChange, entry, onSaved }: Props) {
     };
 
     const res = isEdit
-      ? await apiFetch(`/api/v1/dak/${entry!.unitId}`, {
+      ? await apiFetch(`/api/dak/${entry!.unitId}`, {
           method: "PATCH",
           json: body,
         })
-      : await apiFetch("/api/v1/dak", { method: "POST", json: body });
+      : await apiFetch("/api/dak", { method: "POST", json: body });
 
     setBusy(false);
     if (!res.ok) {

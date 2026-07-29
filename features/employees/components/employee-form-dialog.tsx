@@ -169,7 +169,7 @@ export function EmployeeFormDialog({
       if (cancelled) return;
       setPreviewLoading(true);
       setPreviewError("");
-      const { ok, data } = await apiFetch<PreviewResponse>("/api/v1/permissions/preview", {
+      const { ok, data } = await apiFetch<PreviewResponse>("/api/permissions/preview", {
         method: "POST",
         json: { roles: debouncedRoles },
       });
@@ -250,7 +250,7 @@ export function EmployeeFormDialog({
     };
 
     const { ok, data } = await apiFetch(
-      isEdit ? `/api/v1/employees/${employee!.unitId}` : "/api/v1/employees",
+      isEdit ? `/api/employees/${employee!.unitId}` : "/api/employees",
       { method: isEdit ? "PATCH" : "POST", json: payload }
     );
     setBusy(false);

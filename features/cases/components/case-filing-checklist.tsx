@@ -34,7 +34,7 @@ export function CaseFilingChecklist({ caseItem, canEdit, onUpdated }: Props) {
     if (!canEdit || busy) return;
     setBusy(true);
     const { ok, data } = await apiFetch<{ case: CaseSummary }>(
-      `/api/v1/cases/${caseItem.unitId}/checklist`,
+      `/api/cases/${caseItem.unitId}/checklist`,
       { method: "PATCH", json: payload }
     );
     setBusy(false);

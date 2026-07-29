@@ -43,7 +43,7 @@ export function AddHearingDialog({
       return;
     }
     setBusy(true);
-    const { ok, data } = await apiFetch(`/api/v1/cases/${caseUnitId}/hearings`, {
+    const { ok, data } = await apiFetch(`/api/cases/${caseUnitId}/hearings`, {
       method: "POST",
       json: {
         hearingDate,

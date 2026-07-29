@@ -90,7 +90,7 @@ export function CaseDocumentsPanel({
     if (!ok) return;
     setDeleting(d.unitId);
     try {
-      const res = await apiFetch(`/api/v1/documents/${d.unitId}`, {
+      const res = await apiFetch(`/api/documents/${d.unitId}`, {
         method: "DELETE",
       });
       if (!res.ok) {
@@ -248,7 +248,7 @@ export function CaseDocumentsPanel({
                           d.title?.trim() ||
                           `${d.unitId}.bin`;
                         const result = await apiDownload(
-                          `/api/v1/documents/${d.unitId}/download`,
+                          `/api/documents/${d.unitId}/download`,
                           filename
                         );
                         if (!result.ok) {

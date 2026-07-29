@@ -30,7 +30,7 @@ export function CasePicker({
       page: number;
       pageSize: number;
     }) =>
-      fetchPagedList<CaseOption>("/api/v1/cases", {
+      fetchPagedList<CaseOption>("/api/cases", {
         query,
         page,
         pageSize,

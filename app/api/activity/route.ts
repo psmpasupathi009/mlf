@@ -3,14 +3,11 @@ import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
 import { containsInsensitive } from "@/lib/db/search";
+import { decodeOpaqueId, encodeOpaqueId } from "@/lib/ids/opaque";
 import { istDayBounds } from "@/lib/utils/ist";
 
 function isYmd(s: string): boolean {
   return /^\d{4}-\d{2}-\d{2}$/.test(s);
-}
-
-function isObjectId(s: string): boolean {
-  return /^[a-f\d]{24}$/i.test(s);
 }
 
 export const GET = apiHandler(async (request) => {
@@ -22,7 +19,7 @@ export const GET = apiHandler(async (request) => {
   const limit = Number.isFinite(limitRaw)
     ? Math.min(Math.max(Math.trunc(limitRaw), 1), 100)
     : 40;
-  const cursor = url.searchParams.get("cursor")?.trim() || null;
+  const cursorRaw = url.searchParams.get("cursor")?.trim() || null;
   const entity = url.searchParams.get("entity")?.trim() || null;
   const actorUnitId = url.searchParams.get("actorUnitId")?.trim() || null;
   const action = url.searchParams.get("action")?.trim() || null;
@@ -39,8 +36,13 @@ export const GET = apiHandler(async (request) => {
   if (from && to && from > to) {
     return jsonFail("VALIDATION", "from must be on/before to", 400);
   }
-  if (cursor && !isObjectId(cursor)) {
-    return jsonFail("VALIDATION", "cursor must be a valid id", 400);
+
+  let cursorId: string | null = null;
+  if (cursorRaw) {
+    cursorId = decodeOpaqueId(cursorRaw);
+    if (!cursorId) {
+      return jsonFail("VALIDATION", "cursor must be a valid id", 400);
+    }
   }
 
   const where: Prisma.AuditLogWhereInput = {};
@@ -66,9 +68,9 @@ export const GET = apiHandler(async (request) => {
     where,
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
     take: limit + 1,
-    ...(cursor
+    ...(cursorId
       ? {
-          cursor: { id: cursor },
+          cursor: { id: cursorId },
           skip: 1,
         }
       : {}),
@@ -76,7 +78,8 @@ export const GET = apiHandler(async (request) => {
 
   const hasMore = rows.length > limit;
   const page = hasMore ? rows.slice(0, limit) : rows;
-  const nextCursor = hasMore ? page[page.length - 1]?.id ?? null : null;
+  const lastId = hasMore ? page[page.length - 1]?.id ?? null : null;
+  const nextCursor = lastId ? encodeOpaqueId(lastId) : null;
 
   const actorUnitIds = Array.from(
     new Set(
@@ -96,7 +99,7 @@ export const GET = apiHandler(async (request) => {
 
   return jsonOk({
     data: page.map((row) => ({
-      id: row.id,
+      id: encodeOpaqueId(row.id),
       action: row.action,
       entity: row.entity,
       entityUnitId: row.entityUnitId,

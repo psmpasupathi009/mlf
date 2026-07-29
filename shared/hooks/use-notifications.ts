@@ -30,7 +30,7 @@ export function useNotifications() {
 
   const refreshUnread = useCallback(async () => {
     const countRes = await apiFetch<UnreadEnvelope>(
-      "/api/v1/notifications/unread-count"
+      "/api/notifications/unread-count"
     );
     if (countRes.ok && typeof countRes.data?.unread === "number") {
       setUnread(countRes.data.unread);
@@ -40,9 +40,9 @@ export function useNotifications() {
   const refetch = useCallback(async () => {
     const [listRes, countRes] = await Promise.all([
       apiFetch<ListEnvelope>(
-        `/api/v1/notifications?page=1&pageSize=${LIST_LIMIT}`
+        `/api/notifications?page=1&pageSize=${LIST_LIMIT}`
       ),
-      apiFetch<UnreadEnvelope>("/api/v1/notifications/unread-count"),
+      apiFetch<UnreadEnvelope>("/api/notifications/unread-count"),
     ]);
 
     if (listRes.ok && listRes.data && typeof listRes.data === "object") {
@@ -62,7 +62,7 @@ export function useNotifications() {
       if (marking.current.has(unitId)) return true;
       marking.current.add(unitId);
       try {
-        const { ok } = await apiFetch(`/api/v1/notifications/${unitId}/read`, {
+        const { ok } = await apiFetch(`/api/notifications/${unitId}/read`, {
           method: "PATCH",
         });
         if (!ok) return false;
@@ -85,7 +85,7 @@ export function useNotifications() {
   );
 
   const markAllRead = useCallback(async () => {
-    const { ok } = await apiFetch("/api/v1/notifications/read-all", {
+    const { ok } = await apiFetch("/api/notifications/read-all", {
       method: "POST",
     });
     if (!ok) return false;
@@ -159,7 +159,7 @@ export function useNotifications() {
 
     const connect = () => {
       if (closed) return;
-      es = new EventSource("/api/v1/notifications/stream", {
+      es = new EventSource("/api/notifications/stream", {
         withCredentials: true,
       });
 

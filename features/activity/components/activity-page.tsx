@@ -551,7 +551,7 @@ export function ActivityPage() {
         setLoadMoreError(null);
       }
       const { ok, data } = await apiFetch(
-        `/api/v1/activity?${buildQuery(mode === "append" ? cursor : null)}`
+        `/api/activity?${buildQuery(mode === "append" ? cursor : null)}`
       );
       if (mode === "replace") setLoading(false);
       else setLoadingMore(false);

@@ -304,8 +304,8 @@ export function AppointmentFormDialog({
 
     const { ok, data } = await apiFetch(
       isCreate
-        ? "/api/v1/appointments"
-        : `/api/v1/appointments/${appointment!.unitId}`,
+        ? "/api/appointments"
+        : `/api/appointments/${appointment!.unitId}`,
       { method: isCreate ? "POST" : "PATCH", json: payload }
     );
     setBusy(false);

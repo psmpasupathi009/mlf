@@ -82,7 +82,7 @@ export function CaseDetailPage({
   const load = useCallback(async () => {
     setLoading(true);
     const { ok, data } = await apiFetch<DetailResponse>(
-      `/api/v1/cases/${unitId}`
+      `/api/cases/${unitId}`
     );
     setLoading(false);
     if (!ok) {
@@ -100,7 +100,7 @@ export function CaseDetailPage({
           collected: number;
           outstanding: number | null;
         } | null;
-      }>(`/api/v1/accounts?caseUnitId=${encodeURIComponent(unitId)}&pageSize=1`);
+      }>(`/api/accounts?caseUnitId=${encodeURIComponent(unitId)}&pageSize=1`);
       if (feeRes.ok) {
         const body = feeRes.data as unknown as {
           fee: {

@@ -85,7 +85,7 @@ export function DakPage({ user }: { user: PublicUser }) {
     if (dateFilter) params.set("date", dateFilter);
 
     const { ok, data } = await apiFetch<ListResponse>(
-      `/api/v1/dak?${params.toString()}`
+      `/api/dak?${params.toString()}`
     );
     setLoading(false);
     if (!ok) {
@@ -107,7 +107,7 @@ export function DakPage({ user }: { user: PublicUser }) {
   async function handleDelete(entry: DakSummary) {
     if (!confirm(`Delete dak entry “${entry.subject}”?`)) return;
     setBusyId(entry.unitId);
-    const res = await apiFetch(`/api/v1/dak/${entry.unitId}`, {
+    const res = await apiFetch(`/api/dak/${entry.unitId}`, {
       method: "DELETE",
     });
     setBusyId(null);
@@ -143,7 +143,7 @@ export function DakPage({ user }: { user: PublicUser }) {
                 if (dateFilter) params.set("date", dateFilter);
                 if (debouncedSearch) params.set("q", debouncedSearch);
                 const result = await apiDownload(
-                  `/api/v1/exports?${params.toString()}`,
+                  `/api/exports?${params.toString()}`,
                   "dak.xlsx"
                 );
                 if (!result.ok) toast.error(result.error ?? "Export failed");
@@ -406,7 +406,7 @@ export function DakPage({ user }: { user: PublicUser }) {
         open={importOpen}
         onOpenChange={setImportOpen}
         title="Import dak register"
-        endpoint="/api/v1/dak/import"
+        endpoint="/api/dak/import"
         sampleHref="/samples/dak.sample.csv"
         columnsHint="Required: direction (in|out), entryDate (YYYY-MM-DD), subject. Optional: fromTo, mode, trackingNo, caseUnitId, clientUnitId, notes."
         onImported={load}

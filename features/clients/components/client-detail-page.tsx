@@ -80,7 +80,7 @@ export function ClientDetailPage({
   const load = useCallback(async () => {
     setLoading(true);
     const { ok, data } = await apiFetch<DetailResponse>(
-      `/api/v1/clients/${unitId}`
+      `/api/clients/${unitId}`
     );
     setLoading(false);
     if (!ok) {

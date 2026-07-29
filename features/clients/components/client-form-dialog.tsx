@@ -171,7 +171,7 @@ export function ClientFormDialog({
     };
 
     const { ok, data } = await apiFetch<{ client: ClientSummary }>(
-      isEdit ? `/api/v1/clients/${client!.unitId}` : "/api/v1/clients",
+      isEdit ? `/api/clients/${client!.unitId}` : "/api/clients",
       { method: isEdit ? "PATCH" : "POST", json: payload }
     );
     setBusy(false);

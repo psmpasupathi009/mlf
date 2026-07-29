@@ -63,7 +63,7 @@ export function AdvocatePicker({
       page: number;
       pageSize: number;
     }) =>
-      fetchPagedList<AdvocateSummary>("/api/v1/advocates", {
+      fetchPagedList<AdvocateSummary>("/api/advocates", {
         query,
         page,
         pageSize,

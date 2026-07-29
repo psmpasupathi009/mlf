@@ -64,7 +64,7 @@ export function ClientsPage({ user }: { user: PublicUser }) {
     setLoading(true);
     const params = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
     if (debouncedSearch) params.set("q", debouncedSearch);
-    const { ok, data } = await apiFetch<ListResponse>(`/api/v1/clients?${params.toString()}`);
+    const { ok, data } = await apiFetch<ListResponse>(`/api/clients?${params.toString()}`);
     setLoading(false);
     if (!ok) {
       toast.error(getErrorMessage(data as Record<string, unknown>, "Failed to load clients"));
@@ -97,7 +97,7 @@ export function ClientsPage({ user }: { user: PublicUser }) {
                 const params = new URLSearchParams({ type: "clients" });
                 if (debouncedSearch) params.set("q", debouncedSearch);
                 const result = await apiDownload(
-                  `/api/v1/exports?${params.toString()}`,
+                  `/api/exports?${params.toString()}`,
                   "clients.xlsx"
                 );
                 if (!result.ok) toast.error(result.error ?? "Export failed");
@@ -243,7 +243,7 @@ export function ClientsPage({ user }: { user: PublicUser }) {
         open={importOpen}
         onOpenChange={setImportOpen}
         title="Import clients"
-        endpoint="/api/v1/clients/import"
+        endpoint="/api/clients/import"
         sampleHref="/samples/clients.sample.csv"
         columnsHint="Required: name, mobile. Optional: address, city, district, state, referredBy…"
         onImported={load}

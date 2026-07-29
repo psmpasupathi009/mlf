@@ -129,7 +129,7 @@ export function CasesPage({ user }: { user: PublicUser }) {
     void (async () => {
       const { ok, data } = await apiFetch<{
         client: { name: string; unitId: string };
-      }>(`/api/v1/clients/${clientUnitId}`);
+      }>(`/api/clients/${clientUnitId}`);
       if (cancelled || !ok) return;
       const body = data as { client?: { name?: string; unitId?: string } };
       if (body.client?.name && body.client?.unitId) {
@@ -163,7 +163,7 @@ export function CasesPage({ user }: { user: PublicUser }) {
     if (quick === "battaDue") params.set("battaDue", "1");
 
     const { ok, data } = await apiFetch<ListResponse>(
-      `/api/v1/cases?${params.toString()}`
+      `/api/cases?${params.toString()}`
     );
     setLoading(false);
     if (!ok) {
@@ -286,7 +286,7 @@ export function CasesPage({ user }: { user: PublicUser }) {
                   }
                   if (quick === "battaDue") params.set("battaDue", "1");
                   const result = await apiDownload(
-                    `/api/v1/exports?${params.toString()}`,
+                    `/api/exports?${params.toString()}`,
                     "cases.xlsx"
                   );
                   if (!result.ok) toast.error(result.error ?? "Export failed");
@@ -434,7 +434,7 @@ export function CasesPage({ user }: { user: PublicUser }) {
         open={importOpen}
         onOpenChange={setImportOpen}
         title="Import cases"
-        endpoint="/api/v1/cases/import"
+        endpoint="/api/cases/import"
         sampleHref="/samples/cases.sample.csv"
         columnsHint="Need clientMobile or clientUnitId. Optional: caseNumber, court, status, nextHearingAt…"
         onImported={load}
@@ -444,7 +444,7 @@ export function CasesPage({ user }: { user: PublicUser }) {
         open={hearingsImportOpen}
         onOpenChange={setHearingsImportOpen}
         title="Import hearings"
-        endpoint="/api/v1/hearings/import"
+        endpoint="/api/hearings/import"
         sampleHref="/samples/hearings.sample.csv"
         columnsHint="Need caseUnitId or caseNumber, plus hearingDate (YYYY-MM-DD). Optional: purpose, notes."
         onImported={load}

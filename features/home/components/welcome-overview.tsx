@@ -64,7 +64,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
       setLoading(true);
       setLoadError(null);
       const res = await apiFetch<{ summary: DashboardSummary } & { error?: string; message?: string }>(
-        "/api/v1/dashboard/summary"
+        "/api/dashboard/summary"
       );
       if (!cancelled) {
         if (res.ok && res.data && typeof res.data === "object" && "summary" in res.data) {
@@ -407,7 +407,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
               setLoadError(null);
               void (async () => {
                 const res = await apiFetch<{ summary: DashboardSummary }>(
-                  "/api/v1/dashboard/summary"
+                  "/api/dashboard/summary"
                 );
                 if (
                   res.ok &&

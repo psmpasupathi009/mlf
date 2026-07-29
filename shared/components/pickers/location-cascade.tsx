@@ -52,7 +52,7 @@ export function LocationCascade({ state, district, city, onChange }: Props) {
       });
       if (query.trim()) q.set("q", query.trim());
       const { ok, data } = await apiFetch<MetaPage>(
-        `/api/v1/locations/meta?${q.toString()}`
+        `/api/locations/meta?${q.toString()}`
       );
       if (!ok || !data || typeof data !== "object") {
         throw new Error("Failed to load districts");

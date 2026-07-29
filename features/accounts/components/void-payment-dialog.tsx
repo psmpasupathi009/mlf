@@ -38,7 +38,7 @@ export function VoidPaymentDialog({
       return;
     }
     setBusy(true);
-    const { ok, data } = await apiFetch(`/api/v1/accounts/${unitId}/void`, {
+    const { ok, data } = await apiFetch(`/api/accounts/${unitId}/void`, {
       method: "POST",
       json: { reason },
     });

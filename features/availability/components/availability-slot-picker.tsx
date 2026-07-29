@@ -120,7 +120,7 @@ export function AvailabilitySlotPicker({
           params.set("excludeAppointmentUnitId", excludeAppointmentUnitId);
         }
         const { ok, data } = await apiFetch<DayAvailability>(
-          `/api/v1/appointments/availability?${params.toString()}`
+          `/api/appointments/availability?${params.toString()}`
         );
         if (cancelled) return;
         setLoading(false);
