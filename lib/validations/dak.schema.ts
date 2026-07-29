@@ -34,8 +34,6 @@ export const importDakRowSchema = z.object({
   entryDate: z.string().trim().min(1, "entryDate is required (YYYY-MM-DD)"),
   subject: z.string().trim().min(1, "Subject is required").max(300),
   fromTo: optionalText(200),
-  mode: optionalText(80),
-  trackingNo: optionalText(80),
   caseUnitId: optionalText(40),
   clientUnitId: optionalText(40),
   notes: optionalText(1000),

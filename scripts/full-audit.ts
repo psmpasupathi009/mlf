@@ -297,7 +297,12 @@ async function main() {
     "POST",
     "/api/clients/import",
     "CSV import clients (dry-run)",
-    { dryRun: true, rows: [] },
+    {
+      dryRun: true,
+      rows: [
+        { name: `Audit Import Client ${stamp}`, mobile: `97${stamp}${stamp.slice(0, 2)}`.slice(0, 10) },
+      ],
+    },
     (s) => s >= 200 && s < 500
   );
 
@@ -374,7 +379,19 @@ async function main() {
     "POST",
     "/api/cases/import",
     "CSV import cases (dry-run)",
-    { dryRun: true, rows: [] },
+    {
+      dryRun: true,
+      rows: clientUnitId
+        ? [
+            {
+              clientUnitId,
+              caseType: "OS",
+              status: "enquiry",
+              notes: "audit import dry-run",
+            },
+          ]
+        : [],
+    },
     (s) => s >= 200 && s < 500
   );
   await testApi(
@@ -383,7 +400,12 @@ async function main() {
     "POST",
     "/api/hearings/import",
     "CSV import hearings (dry-run)",
-    { dryRun: true, rows: [] },
+    {
+      dryRun: true,
+      rows: caseUnitId
+        ? [{ caseUnitId, hearingDate: ymd, purpose: "Audit import hearing" }]
+        : [],
+    },
     (s) => s >= 200 && s < 500
   );
   if (hearingUnitId) {
@@ -534,7 +556,20 @@ async function main() {
     "POST",
     "/api/accounts/import",
     "CSV import payments (dry-run)",
-    { dryRun: true, rows: [] },
+    {
+      dryRun: true,
+      rows: clientUnitId
+        ? [
+            {
+              clientUnitId,
+              ...(caseUnitId ? { caseUnitId } : {}),
+              type: "advance",
+              amount: "1000",
+              status: "pending",
+            },
+          ]
+        : [],
+    },
     (s) => s >= 200 && s < 500
   );
 
@@ -636,7 +671,22 @@ async function main() {
     "POST",
     "/api/appointments/import",
     "CSV import appointments (dry-run)",
-    { dryRun: true, rows: [] },
+    {
+      dryRun: true,
+      rows: advocateMobile
+        ? [
+            {
+              title: "Audit import appt",
+              scheduledAt: `${ymd}T10:30`,
+              advocateMobile,
+              ...(clientUnitId ? { clientUnitId } : {}),
+              ...(caseUnitId ? { caseUnitId } : {}),
+              durationMin: "30",
+              mode: "office",
+            },
+          ]
+        : [],
+    },
     (s) => s >= 200 && s < 500
   );
 
@@ -731,7 +781,19 @@ async function main() {
     "POST",
     "/api/dak/import",
     "CSV import dak (dry-run)",
-    { dryRun: true, rows: [] },
+    {
+      dryRun: true,
+      rows: [
+        {
+          direction: "in",
+          entryDate: ymd,
+          subject: "Audit import dak",
+          fromTo: "District Court",
+          ...(caseUnitId ? { caseUnitId } : {}),
+          ...(clientUnitId ? { clientUnitId } : {}),
+        },
+      ],
+    },
     (s) => s >= 200 && s < 500
   );
 
@@ -763,7 +825,17 @@ async function main() {
     "POST",
     "/api/tasks/import",
     "CSV import tasks (dry-run)",
-    { dryRun: true, rows: [] },
+    {
+      dryRun: true,
+      rows: [
+        {
+          title: "Audit import task",
+          workDate: ymd,
+          ...(caseUnitId ? { caseUnitId } : {}),
+          kind: "allotment",
+        },
+      ],
+    },
     (s) => s >= 200 && s < 500
   );
 
@@ -809,7 +881,16 @@ async function main() {
     "POST",
     "/api/employees/import",
     "CSV import employees (dry-run)",
-    { dryRun: true, rows: [] },
+    {
+      dryRun: true,
+      rows: [
+        {
+          name: `Audit Import Emp ${stamp}`,
+          designation: "Clerk",
+          mobile: `96${stamp}${stamp.slice(0, 2)}`.slice(0, 10),
+        },
+      ],
+    },
     (s) => s >= 200 && s < 500
   );
   await testApi(

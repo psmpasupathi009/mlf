@@ -3,12 +3,21 @@ import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
 import { writeAudit } from "@/lib/audit";
-import { normalizeMobile } from "@/lib/auth/mobile";
 import { importPaymentsSchema } from "@/lib/validations/accounts.schema";
 import { compliance } from "@/config/company/compliance";
 import { isPaymentPurpose } from "@/features/accounts/lib/payment-purposes";
 import type { PaymentStatus, PaymentType } from "@prisma/client";
 import { assertImportRateLimit } from "@/lib/rate-limit/guards";
+import {
+  caseBelongsToClient,
+  findCaseByUnitId,
+  findClientByUnitId,
+} from "@/lib/imports/lookups";
+import {
+  findIgnoredImportColumns,
+  IMPORT_PAYMENT_COLUMNS,
+} from "@/lib/imports/columns";
+import { parseIstDateInput } from "@/lib/utils/ist";
 
 type RowResult = {
   row: number;
@@ -28,6 +37,9 @@ export const POST = apiHandler(async (request) => {
   if (limited) return limited;
 
   const raw = await request.json();
+  const ignoredColumns = Array.isArray(raw?.rows)
+    ? findIgnoredImportColumns(raw.rows as Record<string, string>[], IMPORT_PAYMENT_COLUMNS)
+    : [];
   const parsed = importPaymentsSchema.safeParse(raw);
   if (!parsed.success) {
     return jsonFail(
@@ -51,13 +63,13 @@ export const POST = apiHandler(async (request) => {
   const createdUnitIds: string[] = [];
 
   for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
+    const row = rows[i]!;
     const rowNum = i + 2;
 
     if (!isPaymentPurpose(row.type)) {
       results.push({
         row: rowNum,
-        unitId: row.unitId || null,
+        unitId: null,
         status: "error",
         message: "Invalid payment type",
       });
@@ -68,7 +80,7 @@ export const POST = apiHandler(async (request) => {
     if (!Number.isFinite(amount) || amount <= 0) {
       results.push({
         row: rowNum,
-        unitId: row.unitId || null,
+        unitId: null,
         status: "error",
         message: "Invalid amount",
       });
@@ -77,7 +89,7 @@ export const POST = apiHandler(async (request) => {
     if (type === "other" && !row.notes?.trim()) {
       results.push({
         row: rowNum,
-        unitId: row.unitId || null,
+        unitId: null,
         status: "error",
         message: "Notes required for Other purpose",
       });
@@ -85,48 +97,34 @@ export const POST = apiHandler(async (request) => {
     }
 
     try {
-      const client = row.clientUnitId
-        ? await prisma.client.findUnique({ where: { unitId: row.clientUnitId } })
-        : row.clientMobile
-          ? await prisma.client.findFirst({
-              where: {
-                mobile:
-                  normalizeMobile(row.clientMobile) ?? row.clientMobile,
-              },
-            })
-          : null;
-
+      const client = await findClientByUnitId(row.clientUnitId);
       if (!client) {
         results.push({
           row: rowNum,
-          unitId: row.unitId || null,
+          unitId: null,
           status: "error",
-          message: "Client not found",
+          message: "Client not found (set clientUnitId)",
         });
         continue;
       }
 
       let caseUnitId: string | undefined;
       let caseId: string | undefined;
-      if (row.caseUnitId || row.caseNumber) {
-        const caseItem = row.caseUnitId
-          ? await prisma.case.findUnique({ where: { unitId: row.caseUnitId } })
-          : await prisma.case.findFirst({
-              where: { caseNumber: row.caseNumber },
-            });
+      if (row.caseUnitId?.trim()) {
+        const caseItem = await findCaseByUnitId(row.caseUnitId);
         if (!caseItem) {
           results.push({
             row: rowNum,
-            unitId: row.unitId || null,
+            unitId: null,
             status: "error",
             message: "Case not found",
           });
           continue;
         }
-        if (caseItem.clientUnitId !== client.unitId) {
+        if (!caseBelongsToClient(caseItem, client.unitId)) {
           results.push({
             row: rowNum,
-            unitId: row.unitId || null,
+            unitId: null,
             status: "error",
             message: "Case does not belong to client",
           });
@@ -142,7 +140,7 @@ export const POST = apiHandler(async (request) => {
         if (rawStatus === "void") {
           results.push({
             row: rowNum,
-            unitId: row.unitId || null,
+            unitId: null,
             status: "error",
             message: "Void status not allowed via import",
           });
@@ -151,7 +149,7 @@ export const POST = apiHandler(async (request) => {
         if (!VALID_STATUS.has(rawStatus)) {
           results.push({
             row: rowNum,
-            unitId: row.unitId || null,
+            unitId: null,
             status: "error",
             message: "Invalid status (use pending or paid)",
           });
@@ -160,19 +158,18 @@ export const POST = apiHandler(async (request) => {
         status = rawStatus;
       }
 
-      const paidOnRaw = row.paidOn ? new Date(row.paidOn) : null;
       const paidOn =
         status === "paid"
-          ? paidOnRaw && !Number.isNaN(paidOnRaw.getTime())
-            ? paidOnRaw
+          ? row.paidOn?.trim()
+            ? parseIstDateInput(row.paidOn)
             : null
           : null;
       if (status === "paid" && !paidOn) {
         results.push({
           row: rowNum,
-          unitId: row.unitId || null,
+          unitId: null,
           status: "error",
-          message: "paidOn required when status is paid",
+          message: "paidOn required when status is paid (YYYY-MM-DD)",
         });
         continue;
       }
@@ -180,7 +177,7 @@ export const POST = apiHandler(async (request) => {
       if (dryRun) {
         results.push({
           row: rowNum,
-          unitId: row.unitId || null,
+          unitId: null,
           status: "ok",
           message: "Will create",
         });
@@ -214,7 +211,7 @@ export const POST = apiHandler(async (request) => {
     } catch {
       results.push({
         row: rowNum,
-        unitId: row.unitId || null,
+        unitId: null,
         status: "error",
         message: "Failed to save row",
       });
@@ -241,5 +238,6 @@ export const POST = apiHandler(async (request) => {
     succeeded: results.filter((r) => r.status === "ok").length,
     failed: results.filter((r) => r.status === "error").length,
     results,
+    ignoredColumns,
   });
 });

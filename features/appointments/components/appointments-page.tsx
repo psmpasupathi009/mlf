@@ -737,7 +737,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
         title="Import appointments"
         endpoint="/api/appointments/import"
         sampleHref="/samples/appointments.sample.csv"
-        columnsHint="Required: title, scheduledAt (ISO), advocateMobile. Optional: clientUnitId or clientMobile, caseUnitId, durationMin, mode, location, notes. Slot clash checks are skipped on bulk import."
+        columnsHint="Required: title, scheduledAt (ISO), advocateMobile. Optional: clientUnitId, caseUnitId, durationMin, mode. Slot clash checks are skipped on bulk import."
         onImported={load}
       />
     </section>

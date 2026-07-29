@@ -5,9 +5,14 @@ import { nextUnitId } from "@/lib/ids";
 import { writeAudit } from "@/lib/audit";
 import { compliance } from "@/config/company/compliance";
 import { importTasksSchema, officeTaskKindEnum } from "@/lib/validations/tasks.schema";
-import { istDayBounds } from "@/lib/utils/ist";
+import { parseIstDateInput } from "@/lib/utils/ist";
 import { notifyUser, scheduleNotify } from "@/lib/notifications/notify";
 import { assertImportRateLimit } from "@/lib/rate-limit/guards";
+import { findCaseByUnitId, findUserByUnitId } from "@/lib/imports/lookups";
+import {
+  findIgnoredImportColumns,
+  IMPORT_TASK_COLUMNS,
+} from "@/lib/imports/columns";
 
 type RowResult = {
   row: number;
@@ -15,14 +20,6 @@ type RowResult = {
   status: "ok" | "error";
   message: string;
 };
-
-function parseDay(value: string | undefined | null) {
-  if (!value?.trim()) return null;
-  const s = value.trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return istDayBounds(s).start;
-  const d = new Date(s);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
 
 export const POST = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "tasks", "create");
@@ -32,6 +29,9 @@ export const POST = apiHandler(async (request) => {
   if (limited) return limited;
 
   const raw = await request.json();
+  const ignoredColumns = Array.isArray(raw?.rows)
+    ? findIgnoredImportColumns(raw.rows as Record<string, string>[], IMPORT_TASK_COLUMNS)
+    : [];
   const parsed = importTasksSchema.safeParse(raw);
   if (!parsed.success) {
     return jsonFail(
@@ -54,10 +54,10 @@ export const POST = apiHandler(async (request) => {
   const results: RowResult[] = [];
 
   for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
+    const row = rows[i]!;
     const rowNum = i + 2;
 
-    const workDate = parseDay(row.workDate);
+    const workDate = parseIstDateInput(row.workDate);
     if (!workDate) {
       results.push({
         row: rowNum,
@@ -68,7 +68,7 @@ export const POST = apiHandler(async (request) => {
       continue;
     }
 
-    let kind = "general";
+    let kind = "allotment";
     if (row.kind?.trim()) {
       const kindParsed = officeTaskKindEnum.safeParse(row.kind.trim());
       if (!kindParsed.success) {
@@ -83,24 +83,10 @@ export const POST = apiHandler(async (request) => {
       kind = kindParsed.data;
     }
 
-    const dueDate = row.dueDate?.trim() ? parseDay(row.dueDate) : null;
-    if (row.dueDate?.trim() && !dueDate) {
-      results.push({
-        row: rowNum,
-        unitId: null,
-        status: "error",
-        message: "Invalid dueDate (use YYYY-MM-DD)",
-      });
-      continue;
-    }
-
     let assigneeId: string | undefined;
     let assigneeUnitId: string | undefined;
     if (row.assigneeUnitId?.trim()) {
-      const person = await prisma.user.findUnique({
-        where: { unitId: row.assigneeUnitId.trim() },
-        select: { id: true, unitId: true },
-      });
+      const person = await findUserByUnitId(row.assigneeUnitId);
       if (!person) {
         results.push({
           row: rowNum,
@@ -116,10 +102,7 @@ export const POST = apiHandler(async (request) => {
 
     let caseUnitId: string | undefined;
     if (row.caseUnitId?.trim()) {
-      const caseItem = await prisma.case.findUnique({
-        where: { unitId: row.caseUnitId.trim() },
-        select: { unitId: true },
-      });
+      const caseItem = await findCaseByUnitId(row.caseUnitId);
       if (!caseItem) {
         results.push({
           row: rowNum,
@@ -151,11 +134,9 @@ export const POST = apiHandler(async (request) => {
           kind,
           status: "open",
           workDate,
-          dueDate: dueDate ?? undefined,
           assigneeUnitId,
           assigneeId,
           caseUnitId,
-          notes: row.notes?.trim() || undefined,
           createdById: user.id,
         },
       });
@@ -167,7 +148,7 @@ export const POST = apiHandler(async (request) => {
             userUnitId: assigneeUnitId!,
             type: "task_assigned",
             title: `Task assigned: ${created.title}`,
-            body: created.notes ?? null,
+            body: null,
             href: "/tasks",
             meta: { taskUnitId: created.unitId },
           });
@@ -211,5 +192,6 @@ export const POST = apiHandler(async (request) => {
     succeeded,
     failed,
     results,
+    ignoredColumns,
   });
 });

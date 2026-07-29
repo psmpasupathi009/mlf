@@ -5,7 +5,13 @@ import { nextUnitId } from "@/lib/ids";
 import { writeAudit } from "@/lib/audit";
 import { importHearingsSchema } from "@/lib/validations/cases.schema";
 import { compliance } from "@/config/company/compliance";
+import { parseIstDateInput } from "@/lib/utils/ist";
 import { assertImportRateLimit } from "@/lib/rate-limit/guards";
+import { findCaseByUnitId } from "@/lib/imports/lookups";
+import {
+  findIgnoredImportColumns,
+  IMPORT_HEARING_COLUMNS,
+} from "@/lib/imports/columns";
 
 type RowResult = {
   row: number;
@@ -22,6 +28,9 @@ export const POST = apiHandler(async (request) => {
   if (limited) return limited;
 
   const raw = await request.json();
+  const ignoredColumns = Array.isArray(raw?.rows)
+    ? findIgnoredImportColumns(raw.rows as Record<string, string>[], IMPORT_HEARING_COLUMNS)
+    : [];
   const parsed = importHearingsSchema.safeParse(raw);
   if (!parsed.success) {
     return jsonFail(
@@ -48,31 +57,24 @@ export const POST = apiHandler(async (request) => {
     const rowNum = i + 2;
 
     try {
-      const caseItem = row.caseUnitId?.trim()
-        ? await prisma.case.findUnique({ where: { unitId: row.caseUnitId.trim() } })
-        : row.caseNumber?.trim()
-          ? await prisma.case.findFirst({
-              where: { caseNumber: row.caseNumber.trim() },
-            })
-          : null;
-
+      const caseItem = await findCaseByUnitId(row.caseUnitId);
       if (!caseItem) {
         results.push({
           row: rowNum,
           unitId: null,
           status: "error",
-          message: "Case not found (set caseUnitId or caseNumber)",
+          message: "Case not found (set caseUnitId)",
         });
         continue;
       }
 
-      const hearingDate = new Date(row.hearingDate);
-      if (Number.isNaN(hearingDate.getTime())) {
+      const hearingDate = parseIstDateInput(row.hearingDate);
+      if (!hearingDate) {
         results.push({
           row: rowNum,
           unitId: null,
           status: "error",
-          message: "Invalid hearingDate",
+          message: "Invalid hearingDate (use YYYY-MM-DD)",
         });
         continue;
       }
@@ -104,7 +106,6 @@ export const POST = apiHandler(async (request) => {
           where: { id: caseItem.id },
           data: {
             nextHearingAt: hearingDate,
-            // Do not auto-promote pipeline status on hearing import.
             ...((caseItem.status === "pending" || caseItem.status === "listed") &&
             (caseItem.caseNumber || caseItem.cnr)
               ? { status: "active" as const }
@@ -147,5 +148,6 @@ export const POST = apiHandler(async (request) => {
     succeeded: okCount,
     failed: errCount,
     results,
+    ignoredColumns,
   });
 });

@@ -61,8 +61,6 @@ export const importEmployeesRowSchema = z.object({
     { message: "Select a designation" }
   ),
   mobile: z.string().trim().min(10, "Enter a valid mobile number").max(15),
-  email: z.string().trim().optional().or(z.literal("")),
-  address: z.string().trim().optional().or(z.literal("")),
 });
 
 export const importEmployeesSchema = z.object({

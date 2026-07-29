@@ -52,12 +52,9 @@ export const importAppointmentsRowSchema = z.object({
   scheduledAt: z.string().trim().min(1, "scheduledAt is required"),
   advocateMobile: z.string().trim().min(10, "advocateMobile is required").max(15),
   clientUnitId: optionalText(40),
-  clientMobile: optionalText(15),
   caseUnitId: optionalText(40),
   durationMin: optionalText(10),
   mode: optionalText(20),
-  location: optionalText(200),
-  notes: optionalText(1000),
 });
 
 export const importAppointmentsSchema = z.object({

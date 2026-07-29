@@ -30,6 +30,7 @@ type ImportResponse = {
   succeeded: number;
   failed: number;
   results: RowResult[];
+  ignoredColumns?: string[];
 };
 
 export function ImportDialog({
@@ -79,6 +80,11 @@ export function ImportDialog({
 
     setResult(data);
     if (dryRun) {
+      if (data.ignoredColumns && data.ignoredColumns.length > 0) {
+        toast.message(
+          `Ignored columns (not imported): ${data.ignoredColumns.join(", ")}`
+        );
+      }
       if (data.failed === 0) {
         toast.success(`Dry-run OK — ${data.succeeded} row(s) ready`);
       } else {
@@ -170,6 +176,11 @@ export function ImportDialog({
                 {result.failed} failed
                 {result.dryRun ? " (dry-run)" : ""}
               </p>
+              {result.ignoredColumns && result.ignoredColumns.length > 0 ? (
+                <p className="mb-1 text-xs text-amber-800">
+                  Ignored columns: {result.ignoredColumns.join(", ")}
+                </p>
+              ) : null}
               {result.results.map((r) => (
                 <div key={r.row} className="flex min-w-0 items-start gap-2 text-xs">
                   <Badge variant={r.status === "ok" ? "success" : "destructive"}>

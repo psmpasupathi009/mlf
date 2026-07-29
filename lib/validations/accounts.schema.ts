@@ -73,11 +73,8 @@ export const voidPaymentSchema = z.object({
 });
 
 export const importPaymentsRowSchema = z.object({
-  unitId: z.string().trim().optional().or(z.literal("")),
-  clientMobile: z.string().trim().optional().or(z.literal("")),
-  clientUnitId: z.string().trim().optional().or(z.literal("")),
+  clientUnitId: z.string().trim().min(1, "clientUnitId is required"),
   caseUnitId: z.string().trim().optional().or(z.literal("")),
-  caseNumber: z.string().trim().optional().or(z.literal("")),
   type: z.string().trim(),
   amount: z.string().trim(),
   status: z.string().trim().optional().or(z.literal("")),

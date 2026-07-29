@@ -7,7 +7,7 @@ import { normalizeMobile } from "@/lib/auth/mobile";
 import { createEmployeeSchema } from "@/lib/validations/employees.schema";
 import { requireAdminToAssignAdmin } from "@/lib/rbac/employee-guards";
 import { toEmployeeSummary } from "@/features/employees/server/serialize";
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
 import { containsInsensitive } from "@/lib/db/search";
 
 const EMPLOYEE_AUDIT_KEYS = [

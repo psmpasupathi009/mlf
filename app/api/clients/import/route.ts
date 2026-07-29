@@ -8,6 +8,14 @@ import { normalizeMobile } from "@/lib/auth/mobile";
 import { importClientsSchema } from "@/lib/validations/clients.schema";
 import { compliance } from "@/config/company/compliance";
 import { assertImportRateLimit } from "@/lib/rate-limit/guards";
+import {
+  findClientByMobile,
+  findClientByUnitId,
+} from "@/lib/imports/lookups";
+import {
+  findIgnoredImportColumns,
+  IMPORT_CLIENT_COLUMNS,
+} from "@/lib/imports/columns";
 
 type RowResult = { row: number; unitId: string | null; status: "ok" | "error"; message: string };
 
@@ -20,6 +28,9 @@ export const POST = apiHandler(async (request) => {
   const canEdit = await hasPermission(user.id, "clients", "edit");
 
   const raw = await request.json();
+  const ignoredColumns = Array.isArray(raw?.rows)
+    ? findIgnoredImportColumns(raw.rows as Record<string, string>[], IMPORT_CLIENT_COLUMNS)
+    : [];
   const parsed = importClientsSchema.safeParse(raw);
   if (!parsed.success) {
     return jsonFail("VALIDATION", parsed.error.issues[0]?.message ?? "Invalid request", 400, parsed.error.issues);
@@ -44,8 +55,9 @@ export const POST = apiHandler(async (request) => {
 
     try {
       const existingByUnitId = row.unitId
-        ? await prisma.client.findUnique({ where: { unitId: row.unitId } })
+        ? await findClientByUnitId(row.unitId)
         : null;
+      const existingByMobile = await findClientByMobile(mobile);
 
       if (row.unitId?.trim() && !existingByUnitId) {
         results.push({
@@ -53,6 +65,26 @@ export const POST = apiHandler(async (request) => {
           unitId: row.unitId,
           status: "error",
           message: "Client unitId not found (remove unitId to create a new client)",
+        });
+        continue;
+      }
+
+      if (existingByUnitId && existingByUnitId.mobile !== mobile && existingByMobile) {
+        results.push({
+          row: rowNum,
+          unitId: row.unitId || null,
+          status: "error",
+          message: "Mobile already used by another client",
+        });
+        continue;
+      }
+
+      if (!existingByUnitId && existingByMobile) {
+        results.push({
+          row: rowNum,
+          unitId: existingByMobile.unitId,
+          status: "error",
+          message: "Mobile already registered (set unitId to update that client)",
         });
         continue;
       }
@@ -82,24 +114,7 @@ export const POST = apiHandler(async (request) => {
           where: { id: existingByUnitId.id },
           data: {
             name: row.name,
-            fatherOrSpouse: row.fatherOrSpouse || undefined,
-            occupation: row.occupation || undefined,
-            gender: row.gender || undefined,
             mobile,
-            altMobile: row.altMobile ? normalizeMobile(row.altMobile) ?? row.altMobile : undefined,
-            email: row.email || undefined,
-            address: row.address || undefined,
-            city: row.city || undefined,
-            district: row.district || undefined,
-            state: row.state || undefined,
-            aadhaarLast4: row.aadhaarLast4 || undefined,
-            referredBy: row.referredBy || undefined,
-            matterBrief: row.matterBrief || undefined,
-            notes: row.notes || undefined,
-            smsConsent:
-              row.smsConsent === "" || row.smsConsent == null
-                ? undefined
-                : !["false", "0", "no"].includes(String(row.smsConsent).toLowerCase()),
           },
         });
         results.push({ row: rowNum, unitId: updated.unitId, status: "ok", message: "Updated" });
@@ -109,23 +124,7 @@ export const POST = apiHandler(async (request) => {
           data: {
             unitId,
             name: row.name,
-            fatherOrSpouse: row.fatherOrSpouse || undefined,
-            occupation: row.occupation || undefined,
-            gender: row.gender || undefined,
             mobile,
-            altMobile: row.altMobile ? normalizeMobile(row.altMobile) ?? row.altMobile : undefined,
-            email: row.email || undefined,
-            address: row.address || undefined,
-            city: row.city || undefined,
-            district: row.district || undefined,
-            state: row.state || undefined,
-            aadhaarLast4: row.aadhaarLast4 || undefined,
-            referredBy: row.referredBy || undefined,
-            matterBrief: row.matterBrief || undefined,
-            notes: row.notes || undefined,
-            smsConsent: !["false", "0", "no"].includes(
-              String(row.smsConsent || "true").toLowerCase()
-            ),
             createdById: user.id,
           },
         });
@@ -155,5 +154,6 @@ export const POST = apiHandler(async (request) => {
     succeeded: results.filter((r) => r.status === "ok").length,
     failed: results.filter((r) => r.status === "error").length,
     results,
+    ignoredColumns,
   });
 });

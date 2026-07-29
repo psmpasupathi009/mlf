@@ -8,12 +8,20 @@ import {
   appointmentModeEnum,
   importAppointmentsSchema,
 } from "@/lib/validations/appointments.schema";
-import { normalizeMobile, displayMobile } from "@/lib/auth/mobile";
 import {
   canBookForAnyAdvocate,
   resolveBookingAdvocateMobile,
 } from "@/lib/appointments/booking-rules";
 import { assertImportRateLimit } from "@/lib/rate-limit/guards";
+import {
+  caseBelongsToClient,
+  findCaseByUnitId,
+  findClientByUnitId,
+} from "@/lib/imports/lookups";
+import {
+  findIgnoredImportColumns,
+  IMPORT_APPOINTMENT_COLUMNS,
+} from "@/lib/imports/columns";
 
 type RowResult = {
   row: number;
@@ -30,6 +38,12 @@ export const POST = apiHandler(async (request) => {
   if (limited) return limited;
 
   const raw = await request.json();
+  const ignoredColumns = Array.isArray(raw?.rows)
+    ? findIgnoredImportColumns(
+        raw.rows as Record<string, string>[],
+        IMPORT_APPOINTMENT_COLUMNS
+      )
+    : [];
   const parsed = importAppointmentsSchema.safeParse(raw);
   if (!parsed.success) {
     return jsonFail(
@@ -52,7 +66,7 @@ export const POST = apiHandler(async (request) => {
   const results: RowResult[] = [];
 
   for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
+    const row = rows[i]!;
     const rowNum = i + 2;
 
     const scheduledAt = new Date(row.scheduledAt.trim());
@@ -98,10 +112,7 @@ export const POST = apiHandler(async (request) => {
 
     let clientUnitId: string | undefined;
     if (row.clientUnitId?.trim()) {
-      const client = await prisma.client.findUnique({
-        where: { unitId: row.clientUnitId.trim() },
-        select: { unitId: true },
-      });
+      const client = await findClientByUnitId(row.clientUnitId);
       if (!client) {
         results.push({
           row: rowNum,
@@ -112,53 +123,27 @@ export const POST = apiHandler(async (request) => {
         continue;
       }
       clientUnitId = client.unitId;
-    } else if (row.clientMobile?.trim()) {
-      const mobile = normalizeMobile(row.clientMobile);
-      if (!mobile) {
-        results.push({
-          row: rowNum,
-          unitId: null,
-          status: "error",
-          message: "Invalid clientMobile",
-        });
-        continue;
-      }
-      const ten = displayMobile(mobile);
-      const client = await prisma.client.findFirst({
-        where: {
-          OR: [
-            { mobile },
-            { mobile: ten },
-            { mobile: `91${ten}` },
-          ],
-        },
-        select: { unitId: true },
-      });
-      if (!client) {
-        results.push({
-          row: rowNum,
-          unitId: null,
-          status: "error",
-          message: `No client with mobile ${ten}`,
-        });
-        continue;
-      }
-      clientUnitId = client.unitId;
     }
 
     let caseId: string | undefined;
     let caseUnitId: string | undefined;
     if (row.caseUnitId?.trim()) {
-      const caseItem = await prisma.case.findUnique({
-        where: { unitId: row.caseUnitId.trim() },
-        select: { id: true, unitId: true },
-      });
+      const caseItem = await findCaseByUnitId(row.caseUnitId);
       if (!caseItem) {
         results.push({
           row: rowNum,
           unitId: null,
           status: "error",
           message: `Case not found: ${row.caseUnitId}`,
+        });
+        continue;
+      }
+      if (clientUnitId && !caseBelongsToClient(caseItem, clientUnitId)) {
+        results.push({
+          row: rowNum,
+          unitId: null,
+          status: "error",
+          message: "Case does not belong to client",
         });
         continue;
       }
@@ -229,8 +214,6 @@ export const POST = apiHandler(async (request) => {
           scheduledAt,
           durationMin,
           mode,
-          location: row.location?.trim() || undefined,
-          notes: row.notes?.trim() || undefined,
           createdById: user.id,
         },
       });
@@ -269,5 +252,6 @@ export const POST = apiHandler(async (request) => {
     succeeded: results.filter((r) => r.status === "ok").length,
     failed: results.filter((r) => r.status === "error").length,
     results,
+    ignoredColumns,
   });
 });

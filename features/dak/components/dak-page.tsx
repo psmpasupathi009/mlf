@@ -408,7 +408,7 @@ export function DakPage({ user }: { user: PublicUser }) {
         title="Import dak register"
         endpoint="/api/dak/import"
         sampleHref="/samples/dak.sample.csv"
-        columnsHint="Required: direction (in|out), entryDate (YYYY-MM-DD), subject. Optional: fromTo, mode, trackingNo, caseUnitId, clientUnitId, notes."
+        columnsHint="Required: direction (in|out), entryDate (YYYY-MM-DD), subject. Optional: fromTo, caseUnitId, clientUnitId, notes."
         onImported={load}
       />
     </section>

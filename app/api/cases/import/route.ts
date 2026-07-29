@@ -12,8 +12,13 @@ import {
   CASE_PIPELINE_STATUSES,
   normalizeCaseStatus,
 } from "@/config/company/case-pipeline";
-import { istDayBounds } from "@/lib/utils/ist";
+import { parseIstDateInput } from "@/lib/utils/ist";
 import { assertImportRateLimit } from "@/lib/rate-limit/guards";
+import { findCaseByUnitId, findClientByUnitId } from "@/lib/imports/lookups";
+import {
+  findIgnoredImportColumns,
+  IMPORT_CASE_COLUMNS,
+} from "@/lib/imports/columns";
 
 type RowResult = { row: number; unitId: string | null; status: "ok" | "error"; message: string };
 
@@ -22,14 +27,6 @@ const VALID_STATUS = new Set<string>([
   "pending",
   "listed",
 ]);
-
-function parseDay(value: string | undefined | null) {
-  if (!value?.trim()) return undefined;
-  const s = value.trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return istDayBounds(s).start;
-  const d = new Date(s);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
 
 export const POST = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "cases", "create");
@@ -40,6 +37,9 @@ export const POST = apiHandler(async (request) => {
   const canEdit = await hasPermission(user.id, "cases", "edit");
 
   const raw = await request.json();
+  const ignoredColumns = Array.isArray(raw?.rows)
+    ? findIgnoredImportColumns(raw.rows as Record<string, string>[], IMPORT_CASE_COLUMNS)
+    : [];
   const parsed = importCasesSchema.safeParse(raw);
   if (!parsed.success) {
     return jsonFail("VALIDATION", parsed.error.issues[0]?.message ?? "Invalid request", 400, parsed.error.issues);
@@ -57,26 +57,22 @@ export const POST = apiHandler(async (request) => {
     const rowNum = i + 2;
 
     try {
-      const client = row.clientUnitId
-        ? await prisma.client.findUnique({ where: { unitId: row.clientUnitId } })
-        : row.clientMobile
-          ? await prisma.client.findFirst({
-              where: { mobile: normalizeMobile(row.clientMobile) ?? row.clientMobile },
-            })
-          : null;
-
+      const client = await findClientByUnitId(row.clientUnitId);
       if (!client) {
         results.push({
           row: rowNum,
           unitId: row.unitId || null,
           status: "error",
-          message: "Client not found (set clientMobile or clientUnitId)",
+          message: "Client not found (set clientUnitId)",
         });
         continue;
       }
 
       if (row.caseNumber) {
-        const dupe = await prisma.case.findFirst({ where: { caseNumber: row.caseNumber } });
+        const dupe = await prisma.case.findFirst({
+          where: { caseNumber: row.caseNumber },
+          select: { unitId: true },
+        });
         if (dupe && dupe.unitId !== row.unitId) {
           results.push({
             row: rowNum,
@@ -89,7 +85,7 @@ export const POST = apiHandler(async (request) => {
       }
 
       const existingByUnitId = row.unitId
-        ? await prisma.case.findUnique({ where: { unitId: row.unitId } })
+        ? await findCaseByUnitId(row.unitId)
         : null;
 
       if (row.unitId?.trim() && !existingByUnitId) {
@@ -126,7 +122,9 @@ export const POST = apiHandler(async (request) => {
         ? (normalizeCaseStatus(row.status.trim()) as CaseStatus)
         : "enquiry";
 
-      const filingDate = parseDay(row.filingDate);
+      const filingDate = row.filingDate?.trim()
+        ? parseIstDateInput(row.filingDate)
+        : undefined;
       if (row.filingDate?.trim() && filingDate === null) {
         results.push({
           row: rowNum,
@@ -137,7 +135,9 @@ export const POST = apiHandler(async (request) => {
         continue;
       }
 
-      const nextHearingAt = parseDay(row.nextHearingAt);
+      const nextHearingAt = row.nextHearingAt?.trim()
+        ? parseIstDateInput(row.nextHearingAt)
+        : undefined;
       if (row.nextHearingAt?.trim() && nextHearingAt === null) {
         results.push({
           row: rowNum,
@@ -162,42 +162,18 @@ export const POST = apiHandler(async (request) => {
         }
       }
 
-      const advocateMobiles = row.advocateMobiles
-        ? row.advocateMobiles.split(";").map((m) => m.trim()).filter(Boolean)
-        : [];
-
-      const caseYear = row.caseYear?.trim()
-        ? Number(row.caseYear.trim())
+      const primaryAdvocateMobile = row.primaryAdvocateMobile?.trim()
+        ? normalizeMobile(row.primaryAdvocateMobile) ?? row.primaryAdvocateMobile.trim()
         : undefined;
-      if (row.caseYear?.trim() && (!caseYear || !Number.isFinite(caseYear))) {
-        results.push({
-          row: rowNum,
-          unitId: row.unitId || null,
-          status: "error",
-          message: "Invalid caseYear",
-        });
-        continue;
-      }
 
       const sharedData = {
         clientId: client.id,
         clientUnitId: client.unitId,
         caseNumber: row.caseNumber || undefined,
-        filingNumber: row.filingNumber || undefined,
-        caseYear,
         cnr: row.cnr || undefined,
-        state: row.state || undefined,
-        district: row.district || undefined,
-        city: row.city || undefined,
         courtName: row.courtName || undefined,
-        advocateMobiles,
-        primaryAdvocateMobile: row.primaryAdvocateMobile || undefined,
-        opposingParty: row.opposingParty || undefined,
-        ourSide: row.ourSide || undefined,
-        underActs: row.underActs || undefined,
-        policeStation: row.policeStation || undefined,
-        firNumber: row.firNumber || undefined,
-        stage: row.stage || undefined,
+        primaryAdvocateMobile,
+        advocateMobiles: primaryAdvocateMobile ? [primaryAdvocateMobile] : [],
         caseType: row.caseType || undefined,
         status,
         filingDate: filingDate ?? undefined,
@@ -262,5 +238,6 @@ export const POST = apiHandler(async (request) => {
     succeeded: results.filter((r) => r.status === "ok").length,
     failed: results.filter((r) => r.status === "error").length,
     results,
+    ignoredColumns,
   });
 });

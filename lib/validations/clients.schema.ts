@@ -33,21 +33,7 @@ export const updateClientSchema = createClientSchema.partial();
 export const importClientsRowSchema = z.object({
   unitId: optionalText(40),
   name: z.string().trim().min(1, "Name is required"),
-  fatherOrSpouse: optionalText(120),
-  occupation: optionalText(80),
-  gender: optionalText(20),
   mobile: z.string().trim().min(10, "Enter a valid mobile number").max(15),
-  altMobile: optionalText(15),
-  email: optionalText(120),
-  address: optionalText(500),
-  city: optionalText(80),
-  district: optionalText(80),
-  state: optionalText(80),
-  aadhaarLast4: optionalText(4),
-  referredBy: optionalText(120),
-  matterBrief: optionalText(2000),
-  notes: optionalText(1000),
-  smsConsent: optionalText(10),
 });
 
 export const importClientsSchema = z.object({

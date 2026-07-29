@@ -105,29 +105,16 @@ export const adjournHearingSchema = z.object({
 
 export const importCasesRowSchema = z.object({
   unitId: z.string().trim().optional().or(z.literal("")),
-  clientMobile: z.string().trim().optional().or(z.literal("")),
-  clientUnitId: z.string().trim().optional().or(z.literal("")),
+  clientUnitId: z.string().trim().min(1, "clientUnitId is required"),
   caseNumber: z.string().trim().optional().or(z.literal("")),
-  filingNumber: z.string().trim().optional().or(z.literal("")),
-  caseYear: z.string().trim().optional().or(z.literal("")),
   cnr: z.string().trim().optional().or(z.literal("")),
-  state: z.string().trim().optional().or(z.literal("")),
-  district: z.string().trim().optional().or(z.literal("")),
-  city: z.string().trim().optional().or(z.literal("")),
   courtName: z.string().trim().optional().or(z.literal("")),
-  advocateMobiles: z.string().trim().optional().or(z.literal("")),
-  primaryAdvocateMobile: z.string().trim().optional().or(z.literal("")),
-  opposingParty: z.string().trim().optional().or(z.literal("")),
-  ourSide: z.string().trim().optional().or(z.literal("")),
-  underActs: z.string().trim().optional().or(z.literal("")),
-  policeStation: z.string().trim().optional().or(z.literal("")),
-  firNumber: z.string().trim().optional().or(z.literal("")),
-  stage: z.string().trim().optional().or(z.literal("")),
   caseType: z.string().trim().optional().or(z.literal("")),
   status: z.string().trim().optional().or(z.literal("")),
   filingDate: z.string().trim().optional().or(z.literal("")),
   nextHearingAt: z.string().trim().optional().or(z.literal("")),
   agreedFee: z.string().trim().optional().or(z.literal("")),
+  primaryAdvocateMobile: z.string().trim().optional().or(z.literal("")),
   notes: z.string().trim().optional().or(z.literal("")),
 });
 
@@ -136,18 +123,12 @@ export const importCasesSchema = z.object({
   rows: z.array(importCasesRowSchema).max(500, "Max 500 rows per import"),
 });
 
-export const importHearingsRowSchema = z
-  .object({
-    caseUnitId: z.string().trim().optional().or(z.literal("")),
-    caseNumber: z.string().trim().optional().or(z.literal("")),
-    hearingDate: z.string().trim().min(1, "hearingDate is required"),
-    purpose: z.string().trim().max(200).optional().or(z.literal("")),
-    notes: z.string().trim().max(1000).optional().or(z.literal("")),
-  })
-  .refine((r) => Boolean(r.caseUnitId?.trim()) || Boolean(r.caseNumber?.trim()), {
-    message: "Set caseUnitId or caseNumber",
-    path: ["caseUnitId"],
-  });
+export const importHearingsRowSchema = z.object({
+  caseUnitId: z.string().trim().min(1, "caseUnitId is required"),
+  hearingDate: z.string().trim().min(1, "hearingDate is required"),
+  purpose: z.string().trim().max(200).optional().or(z.literal("")),
+  notes: z.string().trim().max(1000).optional().or(z.literal("")),
+});
 
 export const importHearingsSchema = z.object({
   dryRun: z.boolean().default(true),

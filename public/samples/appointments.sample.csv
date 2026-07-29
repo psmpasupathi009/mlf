@@ -1,4 +1,3 @@
-title,scheduledAt,advocateMobile,clientUnitId,clientMobile,caseUnitId,durationMin,mode,location,notes
-Initial consultation,2026-07-25T10:30:00+05:30,9841578862,,9123456780,,30,office,Chamber 1,Bring survey documents
-Maintenance follow-up,2026-07-25T14:00:00+05:30,8760228622,,9123456782,,30,call,,Confirm next hearing
-Cheque bounce briefing,2026-07-26T11:00:00+05:30,9786570408,,9123456783,,45,office,Chamber 2,
+title,scheduledAt,advocateMobile,clientUnitId,caseUnitId,durationMin,mode
+Client consult,2024-07-15T10:30,9876543210,CLI-00001,CAS-00001,30,office
+Follow-up call,2024-07-16T16:00,9876543210,CLI-00001,,15,call

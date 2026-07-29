@@ -378,7 +378,7 @@ export function EmployeesPage({ user }: { user: PublicUser }) {
         title="Import employees"
         endpoint="/api/employees/import"
         sampleHref="/samples/employees.sample.csv"
-        columnsHint="Required: mobile, name, designation (job title). Roles are assigned from designation defaults."
+        columnsHint="Required: mobile, name, designation. Optional unitId to update. Roles come from designation defaults."
         onImported={load}
       />
     </section>

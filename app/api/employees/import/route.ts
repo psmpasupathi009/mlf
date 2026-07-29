@@ -9,6 +9,11 @@ import { designationDefaultRoles, normalizeDesignation } from "@/config/company/
 import { importEmployeesSchema } from "@/lib/validations/employees.schema";
 import { compliance } from "@/config/company/compliance";
 import { assertImportRateLimit } from "@/lib/rate-limit/guards";
+import { findUserByUnitId } from "@/lib/imports/lookups";
+import {
+  findIgnoredImportColumns,
+  IMPORT_EMPLOYEE_COLUMNS,
+} from "@/lib/imports/columns";
 
 type RowResult = {
   row: number;
@@ -26,6 +31,9 @@ export const POST = apiHandler(async (request) => {
   const canEdit = await hasPermission(user.id, "employees", "edit");
 
   const raw = await request.json();
+  const ignoredColumns = Array.isArray(raw?.rows)
+    ? findIgnoredImportColumns(raw.rows as Record<string, string>[], IMPORT_EMPLOYEE_COLUMNS)
+    : [];
   const parsed = importEmployeesSchema.safeParse(raw);
   if (!parsed.success) {
     return jsonFail("VALIDATION", parsed.error.issues[0]?.message ?? "Invalid request", 400, parsed.error.issues);
@@ -41,7 +49,7 @@ export const POST = apiHandler(async (request) => {
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]!;
-    const rowNum = i + 2; // header is row 1
+    const rowNum = i + 2;
 
     const mobile = normalizeMobile(row.mobile);
     if (!mobile) {
@@ -68,12 +76,15 @@ export const POST = apiHandler(async (request) => {
     const baseRoles = designationDefaultRoles[designation];
 
     try {
-      const existingByMobile = await prisma.user.findUnique({ where: { mobile } });
+      const existingByMobile = await prisma.user.findUnique({
+        where: { mobile },
+        select: { id: true, unitId: true, mobile: true, roles: true },
+      });
       const existingByUnitId = row.unitId
-        ? await prisma.user.findUnique({ where: { unitId: row.unitId } })
+        ? await findUserByUnitId(row.unitId)
         : null;
 
-      if (existingByUnitId && existingByUnitId.mobile !== mobile && existingByMobile) {
+      if (existingByUnitId && existingByUnitId.unitId !== existingByMobile?.unitId && existingByMobile) {
         results.push({ row: rowNum, unitId: row.unitId || null, status: "error", message: "Mobile already used by another employee" });
         continue;
       }
@@ -103,7 +114,6 @@ export const POST = apiHandler(async (request) => {
         continue;
       }
 
-      // Never strip admin/sub_admin via CSV designation remap.
       const preserved = (existingByUnitId?.roles ?? []).filter(
         (r) => r === "admin" || r === "sub_admin"
       );
@@ -127,8 +137,6 @@ export const POST = apiHandler(async (request) => {
             designation,
             roles,
             mobile,
-            email: row.email || undefined,
-            address: row.address || undefined,
           },
         });
         results.push({ row: rowNum, unitId: updated.unitId, status: "ok", message: "Updated" });
@@ -141,8 +149,6 @@ export const POST = apiHandler(async (request) => {
             name: row.name,
             designation,
             roles,
-            email: row.email || undefined,
-            address: row.address || undefined,
             createdById: user.id,
             isActive: true,
           },
@@ -173,5 +179,6 @@ export const POST = apiHandler(async (request) => {
     succeeded: results.filter((r) => r.status === "ok").length,
     failed: results.filter((r) => r.status === "error").length,
     results,
+    ignoredColumns,
   });
 });

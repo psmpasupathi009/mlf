@@ -554,7 +554,7 @@ export function TasksPage({ user }: { user: PublicUser }) {
         title="Import work allotment"
         endpoint="/api/tasks/import"
         sampleHref="/samples/tasks.sample.csv"
-        columnsHint={`Required: title, workDate (YYYY-MM-DD). Optional: assigneeUnitId, caseUnitId, kind (default allotment), dueDate, notes. Prefill workDate as ${workDate} for today’s board.`}
+        columnsHint={`Required: title, workDate (YYYY-MM-DD). Optional: assigneeUnitId, caseUnitId, kind (default allotment). Prefill workDate as ${workDate} for today’s board.`}
         onImported={refresh}
       />
     </section>

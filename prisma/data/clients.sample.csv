@@ -1,4 +1,3 @@
-unitId,name,fatherOrSpouse,occupation,gender,mobile,altMobile,email,address,city,district,state,aadhaarLast4,referredBy,matterBrief,notes,smsConsent
-,Murugan A,S/o Annamalai,Farmer,male,9123456780,9123456781,,Door 12 Periyar Illam,Gobichettipalayam,Erode,Tamil Nadu,1234,Walk-in,Land boundary dispute with neighbour,,true
-CLI-00002,Lakshmi B,W/o Ravi,Homemaker,female,9123456782,,,Modachur,Gobichettipalayam,Erode,Tamil Nadu,,Client referral,Maintenance enquiry,,true
-,John D,S/o David,Business,male,9123456783,,john@example.com,"45, Anna Nagar",Chennai,Chennai,Tamil Nadu,5678,,Cheque bounce notice,,true
+unitId,name,mobile
+,Sample Client One,9876500001
+,Sample Client Two,9876500002

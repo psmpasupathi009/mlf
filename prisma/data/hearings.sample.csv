@@ -1,3 +1,3 @@
-caseUnitId,caseNumber,hearingDate,purpose,notes
-CSE-00001,,2024-08-20,Arguments,Bring documents
-,OS/123/2024,2024-09-05,Further hearing,
+caseUnitId,hearingDate,purpose,notes
+CAS-00001,2024-09-15,Arguments,Replace CAS-00001 with a real case unitId
+CAS-00001,2024-10-01,Evidence,

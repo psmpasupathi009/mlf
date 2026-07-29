@@ -436,7 +436,7 @@ export function CasesPage({ user }: { user: PublicUser }) {
         title="Import cases"
         endpoint="/api/cases/import"
         sampleHref="/samples/cases.sample.csv"
-        columnsHint="Need clientMobile or clientUnitId. Optional: caseNumber, court, status, nextHearingAt…"
+        columnsHint="Required: clientUnitId (from Clients). Optional: unitId, caseNumber, cnr, courtName, caseType, status, filingDate, nextHearingAt, agreedFee, primaryAdvocateMobile, notes."
         onImported={load}
       />
 
@@ -446,7 +446,7 @@ export function CasesPage({ user }: { user: PublicUser }) {
         title="Import hearings"
         endpoint="/api/hearings/import"
         sampleHref="/samples/hearings.sample.csv"
-        columnsHint="Need caseUnitId or caseNumber, plus hearingDate (YYYY-MM-DD). Optional: purpose, notes."
+        columnsHint="Required: caseUnitId, hearingDate (YYYY-MM-DD IST). Optional: purpose, notes."
         onImported={load}
       />
     </section>

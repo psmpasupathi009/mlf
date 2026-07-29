@@ -8,8 +8,13 @@ import {
   dakDirectionEnum,
   importDakSchema,
 } from "@/lib/validations/dak.schema";
-import { istDayBounds } from "@/lib/utils/ist";
+import { parseIstDateInput } from "@/lib/utils/ist";
 import { assertImportRateLimit } from "@/lib/rate-limit/guards";
+import { findCaseByUnitId, findClientByUnitId } from "@/lib/imports/lookups";
+import {
+  findIgnoredImportColumns,
+  IMPORT_DAK_COLUMNS,
+} from "@/lib/imports/columns";
 
 type RowResult = {
   row: number;
@@ -17,13 +22,6 @@ type RowResult = {
   status: "ok" | "error";
   message: string;
 };
-
-function parseDay(value: string) {
-  const s = value.trim();
-  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return istDayBounds(s).start;
-  const d = new Date(s);
-  return Number.isNaN(d.getTime()) ? null : d;
-}
 
 export const POST = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "dak", "create");
@@ -33,6 +31,9 @@ export const POST = apiHandler(async (request) => {
   if (limited) return limited;
 
   const raw = await request.json();
+  const ignoredColumns = Array.isArray(raw?.rows)
+    ? findIgnoredImportColumns(raw.rows as Record<string, string>[], IMPORT_DAK_COLUMNS)
+    : [];
   const parsed = importDakSchema.safeParse(raw);
   if (!parsed.success) {
     return jsonFail(
@@ -55,7 +56,7 @@ export const POST = apiHandler(async (request) => {
   const results: RowResult[] = [];
 
   for (let i = 0; i < rows.length; i++) {
-    const row = rows[i];
+    const row = rows[i]!;
     const rowNum = i + 2;
 
     const directionParsed = dakDirectionEnum.safeParse(
@@ -71,7 +72,7 @@ export const POST = apiHandler(async (request) => {
       continue;
     }
 
-    const entryDate = parseDay(row.entryDate);
+    const entryDate = parseIstDateInput(row.entryDate);
     if (!entryDate) {
       results.push({
         row: rowNum,
@@ -84,10 +85,7 @@ export const POST = apiHandler(async (request) => {
 
     let caseUnitId: string | undefined;
     if (row.caseUnitId?.trim()) {
-      const caseItem = await prisma.case.findUnique({
-        where: { unitId: row.caseUnitId.trim() },
-        select: { unitId: true },
-      });
+      const caseItem = await findCaseByUnitId(row.caseUnitId);
       if (!caseItem) {
         results.push({
           row: rowNum,
@@ -102,10 +100,7 @@ export const POST = apiHandler(async (request) => {
 
     let clientUnitId: string | undefined;
     if (row.clientUnitId?.trim()) {
-      const client = await prisma.client.findUnique({
-        where: { unitId: row.clientUnitId.trim() },
-        select: { unitId: true },
-      });
+      const client = await findClientByUnitId(row.clientUnitId);
       if (!client) {
         results.push({
           row: rowNum,
@@ -137,8 +132,6 @@ export const POST = apiHandler(async (request) => {
           entryDate,
           subject: row.subject,
           fromTo: row.fromTo?.trim() || undefined,
-          mode: row.mode?.trim() || undefined,
-          trackingNo: row.trackingNo?.trim() || undefined,
           caseUnitId,
           clientUnitId,
           notes: row.notes?.trim() || undefined,
@@ -180,5 +173,6 @@ export const POST = apiHandler(async (request) => {
     succeeded: results.filter((r) => r.status === "ok").length,
     failed: results.filter((r) => r.status === "error").length,
     results,
+    ignoredColumns,
   });
 });

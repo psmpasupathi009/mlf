@@ -82,8 +82,6 @@ export const importTasksRowSchema = z.object({
   assigneeUnitId: optionalText(40),
   caseUnitId: optionalText(40),
   kind: optionalText(40),
-  dueDate: optionalText(40),
-  notes: optionalText(1000),
 });
 
 export const importTasksSchema = z.object({

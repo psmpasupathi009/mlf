@@ -466,7 +466,7 @@ export function AccountsPage({ user }: { user: PublicUser }) {
         title="Import cash entries"
         endpoint="/api/accounts/import"
         sampleHref="/samples/payments.sample.csv"
-        columnsHint="Need clientUnitId or clientMobile, amount, type (advance/partial/full/consultation/court_fee/stamp/copying/travel/clerkage/other), status (pending/paid). caseUnitId optional. Notes required for other."
+        columnsHint="Required: clientUnitId, amount, type (advance/partial/full/consultation/court_fee/stamp/copying/travel/clerkage/other). Optional: caseUnitId, status (pending/paid), paidOn, notes (required for other)."
         onImported={load}
       />
     </section>
