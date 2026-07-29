@@ -151,7 +151,7 @@ export async function POST(request: Request) {
       jsonFail(
         isDbUnreachableError(error) ? "DB_UNAVAILABLE" : "SERVER_ERROR",
         isDbUnreachableError(error)
-          ? "Database unreachable. Check MongoDB Atlas Network Access — allow 0.0.0.0/0 (Access from Anywhere)."
+          ? "Database unreachable. Check DATABASE_URL and that MongoDB Atlas is reachable."
           : "Login failed",
         isDbUnreachableError(error) ? 503 : 500
       )

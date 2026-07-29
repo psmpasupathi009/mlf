@@ -104,7 +104,7 @@ export async function authFetch<T = Record<string, unknown>>(
       status: 0,
       data: {
         error: aborted
-          ? "Server took too long (often MongoDB Atlas unreachable — allow 0.0.0.0/0 in Network Access)."
+          ? "Server took too long (often MongoDB Atlas unreachable — check DATABASE_URL)."
           : "Network error. Please try again.",
       } as T,
     };
@@ -152,7 +152,7 @@ export async function apiFetch<T = Record<string, unknown>>(
       status: 0,
       data: {
         error: aborted
-          ? "Server took too long (often MongoDB Atlas unreachable — allow 0.0.0.0/0 in Network Access)."
+          ? "Server took too long (often MongoDB Atlas unreachable — check DATABASE_URL)."
           : "Network error. Please try again.",
       } as T,
     };

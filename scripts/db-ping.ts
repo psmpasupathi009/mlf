@@ -27,11 +27,9 @@ async function main() {
     ) {
       console.error(`
 Likely causes:
-  1. Atlas → Network Access → Allow Access from Anywhere (0.0.0.0/0)
-     (single-IP entries break when your ISP IP changes)
+  1. Wrong or missing DATABASE_URL in .env
   2. Cluster paused / no primary
-  3. VPN / firewall blocking *.mongodb.net:27017
-TLS "InternalError" before login usually means the IP is not allowlisted.`);
+  3. VPN / firewall blocking *.mongodb.net:27017`);
     }
     process.exit(1);
   } finally {

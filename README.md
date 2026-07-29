@@ -22,7 +22,7 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 ## Database Setup
 
-This app uses **Prisma + MongoDB Atlas**. Set `DATABASE_URL` to an Atlas `mongodb+srv://...` connection string (see `.env.example`). In Atlas → Network Access, use **Allow Access from Anywhere** (`0.0.0.0/0`) so changing home IPs do not block you day to day. Verify with `npm run db:ping`.
+This app uses **Prisma + MongoDB Atlas**. Sign in to Atlas, copy your `mongodb+srv://...` connection string into `.env` as `DATABASE_URL` (see `.env.example`), then verify with `npm run db:ping`.
 
 Full connection docs: [docs/prisma-database.md](docs/prisma-database.md).
 

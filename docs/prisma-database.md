@@ -21,15 +21,17 @@ flowchart LR
 
 ## Environment (Atlas)
 
-Set `DATABASE_URL` to your Atlas connection string (this project expects Atlas, not a local `mongodb://` host):
+1. Sign in to [MongoDB Atlas](https://cloud.mongodb.com).
+2. Copy your cluster connection string.
+3. Put it in `.env` as `DATABASE_URL`:
 
 ```text
 DATABASE_URL=mongodb+srv://USER:PASS@CLUSTER/mlf
 ```
 
-Copy from [`.env.example`](../.env.example) and replace `USER`, `PASS`, and `CLUSTER` with your Atlas credentials.
+Copy from [`.env.example`](../.env.example) and replace `USER`, `PASS`, and `CLUSTER` with your Atlas credentials. That is all — Prisma connects using this URL.
 
-**Network Access (required):** In Atlas → Network Access → **Allow Access from Anywhere** (`0.0.0.0/0`). Home/ISP IPs change day to day; allowlisting a single IP will block you again after the next change. Use `0.0.0.0/0` for local dev and Vercel so you are not asked to re-add IPs. Blocked IPs often fail as TLS `InternalError` / no primary. Verify with:
+Verify with:
 
 ```bash
 npm run db:ping
@@ -141,30 +143,28 @@ const created = await prisma.cashPayment.create({ /* ... */ });
 
 | | Development | Production (deploy) |
 |--|-------------|---------------------|
-| Host | MongoDB Atlas (same stack) | MongoDB Atlas (prefer a **separate** cluster or DB name) |
+| Host | MongoDB Atlas | MongoDB Atlas (prefer a **separate** cluster or DB name) |
 | Env | Local `.env` `DATABASE_URL` | Host env (e.g. Vercel) `DATABASE_URL` |
-| Access | Atlas Network Access `0.0.0.0/0` (or your IP) | Same; Vercel egress IPs vary |
 
 - Never commit `.env`; set `DATABASE_URL` (and secrets below) in the deployment platform’s env config.
-- Same Prisma schema / client code works for both; only the URL and Atlas network access change.
+- Same Prisma schema / client code works for both; only the connection string changes.
 - Do not point local `.env` at prod casually; use a separate prod env or a one-off shell export when pushing schema.
 
 ## Before deploying (database checklist)
 
 ```mermaid
 flowchart TD
-  before["Before deploy"] --> provision["Provision MongoDB Atlas"]
-  provision --> network["Open network access 0.0.0.0/0"]
-  network --> envHost["Set DATABASE_URL + secrets on host"]
+  before["Before deploy"] --> provision["Sign in to MongoDB Atlas"]
+  provision --> connect["Copy connection string"]
+  connect --> envHost["Set DATABASE_URL + secrets on host"]
   envHost --> pushSchema["db:generate + db:push to prod"]
   pushSchema --> optionalSeed["Optional seed / admin bootstrap"]
   optionalSeed --> deployApp["Deploy Next.js app"]
 ```
 
-1. **Provision** production MongoDB Atlas; note DB name (e.g. `mlf` or `mlf_prod`).
-2. **Network access** — allow `0.0.0.0/0` (or VPC/peering if you have it) so Vercel can reach Atlas.
-3. **DB user** — create a production DB user and copy the `mongodb+srv` connection string.
-4. **Host env** — set at least:
+1. **Sign in** to MongoDB Atlas and note the DB name (e.g. `mlf` or `mlf_prod`).
+2. **Connection string** — copy the `mongodb+srv` URI for your cluster user.
+3. **Host env** — set at least:
    - `DATABASE_URL`
    - `JWT_SECRET`
    - `ADMIN_MOBILE`
@@ -172,10 +172,10 @@ flowchart TD
    - `CRON_SECRET`
    - `ALLOWED_ORIGINS` / public app URL as used by the host
    - `NODE_ENV=production`
-5. From a machine that can reach **prod** Atlas: run `npm run db:generate` and `npm run db:push` with production `DATABASE_URL` so collections/indexes match [`prisma/schema.prisma`](../prisma/schema.prisma).
-6. **Optional seed:** `npm run db:seed` against prod only if intentional — seed upserts demo/bootstrap data; do not wipe live data by accident.
-7. Confirm **`postinstall` / build** runs `prisma generate` on the host so `@prisma/client` exists at runtime (`postinstall` in [`package.json`](../package.json) already does this).
-8. Prefer a one-off `DATABASE_URL=... npm run db:push` for prod schema pushes rather than permanently switching local `.env` to prod.
+4. From a machine that can reach **prod** Atlas: run `npm run db:generate` and `npm run db:push` with production `DATABASE_URL` so collections/indexes match [`prisma/schema.prisma`](../prisma/schema.prisma).
+5. **Optional seed:** `npm run db:seed` against prod only if intentional — seed upserts demo/bootstrap data; do not wipe live data by accident.
+6. Confirm **`postinstall` / build** runs `prisma generate` on the host so `@prisma/client` exists at runtime (`postinstall` in [`package.json`](../package.json) already does this).
+7. Prefer a one-off `DATABASE_URL=... npm run db:push` for prod schema pushes rather than permanently switching local `.env` to prod.
 
 ## After deploying (database checklist)
 
@@ -187,7 +187,7 @@ flowchart TD
    - Cases / diary hearings (reads/writes `Case`, `Hearing`)
    - Accounts payment create (writes `CashPayment`)
    - Admin: create/edit employee
-3. If API returns **500** on data routes: check host logs, verify `DATABASE_URL`, Atlas allowlist, and that `prisma generate` ran during build. Locally mirror with `npm run db:ping`.
+3. If API returns **500** on data routes: check host logs, verify `DATABASE_URL`, and that `prisma generate` ran during build. Locally mirror with `npm run db:ping`.
 4. **Schema changes later:** update [`prisma/schema.prisma`](../prisma/schema.prisma) → `db:push` to **prod** → redeploy the app.
 5. **Backups:** enable Atlas backups / snapshots for production.
 6. Do **not** run destructive seed or wipe scripts against production unless replacing data on purpose.
@@ -208,4 +208,4 @@ flowchart TD
 
 1. Client is created once per process/isolate when the module loads (`globalThis` singleton in development).
 2. Queries use the Atlas connection pool managed by Prisma — no manual `connect()` / `disconnect()` in API routes.
-3. If Atlas is unreachable (Network Access not set to `0.0.0.0/0`, paused cluster, TLS), errors match `isDbUnreachableError` in [`lib/db/unreachable.ts`](../lib/db/unreachable.ts); `npm run db:ping` prints actionable hints.
+3. If Atlas is unreachable (bad `DATABASE_URL`, paused cluster, TLS), errors match `isDbUnreachableError` in [`lib/db/unreachable.ts`](../lib/db/unreachable.ts); `npm run db:ping` prints actionable hints.

@@ -132,7 +132,7 @@ export function apiHandler(handler: RouteHandler): RouteHandler {
       if (isDbUnreachableError(error)) {
         return jsonFail(
           "DB_UNAVAILABLE",
-          "Database unreachable. Check MongoDB Atlas Network Access — allow 0.0.0.0/0 (Access from Anywhere).",
+          "Database unreachable. Check DATABASE_URL and that MongoDB Atlas is reachable.",
           503
         );
       }
