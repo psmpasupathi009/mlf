@@ -1,42 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MLF — Law Firm Portal
 
-## Getting Started
+Next.js office portal for clients, cases, hearings, appointments, accounts, HRMS, and related office workflows. Stack: **Next.js · Prisma 6 · MongoDB Atlas · JWT session · 2Factor SMS**.
 
-First, run the development server:
+## Getting started
 
 ```bash
+npm install
+cp .env.example .env   # set DATABASE_URL and other secrets
+npm run db:generate
+npm run db:ping
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000). Home lives at `app/(portal)/page.tsx` (not a root `app/page.tsx`).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Docs
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Doc | What it covers |
+|-----|----------------|
+| [docs/application-flows.md](docs/application-flows.md) | Folder layout, auth layers, each feature flow, what to keep/clean |
+| [docs/prisma-database.md](docs/prisma-database.md) | Atlas connection, Prisma client, deploy DB checklist |
+| [prisma/data/README.md](prisma/data/README.md) | CSV import order and sample rules |
 
-## Database Setup
+## Layout (short)
 
-This app uses **Prisma + MongoDB Atlas**. Sign in to Atlas, copy your `mongodb+srv://...` connection string into `.env` as `DATABASE_URL` (see `.env.example`), then verify with `npm run db:ping`.
+```text
+app/(portal)/     Logged-in pages
+app/(auth)/       Login
+app/api/          REST APIs
+features/         Domain UI + server helpers
+lib/              Auth, RBAC, DB, validations, imports
+shared/           Shell, dialogs, shared hooks
+config/company/   Modules, nav, permissions, IDs
+proxy.ts          Edge login gate (pages only)
+```
 
-Full connection docs: [docs/prisma-database.md](docs/prisma-database.md).
+## Database
 
-## Learn More
+Uses **Prisma + MongoDB Atlas**. Put your `mongodb+srv://...` string in `.env` as `DATABASE_URL`, then:
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+npm run db:ping
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Deploy
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Deploy on [Vercel](https://vercel.com) (see `vercel.json` for cron). Set production env vars from `.env.example`, including `DATABASE_URL`, `JWT_SECRET`, and `CRON_SECRET`. DB steps: [docs/prisma-database.md](docs/prisma-database.md).

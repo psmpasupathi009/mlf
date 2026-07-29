@@ -312,7 +312,7 @@ export function WelcomeOverview({ user }: WelcomeOverviewProps) {
 
   if (moduleOn("cases") && can("cases.view") && summary?.cases) {
     metrics.push({
-      label: "Open cases",
+      label: "My cases",
       value: String(summary.cases.open),
       hint: `${summary.cases.pending} pre-filing · ${summary.cases.listed} active`,
       href: "/cases",

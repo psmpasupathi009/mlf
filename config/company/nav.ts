@@ -92,7 +92,7 @@ export const navItems: NavItem[] = [
   },
   {
     href: "/dak",
-    label: "Dak / Postal",
+    label: "Postal",
     module: "dak",
     group: "office",
     permission: { module: "dak", action: "view" },

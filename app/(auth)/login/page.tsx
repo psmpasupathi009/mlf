@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import Link from "next/link";
 import { LoginForm } from "@/features/auth/components/login-form";
 import { ThemeToggle } from "@/shared/components/theme/theme-toggle";
+import { BrandMark } from "@/shared/components/brand/brand-mark";
+import { brand } from "@/config/company/brand";
 
 export const metadata: Metadata = {
   title: "Sign in",
@@ -12,23 +13,24 @@ export default function LoginPage() {
   return (
     <main className="grid min-h-dvh grid-cols-1 bg-background md:grid-cols-2">
       {/* Compact brand strip on phone; full hero from md */}
-      <aside className="flex items-center justify-center bg-brand px-4 py-4 sm:py-5 md:min-h-dvh md:px-8 md:py-8 lg:px-10 xl:px-14">
+      <aside className="relative flex items-center justify-center overflow-hidden bg-brand px-4 py-4 sm:py-5 md:min-h-dvh md:px-8 md:py-8 lg:px-10 xl:px-14">
+        <span
+          aria-hidden
+          className="absolute inset-y-0 left-0 w-1 bg-maroon md:w-1.5"
+        />
         <div className="flex w-full flex-row items-center justify-center gap-3 text-left md:flex-col md:text-center">
-          <Image
-            src="/images/mlf-logo-en.jpeg"
-            alt="Manitham Law Foundation"
-            width={240}
-            height={240}
-            priority
-            className="h-12 w-12 shrink-0 object-contain sm:h-14 sm:w-14 md:h-40 md:w-40 lg:h-52 lg:w-52 xl:h-56 xl:w-56"
-          />
+          <BrandMark size="lg" priority />
           <div className="min-w-0 md:mt-4 md:flex md:flex-col md:items-center">
             <span
               aria-hidden
-              className="mb-2 hidden h-px w-8 bg-gold md:block"
+              className="mb-2 hidden h-0.5 w-10 rounded-full bg-gold md:block"
+            />
+            <span
+              aria-hidden
+              className="mb-2 hidden h-px w-6 bg-maroon/80 md:block"
             />
             <p className="truncate text-sm font-medium text-white/90 md:mt-1 md:text-center">
-              Manitham Law Foundation
+              {brand.name}
             </p>
           </div>
         </div>
