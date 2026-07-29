@@ -35,16 +35,6 @@ Copy from [`.env.example`](../.env.example) and replace `USER`, `PASS`, and `CLU
 npm run db:ping
 ```
 
-The app appends serverless-friendly query params when they are missing (via `buildMongoDatabaseUrl`):
-
-| Param | Default | Purpose |
-|-------|---------|---------|
-| `serverSelectionTimeoutMS` | `5000` | Fail fast if Atlas is unreachable |
-| `connectTimeoutMS` | `10000` | Cap connect time |
-| `maxPoolSize` | `10` | Small pool per serverless isolate |
-| `minPoolSize` | `0` | Do not keep idle sockets warm |
-| `maxIdleTimeMS` | `30000` | Release idle connections |
-
 ### Schema datasource
 
 From [`prisma/schema.prisma`](../prisma/schema.prisma):
@@ -76,22 +66,7 @@ Import the shared client everywhere in app code:
 import { prisma } from "@/lib/db/prisma";
 ```
 
-### `buildMongoDatabaseUrl`
-
-Takes the base Atlas URL from `DATABASE_URL` and appends the serverless defaults above only when each param is not already present. Used by the app client, [`prisma/seed.ts`](../prisma/seed.ts), and [`scripts/db-ping.ts`](../scripts/db-ping.ts).
-
-### Singleton + HMR refresh
-
-Next.js hot reload can create many `PrismaClient` instances. The module caches one client on `globalThis`. After `prisma generate`, a stale global client may lack new model delegates (e.g. `officeHoliday`). `clientHasRequiredModels` detects that and disconnects/recreates the client.
-
-### Eager `$connect`
-
-After creating a client, the module calls `$connect()` so the first query after HMR does not race with “Engine is not yet connected”.
-
-### Unreachable Atlas helpers
-
-- **`isDbUnreachableError(error)`** — true when the error looks like Atlas/network/TLS/selection failure.
-- **`withDbRetry(fn, attempts?)`** — retries transient Atlas / cold-start failures (use for idempotent or read-mostly work).
+Next.js hot reload can create many `PrismaClient` instances. The module keeps one client on `globalThis` in development.
 
 Full source:
 
@@ -102,128 +77,18 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-/** Append `key=value` only when the param is not already present. */
-function appendQueryParam(url: string, key: string, value: string): string {
-  if (new RegExp(`[?&]${key}=`, "i").test(url)) return url;
-  const sep = url.includes("?") ? "&" : "?";
-  return `${url}${sep}${key}=${value}`;
-}
+export const prisma = globalForPrisma.prisma ?? new PrismaClient();
 
-/**
- * Serverless-friendly Mongo defaults for Vercel + Atlas:
- * - fail fast on unreachable clusters (not ~30s)
- * - small pool per isolate (many concurrent lambdas)
- * - release idle sockets so frozen isolates do not hold connections forever
- */
-export function buildMongoDatabaseUrl(base: string): string {
-  let url = base;
-  url = appendQueryParam(url, "serverSelectionTimeoutMS", "5000");
-  url = appendQueryParam(url, "connectTimeoutMS", "10000");
-  url = appendQueryParam(url, "maxPoolSize", "10");
-  url = appendQueryParam(url, "minPoolSize", "0");
-  url = appendQueryParam(url, "maxIdleTimeMS", "30000");
-  return url;
-}
-
-function databaseUrl(): string | undefined {
-  const base = process.env.DATABASE_URL;
-  if (!base) return undefined;
-  return buildMongoDatabaseUrl(base);
-}
-
-function createClient() {
-  return new PrismaClient({
-    datasources: { db: { url: databaseUrl() } },
-    log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
-  });
-}
-
-/**
- * After `prisma generate`, Next.js can keep a stale global client missing new
- * delegates (e.g. officeHoliday). Drop and recreate when required models lack.
- */
-function clientHasRequiredModels(client: PrismaClient): boolean {
-  const c = client as unknown as Record<string, unknown>;
-  return (
-    typeof c.officeHoliday === "object" &&
-    c.officeHoliday != null &&
-    typeof c.notification === "object" &&
-    c.notification != null &&
-    typeof c.dakEntry === "object" &&
-    c.dakEntry != null &&
-    typeof c.officeTask === "object" &&
-    c.officeTask != null
-  );
-}
-
-function resolveClient(): PrismaClient {
-  const existing = globalForPrisma.prisma;
-  if (existing && clientHasRequiredModels(existing)) return existing;
-  if (existing) {
-    // Only disconnect when replacing a broken/stale client — never after each request.
-    globalForPrisma.prisma = undefined;
-    void existing.$disconnect().catch(() => undefined);
-  }
-  const next = createClient();
-  // Eager connect so the first query after HMR/recreate does not race
-  // "Engine is not yet connected". Keep the client warm on the isolate.
-  void next.$connect().catch(() => undefined);
-  globalForPrisma.prisma = next;
-  return next;
-}
-
-export const prisma = resolveClient();
-
-// Prefer specific connection failures — avoid bare "timeout" (e.g. OTP messages).
-const UNREACHABLE_RE =
-  /server selection|serverselection|econnrefused|econnreset|enotfound|etimedout|(?:connection|socket|server|operation|network)\s+timed?\s*out|timed\s+out|connect(?:ion)? (?:refused|reset|failed|closed)|noprimary|no primary|replicasetnoprimary|replica set|mongodb.*(connect|network)|engine is not yet connected|prisma.?client.?initialization|can't reach database|could not connect|tlsv1 alert internal error|fatal alert:\s*internalerror|internalerror/i;
-
-/** True when Mongo/Atlas is unreachable or the engine is not ready yet. */
-export function isDbUnreachableError(error: unknown): boolean {
-  if (error == null) return false;
-  const message =
-    error instanceof Error
-      ? `${error.name} ${error.message}`
-      : String(error);
-  return UNREACHABLE_RE.test(message);
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-/**
- * Retry transient Atlas / cold-start connection failures.
- * Use only for idempotent or read-mostly work — not non-idempotent writes.
- */
-export async function withDbRetry<T>(
-  fn: () => Promise<T>,
-  attempts = 3
-): Promise<T> {
-  let last: unknown;
-  for (let i = 0; i < attempts; i++) {
-    try {
-      return await fn();
-    } catch (error) {
-      last = error;
-      if (!isDbUnreachableError(error) || i === attempts - 1) throw error;
-      await sleep(120 * 2 ** i);
-    }
-  }
-  throw last;
-}
-
-export type {
-  User,
-  UserRole,
-  OtpPurpose,
-  OtpSession,
-} from "@prisma/client";
+if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
 ```
+
+### Helpers
+
+- [`lib/db/unreachable.ts`](../lib/db/unreachable.ts) — `isDbUnreachableError` / `withDbRetry` for Atlas outage handling.
 
 ## How the database is used (by feature)
 
-App code imports `prisma` from `@/lib/db/prisma`. Seed / ping scripts may construct their own `PrismaClient` with `buildMongoDatabaseUrl` and should `$disconnect()` when done.
+App code imports `prisma` from `@/lib/db/prisma`. Seed / ping scripts may construct their own `PrismaClient` (reads `DATABASE_URL` from env) and should `$disconnect()` when done.
 
 ### Models (from schema)
 
@@ -341,6 +206,6 @@ flowchart TD
 
 ## Connection lifecycle
 
-1. Client is created once per process/isolate when the module loads (`resolveClient`).
+1. Client is created once per process/isolate when the module loads (`globalThis` singleton in development).
 2. Queries use the Atlas connection pool managed by Prisma — no manual `connect()` / `disconnect()` in API routes.
-3. If Atlas is unreachable (Network Access not set to `0.0.0.0/0`, paused cluster, TLS), errors match `isDbUnreachableError`; `npm run db:ping` prints actionable hints.
+3. If Atlas is unreachable (Network Access not set to `0.0.0.0/0`, paused cluster, TLS), errors match `isDbUnreachableError` in [`lib/db/unreachable.ts`](../lib/db/unreachable.ts); `npm run db:ping` prints actionable hints.

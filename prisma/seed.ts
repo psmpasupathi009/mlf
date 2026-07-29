@@ -19,17 +19,8 @@ import { normalizeMobile } from "../lib/auth/mobile";
 import { hashPin } from "../lib/auth/pin";
 import { parseCsv } from "../lib/utils/csv";
 import { nextUnitId } from "../lib/ids";
-import { buildMongoDatabaseUrl } from "../lib/db/prisma";
 
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL
-        ? buildMongoDatabaseUrl(process.env.DATABASE_URL)
-        : undefined,
-    },
-  },
-});
+const prisma = new PrismaClient();
 const DATA = join(process.cwd(), "prisma", "data");
 
 /** Dev/test PIN for seeded users (override with SEED_PIN). */

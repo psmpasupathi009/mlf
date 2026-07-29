@@ -1,4 +1,5 @@
-import { prisma, withDbRetry } from "@/lib/db/prisma";
+import { prisma } from "@/lib/db/prisma";
+import { withDbRetry } from "@/lib/db/unreachable";
 
 export type RateLimitResult = {
   allowed: boolean;

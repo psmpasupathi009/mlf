@@ -8,20 +8,11 @@ import { writeFileSync } from "node:fs";
 import { PrismaClient } from "@prisma/client";
 import { ACCESS_COOKIE } from "../lib/auth/cookie-names";
 import { normalizeMobile } from "../lib/auth/mobile";
-import { buildMongoDatabaseUrl } from "../lib/db/prisma";
 
 const BASE = process.env.SMOKE_BASE_URL ?? "http://127.0.0.1:3000";
 /** Prefer SMOKE_PIN; fall back to SEED_PIN (same default as prisma/seed.ts). */
 const PIN = process.env.SMOKE_PIN || process.env.SEED_PIN || "123456";
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL
-        ? buildMongoDatabaseUrl(process.env.DATABASE_URL)
-        : undefined,
-    },
-  },
-});
+const prisma = new PrismaClient();
 
 type Status = "PASS" | "FAIL" | "SKIP" | "WARN";
 type Row = {

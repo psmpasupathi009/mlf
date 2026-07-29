@@ -9,18 +9,9 @@ import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { issueAuthTokens, type AuthUser } from "../lib/auth/session";
 import { normalizeMobile } from "../lib/auth/mobile";
-import { buildMongoDatabaseUrl } from "../lib/db/prisma";
 
 const BASE = process.env.SMOKE_BASE_URL ?? "http://127.0.0.1:3000";
-const prisma = new PrismaClient({
-  datasources: {
-    db: {
-      url: process.env.DATABASE_URL
-        ? buildMongoDatabaseUrl(process.env.DATABASE_URL)
-        : undefined,
-    },
-  },
-});
+const prisma = new PrismaClient();
 
 type StepResult = { step: string; ok: boolean; detail: string };
 

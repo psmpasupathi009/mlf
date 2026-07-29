@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { cookies } from "next/headers";
-import { prisma, withDbRetry } from "@/lib/db/prisma";
+import { prisma } from "@/lib/db/prisma";
+import { withDbRetry } from "@/lib/db/unreachable";
 import { verifyAccessToken } from "@/lib/auth/jwt";
 import {
   ACCESS_COOKIE,

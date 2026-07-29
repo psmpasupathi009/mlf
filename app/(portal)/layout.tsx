@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/shared/components/layout/app-shell";
 import { DbUnavailable } from "@/features/auth/components/db-unavailable";
 import { getSessionUser } from "@/lib/auth/session-user";
-import { isDbUnreachableError } from "@/lib/db/prisma";
+import { isDbUnreachableError } from "@/lib/db/unreachable";
 import type { PublicUser } from "@/lib/auth/session";
 
 export default async function PortalLayout({

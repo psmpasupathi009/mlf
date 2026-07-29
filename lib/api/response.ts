@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ZodError, type ZodType } from "zod";
-import { isDbUnreachableError } from "@/lib/db/prisma";
+import { isDbUnreachableError } from "@/lib/db/unreachable";
 
 export type ApiErrorCode =
   | "UNAUTHORIZED"

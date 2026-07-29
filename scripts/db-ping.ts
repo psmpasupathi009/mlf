@@ -4,20 +4,15 @@
  */
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
-import {
-  buildMongoDatabaseUrl,
-  isDbUnreachableError,
-} from "../lib/db/prisma";
+import { isDbUnreachableError } from "../lib/db/unreachable";
 
 async function main() {
-  const base = process.env.DATABASE_URL;
-  if (!base) {
+  if (!process.env.DATABASE_URL) {
     console.error("DATABASE_URL is missing in .env");
     process.exit(1);
   }
 
-  const url = buildMongoDatabaseUrl(base);
-  const prisma = new PrismaClient({ datasources: { db: { url } } });
+  const prisma = new PrismaClient();
 
   try {
     const users = await prisma.user.count();

@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/db/prisma";
 import {
   isDbUnreachableError,
-  prisma,
   withDbRetry,
-} from "@/lib/db/prisma";
+} from "@/lib/db/unreachable";
 import {
   isEnvAdminMobile,
   normalizeMobile,

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
+import { isDbUnreachableError } from "@/lib/db/unreachable";
 import { normalizeMobile } from "@/lib/auth/mobile";
 import {
   isPinLocked,
@@ -147,7 +148,13 @@ export async function POST(request: Request) {
     console.error("login error", error);
     return applyCorsHeaders(
       request,
-      jsonFail("SERVER_ERROR", "Login failed", 500)
+      jsonFail(
+        isDbUnreachableError(error) ? "DB_UNAVAILABLE" : "SERVER_ERROR",
+        isDbUnreachableError(error)
+          ? "Database unreachable. Check MongoDB Atlas Network Access — allow 0.0.0.0/0 (Access from Anywhere)."
+          : "Login failed",
+        isDbUnreachableError(error) ? 503 : 500
+      )
     );
   }
 }

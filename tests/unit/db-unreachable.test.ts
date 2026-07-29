@@ -1,40 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
-  buildMongoDatabaseUrl,
   isDbUnreachableError,
   withDbRetry,
-} from "@/lib/db/prisma";
-
-describe("buildMongoDatabaseUrl", () => {
-  it("appends serverless Mongo defaults", () => {
-    const url = buildMongoDatabaseUrl("mongodb+srv://u:p@cluster/mlf");
-    expect(url).toContain("serverSelectionTimeoutMS=5000");
-    expect(url).toContain("connectTimeoutMS=10000");
-    expect(url).toContain("maxPoolSize=10");
-    expect(url).toContain("minPoolSize=0");
-    expect(url).toContain("maxIdleTimeMS=30000");
-  });
-
-  it("does not override existing query params", () => {
-    const url = buildMongoDatabaseUrl(
-      "mongodb+srv://u:p@cluster/mlf?maxPoolSize=20&serverSelectionTimeoutMS=2000"
-    );
-    expect(url).toContain("maxPoolSize=20");
-    expect(url).not.toMatch(/maxPoolSize=10/);
-    expect(url).toContain("serverSelectionTimeoutMS=2000");
-    expect(url).not.toMatch(/serverSelectionTimeoutMS=5000/);
-    expect(url).toContain("connectTimeoutMS=10000");
-  });
-
-  it("preserves query separator when base already has params", () => {
-    const url = buildMongoDatabaseUrl(
-      "mongodb+srv://u:p@cluster/mlf?retryWrites=true"
-    );
-    expect(
-      url.startsWith("mongodb+srv://u:p@cluster/mlf?retryWrites=true&")
-    ).toBe(true);
-  });
-});
+} from "@/lib/db/unreachable";
 
 describe("isDbUnreachableError", () => {
   it("detects Atlas / selection failures", () => {
