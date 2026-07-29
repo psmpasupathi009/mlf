@@ -5,7 +5,7 @@ import { nextUnitId } from "@/lib/ids";
 import { istDateKey } from "@/lib/utils/ist";
 import { checkInOutSchema } from "@/lib/validations/hrms.schema";
 import { toAttendanceSummary } from "@/features/hrms/server/serialize";
-import { findOfficeHolidayForDate } from "@/features/hrms/lib/office-holiday";
+import { findOfficeHolidayForDate } from "@/features/hrms/server/office-holiday";
 
 export const POST = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "hrms", "own_attendance");

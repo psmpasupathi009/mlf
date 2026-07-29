@@ -479,7 +479,7 @@ export async function buildDashboardSummary(
           (async () => {
             try {
               return await (
-                await import("@/features/hrms/lib/office-holiday")
+                await import("@/features/hrms/server/office-holiday")
               ).findOfficeHolidayForDate(todayKey);
             } catch {
               return null;

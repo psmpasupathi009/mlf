@@ -1,4 +1,3 @@
-import { prisma } from "@/lib/db/prisma";
 import { leaveCoversDate } from "@/features/hrms/lib/status";
 
 export type OfficeHolidaySummary = {
@@ -34,30 +33,4 @@ export function dateIsOfficeHoliday(
   holidays: { fromDate: string; toDate: string }[]
 ): boolean {
   return holidays.some((h) => leaveCoversDate(h.fromDate, h.toDate, dateKey));
-}
-
-export async function findOfficeHolidayForDate(dateKey: string) {
-  const delegate = (
-    prisma as unknown as {
-      officeHoliday?: {
-        findMany: typeof prisma.officeHoliday.findMany;
-      };
-    }
-  ).officeHoliday;
-  if (!delegate?.findMany) return null;
-
-  const rows = await delegate.findMany({
-    where: {
-      fromDate: { lte: dateKey },
-      toDate: { gte: dateKey },
-    },
-    orderBy: { fromDate: "asc" },
-    take: 1,
-  });
-  return rows[0] ?? null;
-}
-
-export async function isOfficeHoliday(dateKey: string): Promise<boolean> {
-  const hit = await findOfficeHolidayForDate(dateKey);
-  return Boolean(hit);
 }

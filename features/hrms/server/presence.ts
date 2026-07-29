@@ -8,7 +8,7 @@ import {
   type PresenceStatus,
 } from "@/features/hrms/lib/status";
 import type { BusyTodayBlock } from "@/features/availability/lib/busy-labels";
-import { findOfficeHolidayForDate } from "@/features/hrms/lib/office-holiday";
+import { findOfficeHolidayForDate } from "@/features/hrms/server/office-holiday";
 
 export type { PresenceStatus };
 

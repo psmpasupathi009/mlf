@@ -3,7 +3,7 @@ import { prisma } from "@/lib/db/prisma";
 import { normalizeMobile } from "@/lib/auth/mobile";
 import { istDateKey, istDayBounds } from "@/lib/utils/ist";
 import { busySegmentLabel } from "@/features/availability/lib/busy-labels";
-import { findOfficeHolidayForDate } from "@/features/hrms/lib/office-holiday";
+import { findOfficeHolidayForDate } from "@/features/hrms/server/office-holiday";
 
 export type ConflictCode =
   | "ADVOCATE_BUSY"
