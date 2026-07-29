@@ -294,7 +294,7 @@ export function CasesPage({ user }: { user: PublicUser }) {
               >
                 Export Excel
               </DropdownMenuItem>
-              {can("create") ? (
+              {can("upload") ? (
                 <DropdownMenuItem onSelect={() => setImportOpen(true)}>
                   Import cases
                 </DropdownMenuItem>

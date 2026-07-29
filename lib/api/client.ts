@@ -144,6 +144,14 @@ export async function apiFetch<T = Record<string, unknown>>(
         ? unwrapSuccess<T>(raw)
         : ((raw.ok === false ? raw : unwrapData<T>(raw)) as T);
 
+    if (
+      typeof window !== "undefined" &&
+      !path.startsWith("/api/auth/") &&
+      (res.status === 401 || getErrorCode(raw) === "UNAUTHORIZED")
+    ) {
+      window.location.assign("/api/auth/session-expired");
+    }
+
     return { ok: res.ok && raw.ok !== false, status: res.status, data };
   } catch (error) {
     const aborted = error instanceof Error && error.name === "AbortError";
@@ -170,6 +178,13 @@ export async function apiDownload(
     const res = await fetch(path, { credentials: "include", cache: "no-store" });
     if (!res.ok) {
       const raw = await parseJson(res);
+      if (
+        typeof window !== "undefined" &&
+        !path.startsWith("/api/auth/") &&
+        (res.status === 401 || getErrorCode(raw) === "UNAUTHORIZED")
+      ) {
+        window.location.assign("/api/auth/session-expired");
+      }
       return {
         ok: false,
         error: getErrorMessage(raw, "Download failed"),

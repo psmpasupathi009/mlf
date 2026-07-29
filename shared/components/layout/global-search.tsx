@@ -11,9 +11,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { apiFetch } from "@/lib/api/client";
+import { apiFetch, getErrorCode, getErrorMessage } from "@/lib/api/client";
 import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
 import { cn } from "@/lib/utils/cn";
+import { toast } from "sonner";
 
 type SearchResult = {
   employees: {
@@ -65,12 +66,19 @@ export function GlobalSearch() {
     let cancelled = false;
     setLoading(true);
     void (async () => {
-      const { ok, data } = await apiFetch<SearchResult>(
+      const { ok, data, status } = await apiFetch<SearchResult>(
         `/api/search?q=${encodeURIComponent(query)}`
       );
       if (cancelled) return;
       setLoading(false);
-      setResults(ok ? data : { employees: [], clients: [], cases: [] });
+      if (!ok) {
+        setResults({ employees: [], clients: [], cases: [] });
+        if (status === 429 || getErrorCode(data) === "RATE_LIMITED") {
+          toast.error(getErrorMessage(data, "Too many searches. Slow down."));
+        }
+        return;
+      }
+      setResults(data);
     })();
     return () => {
       cancelled = true;

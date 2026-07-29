@@ -22,6 +22,9 @@ import { displayMobile } from "@/lib/auth/mobile";
 import { containsInsensitive } from "@/lib/db/search";
 
 export const GET = apiHandler(async (request) => {
+  const reportsGate = await requirePerm(request, "reports", "view");
+  if (!reportsGate.user) return reportsGate.response;
+
   const url = new URL(request.url);
   const type = url.searchParams.get("type") ?? "cases";
 

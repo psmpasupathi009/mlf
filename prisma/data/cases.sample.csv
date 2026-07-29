@@ -1,3 +1,1 @@
-unitId,clientUnitId,caseNumber,cnr,courtName,caseType,status,filingDate,nextHearingAt,agreedFee,primaryAdvocateMobile,notes
-,CLI-00001,OS/123/2024,,City Civil Court,Civil,pre_filing,2024-06-15,2024-08-20,25000,9876543210,Replace CLI-00001 with a real client unitId from Clients
-,CLI-00002,,,JMFC Gobichettipalayam,Criminal,enquiry,,,15000,9876543210,Import clients first then paste their unitId
+../../public/samples/cases.sample.csv

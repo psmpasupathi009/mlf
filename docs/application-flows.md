@@ -109,14 +109,14 @@ flowchart LR
 
 | Route | How users reach it | Module flag on page? | API gate |
 |-------|--------------------|----------------------|----------|
-| `/` | Nav Home (`dashboard`) | No | `requireUser` only on summary |
+| `/` | Nav Home (`dashboard`) | Yes — `dashboard.view` | `requirePerm(dashboard, view)` |
 | `/notifications` | Header bell (not main nav) | No | `requireUser` only |
 | `/profile` | User menu | No | Logged-in profile routes |
-| Documents | Case / client UI panels | N/A (no `/documents` page) | `cases.upload` / accounts upload perms |
-| `/diary` | Nav (gated via cases perms in practice) | Via related module | Diary API + perms |
+| Documents | Case / client UI panels | N/A (no `/documents` page) | List needs parent id; download by doc type (`cases.*` / `accounts.*`) |
+| `/diary` | Nav (cases **or** appointments **or** tasks) | Multi-module OR | At least one matching `*.view` |
 | `/availability` | Nav (appointments-related) | Via related module | Availability APIs |
 
-Treat home / notifications / profile as **any authenticated user** unless you later add stricter `requirePerm`.
+Notifications / profile stay **any authenticated user**. Home requires `dashboard.view` (aligned with nav).
 
 ### Quick map: page → feature → API
 
@@ -216,7 +216,9 @@ Disabled modules leave the nav and fail API module checks. Today every entry in 
 
 **Shared pieces:** `shared/components/data/import-dialog.tsx` · `lib/utils/csv.ts` · `lib/imports/columns.ts` · `lib/imports/lookups.ts` · `assertImportRateLimit` · `compliance.csv.maxRows`
 
-**Samples:** download from **`public/samples/`** (canonical). `prisma/data/` mirrors the same CSVs — see [import order](../prisma/data/README.md). Sample for accounts is named `payments.sample.csv`.
+**Samples:** download from **`public/samples/`** (canonical). `prisma/data/*.sample.csv` are **symlinks** to those files — see [import order](../prisma/data/README.md). Sample for accounts is named `payments.sample.csv`.
+
+Shared server wrapper: `lib/imports/run-import.ts` (`createImportHandler`). Domain routes supply `processRows` only.
 
 ```mermaid
 sequenceDiagram
@@ -233,16 +235,16 @@ sequenceDiagram
 
 **Server loop:** `requirePerm` → rate limit → ignore unknown columns → Zod `{ dryRun, rows }` → per-row lookup/validate → create/update or dry-run message → `writeAudit` if not dry-run.
 
-| Endpoint | Columns constant |
-|----------|------------------|
-| `POST /api/clients/import` | `IMPORT_CLIENT_COLUMNS` |
-| `POST /api/cases/import` | `IMPORT_CASE_COLUMNS` |
-| `POST /api/hearings/import` | `IMPORT_HEARING_COLUMNS` |
-| `POST /api/accounts/import` | `IMPORT_PAYMENT_COLUMNS` |
-| `POST /api/employees/import` | `IMPORT_EMPLOYEE_COLUMNS` |
-| `POST /api/dak/import` | `IMPORT_DAK_COLUMNS` |
-| `POST /api/tasks/import` | `IMPORT_TASK_COLUMNS` |
-| `POST /api/appointments/import` | `IMPORT_APPOINTMENT_COLUMNS` |
+| Endpoint | Columns constant | Import perm |
+|----------|------------------|-------------|
+| `POST /api/clients/import` | `IMPORT_CLIENT_COLUMNS` | `clients.create` (+ `edit` for upsert) |
+| `POST /api/cases/import` | `IMPORT_CASE_COLUMNS` | `cases.upload` (+ `edit` for upsert) |
+| `POST /api/hearings/import` | `IMPORT_HEARING_COLUMNS` | `cases.edit` |
+| `POST /api/accounts/import` | `IMPORT_PAYMENT_COLUMNS` | `accounts.upload` |
+| `POST /api/employees/import` | `IMPORT_EMPLOYEE_COLUMNS` | `employees.create` (+ `edit` for upsert) |
+| `POST /api/dak/import` | `IMPORT_DAK_COLUMNS` | `dak.create` |
+| `POST /api/tasks/import` | `IMPORT_TASK_COLUMNS` | `tasks.create` |
+| `POST /api/appointments/import` | `IMPORT_APPOINTMENT_COLUMNS` | `appointments.create` |
 
 Each domain page wires `ImportDialog` with its `endpoint` + optional `sampleHref`.
 
@@ -252,7 +254,7 @@ Each domain page wires `ImportDialog` with its `endpoint` + optional `sampleHref
 
 **Key files:** `lib/notifications/notify.ts` (`notifyUser`, `scheduleNotify`) · `lib/notifications/sse-hub.ts` · `features/notifications/` · `shared/hooks/use-notifications.ts` (header bell) · `features/notifications/hooks/use-notifications-inbox.ts` (inbox page) · `app/api/notifications/*`
 
-**Flow:** Domain code notifies → `Notification` row + SSE publish → shell listens on `/api/notifications/stream` → inbox via `GET /api/notifications`.
+**Flow:** Domain code notifies → `Notification` row + SSE publish → shell listens on `/api/notifications/stream` **only when** `NEXT_PUBLIC_ENABLE_SSE=1` (otherwise poll). Shared stream hook: `shared/hooks/use-notification-stream.ts`. Inbox + bell both respect the flag.
 
 ### Cron / hearing SMS
 
@@ -330,7 +332,7 @@ Each section: **purpose → files → how it works**.
 | Page / UI | `app/(portal)/availability/` · `features/availability/` |
 | API / libs | `/api/advocates/availability/hours`, `.../blocks` · `/api/appointments/availability` · `lib/appointments/availability.ts`, `booking-rules.ts` · `config/company/booking.ts` |
 
-**Diary** — day board: hearings + appointments + tasks for an IST day.
+**Diary** — day board: hearings + appointments + tasks for an IST day. Nav/page/API allow access when **any** of cases / appointments / tasks is enabled with matching `*.view`; sections soft-gate.
 
 | Layer | Paths |
 |-------|-------|
@@ -394,7 +396,7 @@ Module `hrms` must be on. Split perms: `own_attendance`, `own_leave`, `approve_l
 | Reports | `features/reports/` | `GET /api/exports?type=...` (ExcelJS) |
 | Activity (audit log) | `features/activity/` | `GET /api/activity` · writes via `lib/audit` |
 
-Export types include cases, clients, employees, tasks, dak, accounts, appointments, fees-outstanding, and more (see `app/api/exports/route.ts`).
+Export types include cases, clients, employees, tasks, dak, accounts, appointments, fees-outstanding, and more (see `app/api/exports/route.ts`). All exports require **`reports.view`** first, then the domain `*.view` for that type.
 
 ### Profile and reference data
 
@@ -430,16 +432,26 @@ What is already healthy vs what is clutter or worth consolidating later.
 
 Do **not** commit `.env`, `.data/`, `.tools/`, or runtime `uploads/` contents.
 
-### Better later (consolidate, don’t delete features)
+### Better later (optional follow-ups)
 
 | Improvement | Why it helps |
 |-------------|--------------|
-| One CSV source of truth | `public/samples/` vs `prisma/data/` are duplicates — keep one or generate the mirror |
-| Shared `lib/imports/run-import.ts` | Eight nearly identical `app/api/*/import/route.ts` files (~1.6k lines) |
-| Shared notification hook core | `shared/hooks/use-notifications.ts` and inbox hook both own SSE / mark-read |
-| Align home / notifications perms | Nav implies `dashboard.view`; APIs often `requireUser` only — pick one story |
-| Short `scripts/README.md` | Document audit/smoke env vars (`SMOKE_PIN`, `SMOKE_BASE_URL`) |
 | README as MLF entry | Avoid create-next-app boilerplate pointing at missing `app/page.tsx` |
+| Redis / external SSE hub | Live push across serverless isolates without opt-in poll |
+
+### Done in flow cleanup
+
+| Item | Status |
+|------|--------|
+| `lib/imports/run-import.ts` + thin import routes | Done |
+| CSV single source (`public/samples` + symlinks in `prisma/data`) | Done |
+| Shared notification SSE hook + flag on bell and inbox | Done |
+| Home / exports RBAC (`dashboard.view`, `reports.view`) | Done |
+| Document list scoping + download auth by doc type | Done |
+| Diary multi-module nav/page/API gate | Done |
+| `scripts/README.md` (smoke env vars) | Done |
+| OTP weak-PIN before proof consume; SMS claim-then-send | Done |
+| `apiFetch` mid-session 401 → session-expired | Done |
 
 ### Suggested work order when changing a domain
 
@@ -458,7 +470,9 @@ Do **not** commit `.env`, `.data/`, `.tools/`, or runtime `uploads/` contents.
 |---------|----------|---------|
 | Responses | `lib/api/response.ts` | `apiHandler`, `jsonOk`, `jsonOkList`, `jsonFail` |
 | Guards | `lib/api/guard.ts` | `requireUser`, `requirePerm`, `requireRole` |
-| Browser fetch | `lib/api/client.ts` | `apiFetch`, `apiDownload` |
+| Browser fetch | `lib/api/client.ts` | `apiFetch`, `apiDownload` (401 → session-expired) |
+| CSV import | `lib/imports/run-import.ts` | `createImportHandler` |
+| Notifications (client) | `shared/hooks/use-notification-stream.ts` | SSE opt-in via `NEXT_PUBLIC_ENABLE_SSE` |
 | DB | `lib/db/prisma.ts`, `unreachable.ts` | Prisma client, retry / down detection |
 | Validation | `lib/validations/*.schema.ts` | Zod per domain |
 | Rate limit | `lib/rate-limit/` | Auth, import, search, upload |

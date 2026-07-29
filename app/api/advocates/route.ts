@@ -1,6 +1,7 @@
 import { apiHandler, jsonFail, jsonOkList, parsePagination } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/guard";
 import { hasPermission } from "@/lib/rbac";
+import { isModuleEnabled } from "@/config/company/modules";
 import { prisma } from "@/lib/db/prisma";
 import { displayMobile } from "@/lib/auth/mobile";
 import { userPhotoUrl } from "@/lib/auth/user-photo";
@@ -14,10 +15,13 @@ export const GET = apiHandler(async (request) => {
   const { user, response } = await requireUser(request);
   if (!user) return response;
 
-  const canCases = await hasPermission(user.id, "cases", "view");
+  const canCases =
+    isModuleEnabled("cases") &&
+    (await hasPermission(user.id, "cases", "view"));
   const canAppt =
-    (await hasPermission(user.id, "appointments", "view")) ||
-    (await hasPermission(user.id, "appointments", "create"));
+    isModuleEnabled("appointments") &&
+    ((await hasPermission(user.id, "appointments", "view")) ||
+      (await hasPermission(user.id, "appointments", "create")));
   if (!canCases && !canAppt) {
     return jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403);
   }

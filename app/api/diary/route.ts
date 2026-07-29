@@ -1,6 +1,7 @@
-import { apiHandler, jsonOk } from "@/lib/api/response";
-import { requirePerm } from "@/lib/api/guard";
+import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
+import { requireUser } from "@/lib/api/guard";
 import { hasPermission } from "@/lib/rbac";
+import { isModuleEnabled } from "@/config/company/modules";
 import { prisma } from "@/lib/db/prisma";
 import { istDayBounds, istDateKey } from "@/lib/utils/ist";
 import { displayMobile } from "@/lib/auth/mobile";
@@ -21,8 +22,22 @@ function mobileMatchKeys(mobile: string): string[] {
 }
 
 export const GET = apiHandler(async (request) => {
-  const { user, response } = await requirePerm(request, "cases", "view");
+  const { user, response } = await requireUser(request);
   if (!user) return response;
+
+  const canCases =
+    isModuleEnabled("cases") &&
+    (await hasPermission(user.id, "cases", "view"));
+  const canAppointments =
+    isModuleEnabled("appointments") &&
+    (await hasPermission(user.id, "appointments", "view"));
+  const canTasks =
+    isModuleEnabled("tasks") &&
+    (await hasPermission(user.id, "tasks", "view"));
+
+  if (!canCases && !canAppointments && !canTasks) {
+    return jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403);
+  }
 
   const url = new URL(request.url);
   const dateParam = url.searchParams.get("date");
@@ -30,8 +45,6 @@ export const GET = apiHandler(async (request) => {
   const dateKey = dateParam || istDateKey(new Date());
   const { start, end } = istDayBounds(dateKey);
 
-  const canAppointments = await hasPermission(user.id, "appointments", "view");
-  const canTasks = await hasPermission(user.id, "tasks", "view");
   const isOfficeAdmin =
     user.roles.includes("admin") || user.roles.includes("sub_admin");
 
@@ -51,7 +64,7 @@ export const GET = apiHandler(async (request) => {
   }
 
   const emptyHearings =
-    caseUnitIdFilter !== null && caseUnitIdFilter.length === 0;
+    !canCases || (caseUnitIdFilter !== null && caseUnitIdFilter.length === 0);
 
   const hearingsPromise = emptyHearings
     ? Promise.resolve([])

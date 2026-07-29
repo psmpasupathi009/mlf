@@ -12,7 +12,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { apiFetch, getErrorMessage } from "@/lib/api/client";
+import { apiDownload, apiFetch, getErrorMessage } from "@/lib/api/client";
 import type { PaymentSummary } from "@/features/accounts/server/serialize";
 import type { DocumentSummary } from "@/features/documents/server/serialize";
 import { UploadDocumentDialog } from "@/features/documents/components/upload-document-dialog";
@@ -378,12 +378,21 @@ export function PaymentDetailDrawer({
                           <span className="min-w-0 truncate text-navy">
                             {r.title}
                           </span>
-                          <a
-                            href={`/api/documents/${r.unitId}/download`}
+                          <button
+                            type="button"
                             className="shrink-0 text-xs font-medium text-navy underline-offset-2 hover:underline"
+                            onClick={async () => {
+                              const result = await apiDownload(
+                                `/api/documents/${r.unitId}/download`,
+                                r.originalName || r.title || "receipt"
+                              );
+                              if (!result.ok) {
+                                toast.error(result.error ?? "Download failed");
+                              }
+                            }}
                           >
                             Download
-                          </a>
+                          </button>
                         </li>
                       ))}
                     </ul>

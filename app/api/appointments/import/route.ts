@@ -1,9 +1,6 @@
-import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
-import { requirePerm } from "@/lib/api/guard";
+import { createImportHandler } from "@/lib/imports/run-import";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
-import { writeAudit } from "@/lib/audit";
-import { compliance } from "@/config/company/compliance";
 import {
   appointmentModeEnum,
   importAppointmentsSchema,
@@ -12,246 +9,189 @@ import {
   canBookForAnyAdvocate,
   resolveBookingAdvocateMobile,
 } from "@/lib/appointments/booking-rules";
-import { assertImportRateLimit } from "@/lib/rate-limit/guards";
 import {
   caseBelongsToClient,
   findCaseByUnitId,
   findClientByUnitId,
 } from "@/lib/imports/lookups";
-import {
-  findIgnoredImportColumns,
-  IMPORT_APPOINTMENT_COLUMNS,
-} from "@/lib/imports/columns";
+import { IMPORT_APPOINTMENT_COLUMNS } from "@/lib/imports/columns";
 
-type RowResult = {
-  row: number;
-  unitId: string | null;
-  status: "ok" | "error";
-  message: string;
-};
+export const POST = createImportHandler({
+  perm: ["appointments", "create"],
+  schema: importAppointmentsSchema,
+  columns: IMPORT_APPOINTMENT_COLUMNS,
+  audit: { action: "appointment.import", entity: "Appointment" },
+  async processRows(rows, { user, dryRun }) {
+    const results = [];
 
-export const POST = apiHandler(async (request) => {
-  const { user, response } = await requirePerm(request, "appointments", "create");
-  if (!user) return response;
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i]!;
+      const rowNum = i + 2;
 
-  const limited = await assertImportRateLimit(request, user.unitId);
-  if (limited) return limited;
-
-  const raw = await request.json();
-  const ignoredColumns = Array.isArray(raw?.rows)
-    ? findIgnoredImportColumns(
-        raw.rows as Record<string, string>[],
-        IMPORT_APPOINTMENT_COLUMNS
-      )
-    : [];
-  const parsed = importAppointmentsSchema.safeParse(raw);
-  if (!parsed.success) {
-    return jsonFail(
-      "VALIDATION",
-      parsed.error.issues[0]?.message ?? "Invalid request",
-      400,
-      parsed.error.issues
-    );
-  }
-  const { dryRun, rows } = parsed.data;
-
-  if (rows.length > compliance.csv.maxRows) {
-    return jsonFail(
-      "VALIDATION",
-      `Max ${compliance.csv.maxRows} rows per import`,
-      400
-    );
-  }
-
-  const results: RowResult[] = [];
-
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i]!;
-    const rowNum = i + 2;
-
-    const scheduledAt = new Date(row.scheduledAt.trim());
-    if (Number.isNaN(scheduledAt.getTime())) {
-      results.push({
-        row: rowNum,
-        unitId: null,
-        status: "error",
-        message: "Invalid scheduledAt (use ISO or YYYY-MM-DDTHH:mm)",
-      });
-      continue;
-    }
-
-    let durationMin = 30;
-    if (row.durationMin?.trim()) {
-      const n = Number(row.durationMin);
-      if (!Number.isFinite(n) || n < 5 || n > 480) {
+      const scheduledAt = new Date(row.scheduledAt.trim());
+      if (Number.isNaN(scheduledAt.getTime())) {
         results.push({
           row: rowNum,
           unitId: null,
-          status: "error",
-          message: "durationMin must be 5–480",
+          status: "error" as const,
+          message: "Invalid scheduledAt (use ISO or YYYY-MM-DDTHH:mm)",
         });
         continue;
       }
-      durationMin = Math.round(n);
-    }
 
-    let mode: "office" | "call" | "video" = "office";
-    if (row.mode?.trim()) {
-      const modeParsed = appointmentModeEnum.safeParse(row.mode.trim());
-      if (!modeParsed.success) {
+      let durationMin = 30;
+      if (row.durationMin?.trim()) {
+        const n = Number(row.durationMin);
+        if (!Number.isFinite(n) || n < 5 || n > 480) {
+          results.push({
+            row: rowNum,
+            unitId: null,
+            status: "error" as const,
+            message: "durationMin must be 5–480",
+          });
+          continue;
+        }
+        durationMin = Math.round(n);
+      }
+
+      let mode: "office" | "call" | "video" = "office";
+      if (row.mode?.trim()) {
+        const modeParsed = appointmentModeEnum.safeParse(row.mode.trim());
+        if (!modeParsed.success) {
+          results.push({
+            row: rowNum,
+            unitId: null,
+            status: "error" as const,
+            message: "mode must be office|call|video",
+          });
+          continue;
+        }
+        mode = modeParsed.data;
+      }
+
+      let clientUnitId: string | undefined;
+      if (row.clientUnitId?.trim()) {
+        const client = await findClientByUnitId(row.clientUnitId);
+        if (!client) {
+          results.push({
+            row: rowNum,
+            unitId: null,
+            status: "error" as const,
+            message: `Client not found: ${row.clientUnitId}`,
+          });
+          continue;
+        }
+        clientUnitId = client.unitId;
+      }
+
+      let caseId: string | undefined;
+      let caseUnitId: string | undefined;
+      if (row.caseUnitId?.trim()) {
+        const caseItem = await findCaseByUnitId(row.caseUnitId);
+        if (!caseItem) {
+          results.push({
+            row: rowNum,
+            unitId: null,
+            status: "error" as const,
+            message: `Case not found: ${row.caseUnitId}`,
+          });
+          continue;
+        }
+        if (clientUnitId && !caseBelongsToClient(caseItem, clientUnitId)) {
+          results.push({
+            row: rowNum,
+            unitId: null,
+            status: "error" as const,
+            message: "Case does not belong to client",
+          });
+          continue;
+        }
+        caseId = caseItem.id;
+        caseUnitId = caseItem.unitId;
+      }
+
+      const resolved = resolveBookingAdvocateMobile({
+        roles: user.roles,
+        actorMobile: user.mobile,
+        requestedMobile: row.advocateMobile,
+      });
+      if (!resolved.mobile) {
         results.push({
           row: rowNum,
           unitId: null,
-          status: "error",
-          message: "mode must be office|call|video",
+          status: "error" as const,
+          message: resolved.error ?? "Invalid advocateMobile",
         });
         continue;
       }
-      mode = modeParsed.data;
-    }
 
-    let clientUnitId: string | undefined;
-    if (row.clientUnitId?.trim()) {
-      const client = await findClientByUnitId(row.clientUnitId);
-      if (!client) {
+      if (canBookForAnyAdvocate(user.roles)) {
+        const ten = resolved.mobile.replace(/\D/g, "").slice(-10);
+        const advocate = await prisma.user.findFirst({
+          where: {
+            isActive: true,
+            roles: { has: "advocate" },
+            OR: [
+              { mobile: resolved.mobile },
+              { mobile: ten },
+              { mobile: `91${ten}` },
+            ],
+          },
+          select: { id: true },
+        });
+        if (!advocate) {
+          results.push({
+            row: rowNum,
+            unitId: null,
+            status: "error" as const,
+            message: "Advocate not found in office list",
+          });
+          continue;
+        }
+      }
+
+      if (dryRun) {
         results.push({
           row: rowNum,
           unitId: null,
-          status: "error",
-          message: `Client not found: ${row.clientUnitId}`,
+          status: "ok" as const,
+          message: "Will create (slot checks skipped on import)",
         });
         continue;
       }
-      clientUnitId = client.unitId;
-    }
 
-    let caseId: string | undefined;
-    let caseUnitId: string | undefined;
-    if (row.caseUnitId?.trim()) {
-      const caseItem = await findCaseByUnitId(row.caseUnitId);
-      if (!caseItem) {
+      try {
+        const unitId = await nextUnitId("appointment");
+        const created = await prisma.appointment.create({
+          data: {
+            unitId,
+            clientUnitId,
+            caseId,
+            caseUnitId,
+            advocateMobile: resolved.mobile,
+            title: row.title,
+            scheduledAt,
+            durationMin,
+            mode,
+            createdById: user.id,
+          },
+        });
+        results.push({
+          row: rowNum,
+          unitId: created.unitId,
+          status: "ok" as const,
+          message: "Created",
+        });
+      } catch {
         results.push({
           row: rowNum,
           unitId: null,
-          status: "error",
-          message: `Case not found: ${row.caseUnitId}`,
+          status: "error" as const,
+          message: "Failed to save row",
         });
-        continue;
-      }
-      if (clientUnitId && !caseBelongsToClient(caseItem, clientUnitId)) {
-        results.push({
-          row: rowNum,
-          unitId: null,
-          status: "error",
-          message: "Case does not belong to client",
-        });
-        continue;
-      }
-      caseId = caseItem.id;
-      caseUnitId = caseItem.unitId;
-    }
-
-    const resolved = resolveBookingAdvocateMobile({
-      roles: user.roles,
-      actorMobile: user.mobile,
-      requestedMobile: row.advocateMobile,
-    });
-    if (!resolved.mobile) {
-      results.push({
-        row: rowNum,
-        unitId: null,
-        status: "error",
-        message: resolved.error ?? "Invalid advocateMobile",
-      });
-      continue;
-    }
-
-    if (canBookForAnyAdvocate(user.roles)) {
-      const ten = resolved.mobile.replace(/\D/g, "").slice(-10);
-      const advocate = await prisma.user.findFirst({
-        where: {
-          isActive: true,
-          roles: { has: "advocate" },
-          OR: [
-            { mobile: resolved.mobile },
-            { mobile: ten },
-            { mobile: `91${ten}` },
-          ],
-        },
-        select: { id: true },
-      });
-      if (!advocate) {
-        results.push({
-          row: rowNum,
-          unitId: null,
-          status: "error",
-          message: "Advocate not found in office list",
-        });
-        continue;
       }
     }
 
-    if (dryRun) {
-      results.push({
-        row: rowNum,
-        unitId: null,
-        status: "ok",
-        message: "Will create (slot checks skipped on import)",
-      });
-      continue;
-    }
-
-    try {
-      const unitId = await nextUnitId("appointment");
-      const created = await prisma.appointment.create({
-        data: {
-          unitId,
-          clientUnitId,
-          caseId,
-          caseUnitId,
-          advocateMobile: resolved.mobile,
-          title: row.title,
-          scheduledAt,
-          durationMin,
-          mode,
-          createdById: user.id,
-        },
-      });
-      results.push({
-        row: rowNum,
-        unitId: created.unitId,
-        status: "ok",
-        message: "Created",
-      });
-    } catch {
-      results.push({
-        row: rowNum,
-        unitId: null,
-        status: "error",
-        message: "Failed to save row",
-      });
-    }
-  }
-
-  if (!dryRun) {
-    await writeAudit({
-      actorUnitId: user.unitId,
-      action: "appointment.import",
-      entity: "Appointment",
-      meta: {
-        total: rows.length,
-        succeeded: results.filter((r) => r.status === "ok").length,
-        failed: results.filter((r) => r.status === "error").length,
-      },
-    });
-  }
-
-  return jsonOk({
-    dryRun,
-    total: rows.length,
-    succeeded: results.filter((r) => r.status === "ok").length,
-    failed: results.filter((r) => r.status === "error").length,
-    results,
-    ignoredColumns,
-  });
+    return results;
+  },
 });

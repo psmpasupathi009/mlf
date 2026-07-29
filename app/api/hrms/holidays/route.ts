@@ -7,7 +7,7 @@ import {
   parsePagination,
 } from "@/lib/api/response";
 import { requirePerm, requireUser } from "@/lib/api/guard";
-import { hasPermission } from "@/lib/rbac";
+import { hasPermission, requireModuleEnabled } from "@/lib/rbac";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
 import { writeAudit, pickAuditFields } from "@/lib/audit";
@@ -53,6 +53,8 @@ async function notifyHoliday(
 export const GET = apiHandler(async (request) => {
   const { user, response } = await requireUser(request);
   if (!user) return response;
+  const modFail = requireModuleEnabled("hrms");
+  if (modFail) return modFail;
   const canView =
     (await hasPermission(user.id, "hrms", "view")) ||
     (await hasPermission(user.id, "hrms", "own_attendance")) ||

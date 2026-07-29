@@ -1,16 +1,24 @@
 import { NextResponse } from "next/server";
 import { apiHandler, jsonFail } from "@/lib/api/response";
-import { requirePerm } from "@/lib/api/guard";
+import { requireUser } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
 import { storage } from "@/lib/storage";
+import {
+  canViewDocument,
+  contentDispositionAttachment,
+} from "@/features/documents/server/access";
 
 export const GET = apiHandler(async (request, context) => {
-  const { user, response } = await requirePerm(request, "cases", "view");
+  const { user, response } = await requireUser(request);
   if (!user) return response;
 
   const { unitId } = (await context.params) ?? {};
   const doc = unitId ? await prisma.document.findUnique({ where: { unitId } }) : null;
   if (!doc) return jsonFail("NOT_FOUND", "Document not found", 404);
+
+  if (!(await canViewDocument(user, doc))) {
+    return jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403);
+  }
 
   const file = await storage.get(doc.fileKey);
   if (!file) return jsonFail("NOT_FOUND", "File not found in storage", 404);
@@ -19,7 +27,7 @@ export const GET = apiHandler(async (request, context) => {
     status: 200,
     headers: {
       "Content-Type": doc.mimeType,
-      "Content-Disposition": `attachment; filename="${encodeURIComponent(doc.originalName)}"`,
+      "Content-Disposition": contentDispositionAttachment(doc.originalName),
       "Content-Length": String(doc.size),
     },
   });

@@ -1,9 +1,9 @@
 import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/guard";
-import { hasPermission } from "@/lib/rbac";
 import { prisma } from "@/lib/db/prisma";
 import { writeAudit, pickAuditFields } from "@/lib/audit";
 import { storage } from "@/lib/storage";
+import { canMutateDocument } from "@/features/documents/server/access";
 
 export const DELETE = apiHandler(async (request, context) => {
   const { user, response } = await requireUser(request);
@@ -15,13 +15,7 @@ export const DELETE = apiHandler(async (request, context) => {
     : null;
   if (!doc) return jsonFail("NOT_FOUND", "Document not found", 404);
 
-  const canCasesUpload = await hasPermission(user.id, "cases", "upload");
-  const canAccountsReceipt =
-    doc.docType === "receipt" &&
-    ((await hasPermission(user.id, "accounts", "edit")) ||
-      (await hasPermission(user.id, "accounts", "upload")));
-
-  if (!canCasesUpload && !canAccountsReceipt) {
+  if (!(await canMutateDocument(user, doc))) {
     return jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403);
   }
 

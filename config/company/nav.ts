@@ -14,6 +14,11 @@ export type NavItem = {
   group: NavGroupId;
   /** At least one of these permissions is required to show the item. */
   permission: { module: string; action: string };
+  /**
+   * When set, show if any gate matches (module enabled + permission).
+   * Used for Day board (cases | appointments | tasks).
+   */
+  gates?: Array<{ module: AppModule; permission: string }>;
 };
 
 export const NAV_GROUP_LABELS: Record<NavGroupId, string> = {
@@ -61,6 +66,11 @@ export const navItems: NavItem[] = [
     module: "cases",
     group: "matters",
     permission: { module: "cases", action: "view" },
+    gates: [
+      { module: "cases", permission: "cases.view" },
+      { module: "appointments", permission: "appointments.view" },
+      { module: "tasks", permission: "tasks.view" },
+    ],
   },
   {
     href: "/appointments",

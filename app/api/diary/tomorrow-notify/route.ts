@@ -9,7 +9,7 @@ import { istAddCalendarDays, istDateKey, istDayBounds } from "@/lib/utils/ist";
  * (pairs with the overnight hearing-SMS cron).
  */
 export const GET = apiHandler(async (request) => {
-  const { user, response } = await requirePerm(request, "cases", "view");
+  const { user, response } = await requirePerm(request, "cases", "edit");
   if (!user) return response;
 
   const tomorrowKey = istAddCalendarDays(istDateKey(), 1);

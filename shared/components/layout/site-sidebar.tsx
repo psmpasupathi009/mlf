@@ -103,6 +103,11 @@ export function SiteSidebar({ user }: { user: PublicUser }) {
   };
 
   const items = navItems.filter((item) => {
+    if (item.gates?.length) {
+      return item.gates.some(
+        (g) => isModuleEnabled(g.module) && perms.has(g.permission)
+      );
+    }
     if (!isModuleEnabled(item.module)) return false;
     return perms.has(`${item.permission.module}.${item.permission.action}`);
   });

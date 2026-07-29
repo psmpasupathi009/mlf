@@ -2,7 +2,7 @@
 
 Canonical downloadable templates live in **`public/samples/`** (Import → Download sample CSV).
 
-This folder mirrors those files for seed/docs and offline copy.
+Files in this folder are **symlinks** to `public/samples/*.sample.csv` — edit the canonical copy only.
 
 ## Import order
 
@@ -31,4 +31,4 @@ This folder mirrors those files for seed/docs and offline copy.
 - Extra CSV columns are ignored; dry-run lists them as `ignoredColumns`
 - Always dry-run in the UI first
 
-Keep `public/samples/*.sample.csv` in sync when you change templates here.
+Server wrapper: `lib/imports/run-import.ts` (`createImportHandler`).

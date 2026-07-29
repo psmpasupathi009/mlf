@@ -1,6 +1,6 @@
 import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/guard";
-import { hasPermission } from "@/lib/rbac";
+import { hasPermission, requireModuleEnabled } from "@/lib/rbac";
 import { getEffectivePermissionsForRoles } from "@/lib/rbac";
 import { permissionsPreviewSchema } from "@/lib/validations/employees.schema";
 
@@ -11,6 +11,9 @@ import { permissionsPreviewSchema } from "@/lib/validations/employees.schema";
 export const POST = apiHandler(async (request) => {
   const { user, response } = await requireUser(request);
   if (!user) return response;
+
+  const modFail = requireModuleEnabled("employees");
+  if (modFail) return modFail;
 
   const canView = await hasPermission(user.id, "employees", "view");
   const canCreate = await hasPermission(user.id, "employees", "create");

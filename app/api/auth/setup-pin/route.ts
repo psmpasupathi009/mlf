@@ -49,6 +49,18 @@ export async function POST(request: Request) {
       );
     }
 
+    // Validate PIN before consuming the one-time OTP proof.
+    if (isWeakPin(parsed.data.pin)) {
+      return applyCorsHeaders(
+        request,
+        jsonFail(
+          "VALIDATION",
+          "Choose a stronger 6-digit PIN. Avoid sequences like 123456 or repeated digits.",
+          400
+        )
+      );
+    }
+
     const proof = await consumeOtpProof(parsed.data.otpProofToken, "setup");
     if (!proof) {
       return applyCorsHeaders(
@@ -57,17 +69,6 @@ export async function POST(request: Request) {
           "UNAUTHORIZED",
           "OTP verification expired or already used. Please verify again.",
           401
-        )
-      );
-    }
-
-    if (isWeakPin(parsed.data.pin)) {
-      return applyCorsHeaders(
-        request,
-        jsonFail(
-          "VALIDATION",
-          "Choose a stronger 6-digit PIN. Avoid sequences like 123456 or repeated digits.",
-          400
         )
       );
     }

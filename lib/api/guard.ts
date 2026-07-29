@@ -3,26 +3,13 @@ import type { User } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/session";
 import { hasPermission, requireModuleEnabled } from "@/lib/rbac";
 import { jsonFail } from "@/lib/api/response";
-import type { AppModule } from "@/config/company/modules";
+import { modules, type AppModule } from "@/config/company/modules";
 
 export type GuardResult =
   | { user: User; response: null }
   | { user: null; response: NextResponse };
 
-const APP_MODULES = new Set<string>([
-  "dashboard",
-  "employees",
-  "permissions",
-  "activity",
-  "clients",
-  "appointments",
-  "cases",
-  "accounts",
-  "hrms",
-  "dak",
-  "tasks",
-  "reports",
-]);
+const APP_MODULES = new Set<string>(Object.keys(modules.enabled));
 
 function asAppModule(module: string): AppModule | null {
   return APP_MODULES.has(module) ? (module as AppModule) : null;

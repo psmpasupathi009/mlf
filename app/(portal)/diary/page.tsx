@@ -4,13 +4,19 @@ import { ForbiddenState } from "@/shared/components/feedback/forbidden-state";
 import { DiaryPage } from "@/features/diary/components/diary-page";
 import { isModuleEnabled } from "@/config/company/modules";
 
+function canAccessDiary(permissions: string[] | undefined): boolean {
+  const perms = permissions ?? [];
+  return (
+    (isModuleEnabled("cases") && perms.includes("cases.view")) ||
+    (isModuleEnabled("appointments") &&
+      perms.includes("appointments.view")) ||
+    (isModuleEnabled("tasks") && perms.includes("tasks.view"))
+  );
+}
+
 export default async function DiaryRoutePage() {
   const user = await getSessionUser();
-  if (
-    !user ||
-    !isModuleEnabled("cases") ||
-    !(user.permissions ?? []).includes("cases.view")
-  ) {
+  if (!user || !canAccessDiary(user.permissions)) {
     return <ForbiddenState />;
   }
   return (

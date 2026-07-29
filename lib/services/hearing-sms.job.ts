@@ -216,13 +216,29 @@ export async function runHearingSmsJob(): Promise<HearingSmsJobResult> {
           courtName: caseItem.courtName ?? "the court",
         });
 
+        // Claim before send so cron + manual cannot double-SMS.
+        const claimAt = new Date();
+        const claimed = await prisma.hearing.updateMany({
+          where: { id: hearing.id, smsSentAt: null },
+          data: { smsSentAt: claimAt },
+        });
+        if (claimed.count !== 1) {
+          return {
+            sent: 0,
+            failed: 0,
+            skipped: 1,
+            detail: {
+              hearingUnitId: hearing.unitId,
+              caseUnitId: hearing.caseUnitId,
+              ok: true,
+              message: "Skipped — already claimed by another worker",
+            },
+          };
+        }
+
         const result = await sendTransactionalSms(mobile, message);
 
         if (result.ok) {
-          await prisma.hearing.update({
-            where: { id: hearing.id },
-            data: { smsSentAt: new Date() },
-          });
           return {
             sent: 1,
             failed: 0,
@@ -235,6 +251,12 @@ export async function runHearingSmsJob(): Promise<HearingSmsJobResult> {
             },
           };
         }
+
+        // Allow retry on the next run.
+        await prisma.hearing.update({
+          where: { id: hearing.id },
+          data: { smsSentAt: null },
+        });
 
         return {
           sent: 0,

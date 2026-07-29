@@ -1,3 +1,1 @@
-clientUnitId,caseUnitId,type,amount,status,paidOn,notes
-CLI-00001,CAS-00001,advance,5000,paid,2024-06-01,Replace unitIds from Clients/Cases lists
-CLI-00001,,consultation,1500,pending,,
+../../public/samples/payments.sample.csv

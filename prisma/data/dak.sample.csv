@@ -1,3 +1,1 @@
-direction,entryDate,subject,fromTo,caseUnitId,clientUnitId,notes
-in,2024-07-01,Court notice received,District Court,CAS-00001,CLI-00001,Replace unitIds as needed
-out,2024-07-02,Reply sent,Client counsel,,,
+../../public/samples/dak.sample.csv

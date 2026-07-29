@@ -1,3 +1,1 @@
-caseUnitId,hearingDate,purpose,notes
-CAS-00001,2024-09-15,Arguments,Replace CAS-00001 with a real case unitId
-CAS-00001,2024-10-01,Evidence,
+../../public/samples/hearings.sample.csv

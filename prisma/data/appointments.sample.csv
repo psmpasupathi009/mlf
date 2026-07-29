@@ -1,3 +1,1 @@
-title,scheduledAt,advocateMobile,clientUnitId,caseUnitId,durationMin,mode
-Client consult,2024-07-15T10:30,9876543210,CLI-00001,CAS-00001,30,office
-Follow-up call,2024-07-16T16:00,9876543210,CLI-00001,,15,call
+../../public/samples/appointments.sample.csv

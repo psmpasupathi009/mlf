@@ -1,6 +1,7 @@
 import { apiHandler, jsonFail, jsonOk, jsonOkList, parsePagination } from "@/lib/api/response";
 import { requirePerm, requireUser } from "@/lib/api/guard";
 import { hasPermission } from "@/lib/rbac";
+import { isModuleEnabled } from "@/config/company/modules";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
 import { writeAudit, pickAuditFields } from "@/lib/audit";
@@ -18,6 +19,14 @@ export const GET = apiHandler(async (request) => {
   const { page, pageSize, skip } = parsePagination(searchParams);
   const caseUnitId = searchParams.get("caseUnitId")?.trim();
   const clientUnitId = searchParams.get("clientUnitId")?.trim();
+
+  if (!caseUnitId && !clientUnitId) {
+    return jsonFail(
+      "VALIDATION",
+      "Provide caseUnitId or clientUnitId to list documents",
+      400
+    );
+  }
 
   const where = {
     ...(caseUnitId ? { caseUnitId } : {}),
@@ -68,9 +77,12 @@ export const POST = apiHandler(async (request) => {
   const input = parsed.data;
 
   // Case docs need cases.upload; fee receipts also allowed with accounts.edit/upload.
-  const canCasesUpload = await hasPermission(user.id, "cases", "upload");
+  const canCasesUpload =
+    isModuleEnabled("cases") &&
+    (await hasPermission(user.id, "cases", "upload"));
   const canAccountsReceipt =
     input.docType === "receipt" &&
+    isModuleEnabled("accounts") &&
     ((await hasPermission(user.id, "accounts", "edit")) ||
       (await hasPermission(user.id, "accounts", "upload")));
   if (!canCasesUpload && !canAccountsReceipt) {

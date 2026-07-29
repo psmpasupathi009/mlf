@@ -8,6 +8,7 @@ import {
   emitNotificationsChanged,
   onNotificationsChanged,
 } from "@/features/notifications/lib/notifications-sync";
+import { useNotificationStream } from "@/shared/hooks/use-notification-stream";
 
 type ListEnvelope = {
   data?: NotificationPayload[];
@@ -148,49 +149,7 @@ export function useNotifications() {
     };
   }, [refetch]);
 
-  useEffect(() => {
-    // Poll-only: in-memory SSE does not work across serverless isolates.
-    // Opt-in local live push with NEXT_PUBLIC_ENABLE_SSE=1.
-    if (process.env.NEXT_PUBLIC_ENABLE_SSE !== "1") return;
-
-    let es: EventSource | null = null;
-    let closed = false;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
-
-    const connect = () => {
-      if (closed) return;
-      es = new EventSource("/api/notifications/stream", {
-        withCredentials: true,
-      });
-
-      es.addEventListener("notification", (ev) => {
-        try {
-          const payload = JSON.parse(
-            (ev as MessageEvent).data
-          ) as NotificationPayload;
-          prependLive(payload);
-        } catch {
-          /* ignore malformed */
-        }
-      });
-
-      es.onerror = () => {
-        es?.close();
-        es = null;
-        if (!closed) {
-          retryTimer = setTimeout(connect, 5000);
-        }
-      };
-    };
-
-    connect();
-
-    return () => {
-      closed = true;
-      if (retryTimer) clearTimeout(retryTimer);
-      es?.close();
-    };
-  }, [prependLive]);
+  useNotificationStream(prependLive);
 
   return {
     items,

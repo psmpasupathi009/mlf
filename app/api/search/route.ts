@@ -1,6 +1,7 @@
 import { apiHandler, jsonOk, jsonFail } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/guard";
 import { hasPermission } from "@/lib/rbac";
+import { isModuleEnabled } from "@/config/company/modules";
 import { prisma } from "@/lib/db/prisma";
 import { containsInsensitive } from "@/lib/db/search";
 import { rateLimit } from "@/lib/rate-limit";
@@ -30,9 +31,10 @@ export const GET = apiHandler(async (request) => {
   }
 
   const [canEmployees, canClients, canCases] = await Promise.all([
-    hasPermission(user.id, "employees", "view"),
-    hasPermission(user.id, "clients", "view"),
-    hasPermission(user.id, "cases", "view"),
+    isModuleEnabled("employees") &&
+      hasPermission(user.id, "employees", "view"),
+    isModuleEnabled("clients") && hasPermission(user.id, "clients", "view"),
+    isModuleEnabled("cases") && hasPermission(user.id, "cases", "view"),
   ]);
 
   if (!canEmployees && !canClients && !canCases) {

@@ -11,6 +11,7 @@ import {
   emitNotificationsChanged,
   onNotificationsChanged,
 } from "@/features/notifications/lib/notifications-sync";
+import { useNotificationStream } from "@/shared/hooks/use-notification-stream";
 
 export type InboxFilter = "all" | "unread" | NotificationCategory;
 
@@ -22,6 +23,7 @@ type ListEnvelope = {
 type UnreadEnvelope = { unread?: number };
 
 const PAGE_SIZE = 20;
+const POLL_MS = 30_000;
 
 function buildListUrl(page: number, filter: InboxFilter): string {
   const params = new URLSearchParams({
@@ -163,7 +165,6 @@ export function useNotificationsInbox(filter: InboxFilter, page: number) {
         setTotal((t) => t + 1);
       }
 
-      // Server count avoids SSE-vs-refetch double increments
       void refreshUnread();
     },
     [refreshUnread]
@@ -183,45 +184,16 @@ export function useNotificationsInbox(filter: InboxFilter, page: number) {
     });
   }, [refetch]);
 
+  // Poll when SSE is off (serverless-safe default).
   useEffect(() => {
-    let es: EventSource | null = null;
-    let closed = false;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    if (process.env.NEXT_PUBLIC_ENABLE_SSE === "1") return;
+    const id = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refetch();
+    }, POLL_MS);
+    return () => window.clearInterval(id);
+  }, [refetch]);
 
-    const connect = () => {
-      if (closed) return;
-      es = new EventSource("/api/notifications/stream", {
-        withCredentials: true,
-      });
-
-      es.addEventListener("notification", (ev) => {
-        try {
-          const payload = JSON.parse(
-            (ev as MessageEvent).data
-          ) as NotificationPayload;
-          prependLive(payload);
-        } catch {
-          /* ignore malformed */
-        }
-      });
-
-      es.onerror = () => {
-        es?.close();
-        es = null;
-        if (!closed) {
-          retryTimer = setTimeout(connect, 5000);
-        }
-      };
-    };
-
-    connect();
-
-    return () => {
-      closed = true;
-      if (retryTimer) clearTimeout(retryTimer);
-      es?.close();
-    };
-  }, [prependLive]);
+  useNotificationStream(prependLive);
 
   return {
     items,
