@@ -13,7 +13,6 @@ import {
   attachAuthCookies,
   corsPreflight,
   issueAuthTokens,
-  revokeAllRefreshTokens,
 } from "@/lib/auth/session";
 import { jsonFail, jsonOk } from "@/lib/api/response";
 import { rateLimit } from "@/lib/rate-limit";
@@ -137,8 +136,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // New login invalidates other device sessions.
-    await revokeAllRefreshTokens(user.id);
     const tokens = await issueAuthTokens(user);
     const response = jsonOk({
       message: "Login successful",

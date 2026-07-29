@@ -2,7 +2,6 @@ import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
 import { writeAudit, pickAuditFields, diffAudit } from "@/lib/audit";
-import { revokeAllRefreshTokens } from "@/lib/auth/session";
 import { wouldRemoveLastAdmin, requireAdminToManageAdmin } from "@/lib/rbac/employee-guards";
 import { toEmployeeSummary } from "@/features/employees/server/serialize";
 
@@ -31,8 +30,6 @@ export const POST = apiHandler(async (request, context) => {
     where: { id: target.id },
     data: { isActive: false },
   });
-
-  await revokeAllRefreshTokens(target.id);
 
   const after = pickAuditFields(updated as Record<string, unknown>, ["isActive"] as const);
   await writeAudit({

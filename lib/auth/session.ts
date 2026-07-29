@@ -3,18 +3,19 @@ import { cookies } from "next/headers";
 import type { User, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import {
-  createRefreshTokenValue,
-  hashToken,
-  refreshTokenExpiresAt,
   signAccessToken,
   verifyAccessToken,
   type AccessTokenPayload,
 } from "@/lib/auth/jwt";
 import { getEffectivePermissionsForRoles } from "@/lib/rbac";
-import { ACCESS_COOKIE, REFRESH_COOKIE } from "@/lib/auth/cookie-names";
+import {
+  ACCESS_COOKIE,
+  ACCESS_COOKIE_MAX_AGE_SEC,
+  LEGACY_REFRESH_COOKIE,
+} from "@/lib/auth/cookie-names";
 import { userPhotoUrl } from "@/lib/auth/user-photo";
 
-export { ACCESS_COOKIE, REFRESH_COOKIE } from "@/lib/auth/cookie-names";
+export { ACCESS_COOKIE } from "@/lib/auth/cookie-names";
 
 /**
  * Fields needed for auth/session + public profile.
@@ -77,26 +78,12 @@ function cookieOptions(maxAge: number) {
 
 export async function issueAuthTokens(user: AuthUser): Promise<{
   accessToken: string;
-  refreshToken: string;
   user: PublicUser;
 }> {
   const accessToken = await signAccessToken({
     userId: user.id,
     mobile: user.mobile,
     roles: user.roles,
-  });
-
-  const refreshToken = createRefreshTokenValue();
-  // Drop expired rows so login/refresh doesn't accumulate dead tokens.
-  await prisma.refreshToken.deleteMany({
-    where: { userId: user.id, expiresAt: { lte: new Date() } },
-  });
-  await prisma.refreshToken.create({
-    data: {
-      userId: user.id,
-      tokenHash: hashToken(refreshToken),
-      expiresAt: refreshTokenExpiresAt(),
-    },
   });
 
   const updated = await prisma.user.update({
@@ -110,186 +97,34 @@ export async function issueAuthTokens(user: AuthUser): Promise<{
 
   return {
     accessToken,
-    refreshToken,
     user: await toPublicUser(updated as unknown as AuthUser),
   };
 }
 
 export function attachAuthCookies(
   response: NextResponse,
-  tokens: { accessToken: string; refreshToken: string }
+  tokens: { accessToken: string }
 ): NextResponse {
-  response.cookies.set(ACCESS_COOKIE, tokens.accessToken, cookieOptions(15 * 60));
   response.cookies.set(
-    REFRESH_COOKIE,
-    tokens.refreshToken,
-    cookieOptions(7 * 24 * 60 * 60)
+    ACCESS_COOKIE,
+    tokens.accessToken,
+    cookieOptions(ACCESS_COOKIE_MAX_AGE_SEC)
   );
+  // Drop any leftover refresh cookie from older clients.
+  response.cookies.set(LEGACY_REFRESH_COOKIE, "", {
+    ...cookieOptions(0),
+    maxAge: 0,
+  });
   return response;
 }
 
 export function clearAuthCookies(response: NextResponse): NextResponse {
   response.cookies.set(ACCESS_COOKIE, "", { ...cookieOptions(0), maxAge: 0 });
-  response.cookies.set(REFRESH_COOKIE, "", { ...cookieOptions(0), maxAge: 0 });
+  response.cookies.set(LEGACY_REFRESH_COOKIE, "", {
+    ...cookieOptions(0),
+    maxAge: 0,
+  });
   return response;
-}
-
-export async function revokeRefreshToken(refreshToken: string): Promise<void> {
-  await prisma.refreshToken.deleteMany({
-    where: { tokenHash: hashToken(refreshToken) },
-  });
-}
-
-export async function revokeAllRefreshTokens(userId: string): Promise<void> {
-  await prisma.refreshToken.deleteMany({ where: { userId } });
-}
-
-export type RotateRefreshResult =
-  | {
-      ok: true;
-      accessToken: string;
-      refreshToken: string;
-      user: PublicUser;
-    }
-  | {
-      ok: false;
-      /**
-       * `raced` = concurrent rotate in flight on another isolate — do not clear
-       * cookies; client should retry briefly.
-       * `invalid` = token unknown/expired — clear cookies.
-       */
-      reason: "invalid" | "raced" | "inactive";
-    };
-
-/** Short-lived replay so concurrent refreshes share one rotation (same process). */
-type RotationGrace = {
-  accessToken: string;
-  refreshToken: string;
-  userId: string;
-  expiresAt: number;
-};
-
-const ROTATION_GRACE_MS = 60_000;
-const rotationGrace = new Map<string, RotationGrace>();
-
-function readRotationGrace(oldHash: string): RotationGrace | null {
-  const hit = rotationGrace.get(oldHash);
-  if (!hit) return null;
-  if (hit.expiresAt <= Date.now()) {
-    rotationGrace.delete(oldHash);
-    return null;
-  }
-  return hit;
-}
-
-/** First publisher wins; later callers reuse the same opaque tokens. */
-function publishRotationGrace(
-  oldHash: string,
-  tokens: Omit<RotationGrace, "expiresAt">
-): RotationGrace {
-  const existing = readRotationGrace(oldHash);
-  if (existing) return existing;
-  const entry: RotationGrace = {
-    ...tokens,
-    expiresAt: Date.now() + ROTATION_GRACE_MS,
-  };
-  rotationGrace.set(oldHash, entry);
-  return entry;
-}
-
-async function replayGraceRotation(
-  grace: RotationGrace
-): Promise<RotateRefreshResult> {
-  const user = await prisma.user.findUnique({ where: { id: grace.userId } });
-  if (!user || !user.isActive) {
-    return { ok: false, reason: "inactive" };
-  }
-  return {
-    ok: true,
-    accessToken: grace.accessToken,
-    refreshToken: grace.refreshToken,
-    user: await toPublicUser(user as unknown as AuthUser),
-  };
-}
-
-/**
- * Rotate refresh token. Concurrent requests with the same token reuse one
- * minted pair via in-process grace (avoids 409-before-Set-Cookie races).
- */
-export async function rotateRefreshToken(
-  refreshToken: string
-): Promise<RotateRefreshResult> {
-  const tokenHash = hashToken(refreshToken);
-  const now = new Date();
-
-  const existing = await prisma.refreshToken.findUnique({
-    where: { tokenHash },
-  });
-
-  if (!existing) {
-    const grace = readRotationGrace(tokenHash);
-    if (grace) return replayGraceRotation(grace);
-    // Unknown or already rotated on another isolate — not safe to treat as OK.
-    return { ok: false, reason: "invalid" };
-  }
-
-  if (existing.expiresAt.getTime() <= now.getTime()) {
-    await prisma.refreshToken.deleteMany({ where: { id: existing.id } });
-    return { ok: false, reason: "invalid" };
-  }
-
-  const user = await prisma.user.findUnique({ where: { id: existing.userId } });
-  if (!user || !user.isActive) {
-    return { ok: false, reason: "inactive" };
-  }
-
-  // Mint first, publish grace before consume so a loser never 409s empty-handed.
-  const accessToken = await signAccessToken({
-    userId: user.id,
-    mobile: user.mobile,
-    roles: user.roles,
-  });
-  const nextRefresh = createRefreshTokenValue();
-  const grace = publishRotationGrace(tokenHash, {
-    accessToken,
-    refreshToken: nextRefresh,
-    userId: user.id,
-  });
-
-  // We lost the in-process race — return the winner's pair (same cookies).
-  if (grace.refreshToken !== nextRefresh) {
-    return replayGraceRotation(grace);
-  }
-
-  // Best-effort consume + persist. Unique tokenHash: second create is a no-op.
-  await prisma.refreshToken.deleteMany({
-    where: { id: existing.id, tokenHash },
-  });
-  try {
-    await prisma.refreshToken.create({
-      data: {
-        userId: user.id,
-        tokenHash: hashToken(grace.refreshToken),
-        expiresAt: refreshTokenExpiresAt(),
-      },
-    });
-  } catch {
-    // Already inserted by a concurrent twin that shared this grace pair.
-  }
-
-  // Drop expired rows in the background — don't block the response.
-  void prisma.refreshToken
-    .deleteMany({
-      where: { userId: user.id, expiresAt: { lte: now } },
-    })
-    .catch(() => undefined);
-
-  return {
-    ok: true,
-    accessToken: grace.accessToken,
-    refreshToken: grace.refreshToken,
-    user: await toPublicUser(user as unknown as AuthUser),
-  };
 }
 
 export function getBearerToken(request: Request): string | null {
@@ -334,7 +169,7 @@ export function applyCorsHeaders(
     response.headers.set("Access-Control-Allow-Credentials", "true");
     response.headers.set(
       "Access-Control-Allow-Headers",
-      "Content-Type, Authorization, X-Refresh-Token"
+      "Content-Type, Authorization"
     );
     response.headers.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   }

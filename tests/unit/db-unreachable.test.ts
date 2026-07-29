@@ -17,7 +17,7 @@ describe("buildMongoDatabaseUrl", () => {
 
   it("does not override existing query params", () => {
     const url = buildMongoDatabaseUrl(
-      "mongodb://127.0.0.1:27017/mlf?maxPoolSize=20&serverSelectionTimeoutMS=2000"
+      "mongodb+srv://u:p@cluster/mlf?maxPoolSize=20&serverSelectionTimeoutMS=2000"
     );
     expect(url).toContain("maxPoolSize=20");
     expect(url).not.toMatch(/maxPoolSize=10/);
@@ -27,10 +27,12 @@ describe("buildMongoDatabaseUrl", () => {
   });
 
   it("preserves query separator when base already has params", () => {
-    const url = buildMongoDatabaseUrl("mongodb://127.0.0.1:27017/mlf?authSource=admin");
-    expect(url.startsWith("mongodb://127.0.0.1:27017/mlf?authSource=admin&")).toBe(
-      true
+    const url = buildMongoDatabaseUrl(
+      "mongodb+srv://u:p@cluster/mlf?retryWrites=true"
     );
+    expect(
+      url.startsWith("mongodb+srv://u:p@cluster/mlf?retryWrites=true&")
+    ).toBe(true);
   });
 });
 
@@ -42,7 +44,7 @@ describe("isDbUnreachableError", () => {
       )
     ).toBe(true);
     expect(
-      isDbUnreachableError(new Error("connect ECONNREFUSED 127.0.0.1:27017"))
+      isDbUnreachableError(new Error("connect ECONNREFUSED cluster.mongodb.net"))
     ).toBe(true);
     expect(isDbUnreachableError(new Error("Engine is not yet connected"))).toBe(
       true

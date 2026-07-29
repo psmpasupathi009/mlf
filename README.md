@@ -20,6 +20,12 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Database Setup
+
+This app uses **Prisma + MongoDB Atlas**. Set `DATABASE_URL` to an Atlas `mongodb+srv://...` connection string (see `.env.example`). In Atlas → Network Access, use **Allow Access from Anywhere** (`0.0.0.0/0`) so changing home IPs do not block you day to day. Verify with `npm run db:ping`.
+
+Full connection docs: [docs/prisma-database.md](docs/prisma-database.md).
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

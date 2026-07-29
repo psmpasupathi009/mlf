@@ -6,7 +6,7 @@
 import "dotenv/config";
 import { writeFileSync } from "node:fs";
 import { PrismaClient } from "@prisma/client";
-import { ACCESS_COOKIE, REFRESH_COOKIE } from "../lib/auth/cookie-names";
+import { ACCESS_COOKIE } from "../lib/auth/cookie-names";
 import { normalizeMobile } from "../lib/auth/mobile";
 import { buildMongoDatabaseUrl } from "../lib/db/prisma";
 
@@ -184,8 +184,7 @@ async function main() {
     mobile: user.mobile,
     pin: PIN,
   });
-  const loggedIn =
-    login.res.ok && (jar.has(ACCESS_COOKIE) || jar.has(REFRESH_COOKIE));
+  const loggedIn = login.res.ok && jar.has(ACCESS_COOKIE);
   push({
     module: "Auth",
     method: "POST",
@@ -204,15 +203,6 @@ async function main() {
   }
 
   await testApi(jar, "Auth", "GET", "/api/v1/auth/me", "Current user + permissions");
-  await testApi(
-    jar,
-    "Auth",
-    "POST",
-    "/api/v1/auth/refresh",
-    "Rotate access token using refresh cookie",
-    {},
-    (s) => s >= 200 && s < 300
-  );
 
   // OTP endpoints — skip live SMS (needs 2Factor)
   push({

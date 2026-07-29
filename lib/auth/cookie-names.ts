@@ -1,6 +1,8 @@
 /** Cookie names — edge-safe (no Prisma / Node crypto). */
 export const ACCESS_COOKIE = "mlf_access";
-export const REFRESH_COOKIE = "mlf_refresh";
 
-/** Opaque refresh tokens are base64url(~64 chars); reject junk early in proxy. */
-export const REFRESH_COOKIE_MIN_LENGTH = 32;
+/** Legacy refresh cookie — cleared on logout only (refresh tokens removed). */
+export const LEGACY_REFRESH_COOKIE = "mlf_refresh";
+
+/** Access JWT cookie max-age (matches ACCESS_TTL in jwt.ts). */
+export const ACCESS_COOKIE_MAX_AGE_SEC = 7 * 24 * 60 * 60;

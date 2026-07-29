@@ -63,7 +63,3 @@ export const forgotPinResetSchema = z
     message: "PINs do not match",
     path: ["confirmPin"],
   });
-
-export const refreshSchema = z.object({
-  refreshToken: z.string().min(10).optional(),
-});

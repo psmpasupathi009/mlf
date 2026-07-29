@@ -102,7 +102,6 @@ model User {
   lastLoginAt       DateTime?
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
-  refreshTokens     RefreshToken[]
 
   @@index([name])
 }
@@ -131,18 +130,6 @@ model ConsumedOtpProof {
   expiresAt DateTime
   createdAt DateTime @default(now())
 
-  @@index([expiresAt])
-}
-
-model RefreshToken {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  userId    String   @db.ObjectId
-  user      User     @relation(fields: [userId], references: [id])
-  tokenHash String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
-  @@index([userId])
   @@index([expiresAt])
 }
 

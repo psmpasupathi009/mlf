@@ -2,11 +2,10 @@ import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
 import { writeAudit, diffAudit } from "@/lib/audit";
-import { revokeAllRefreshTokens } from "@/lib/auth/session";
 import { requireAdminToManageAdmin } from "@/lib/rbac/employee-guards";
 import { toEmployeeSummary } from "@/features/employees/server/serialize";
 
-/** Clears the PIN + revokes sessions — employee must set up a new PIN via OTP. */
+/** Clears the PIN — employee must set up a new PIN via OTP. */
 export const POST = apiHandler(async (request, context) => {
   const { user, response } = await requirePerm(request, "employees", "edit");
   if (!user) return response;
@@ -34,8 +33,6 @@ export const POST = apiHandler(async (request, context) => {
       pinLockedUntil: null,
     },
   });
-
-  await revokeAllRefreshTokens(target.id);
 
   const after = {
     pinConfigured: Boolean(updated.pinHash),

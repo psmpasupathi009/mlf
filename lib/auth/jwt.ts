@@ -1,9 +1,9 @@
-import { createHash, randomBytes, randomUUID } from "crypto";
+import { randomUUID } from "crypto";
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import type { UserRole } from "@prisma/client";
 
-const ACCESS_TTL = "15m";
-const REFRESH_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+/** Session length without refresh tokens (was access 15m + refresh 7d). */
+const ACCESS_TTL = "7d";
 const OTP_PROOF_TTL = "10m";
 
 export type AccessTokenPayload = JWTPayload & {
@@ -90,16 +90,4 @@ export async function verifyOtpProofToken(
   } catch {
     return null;
   }
-}
-
-export function createRefreshTokenValue(): string {
-  return randomBytes(48).toString("base64url");
-}
-
-export function hashToken(token: string): string {
-  return createHash("sha256").update(token).digest("hex");
-}
-
-export function refreshTokenExpiresAt(): Date {
-  return new Date(Date.now() + REFRESH_TTL_MS);
 }

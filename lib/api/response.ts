@@ -132,7 +132,7 @@ export function apiHandler(handler: RouteHandler): RouteHandler {
       if (isDbUnreachableError(error)) {
         return jsonFail(
           "DB_UNAVAILABLE",
-          "Database unreachable. If local: start Mongo (`npx tsx scripts/mongo-local.ts start`). If Atlas: Network Access must allow your IP (or 0.0.0.0/0).",
+          "Database unreachable. Check MongoDB Atlas Network Access — allow 0.0.0.0/0 (Access from Anywhere).",
           503
         );
       }

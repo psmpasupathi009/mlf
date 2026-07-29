@@ -96,7 +96,7 @@ function sleep(ms: number): Promise<void> {
 
 /**
  * Retry transient Atlas / cold-start connection failures.
- * Use only for idempotent or read-mostly work — not mid-token-rotation writes.
+ * Use only for idempotent or read-mostly work — not non-idempotent writes.
  */
 export async function withDbRetry<T>(
   fn: () => Promise<T>,
@@ -120,5 +120,4 @@ export type {
   UserRole,
   OtpPurpose,
   OtpSession,
-  RefreshToken,
 } from "@prisma/client";

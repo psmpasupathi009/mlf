@@ -6,7 +6,7 @@
  */
 export function DbUnavailable({
   title = "Database temporarily unavailable",
-  detail = "Your session was kept. Check Atlas Network Access (0.0.0.0/0 for Vercel), then retry.",
+  detail = "Your session was kept. In Atlas → Network Access, allow 0.0.0.0/0 (Access from Anywhere) so changing home IPs do not block you again, then retry.",
 }: {
   title?: string;
   detail?: string;

@@ -85,8 +85,6 @@ export async function POST(request: Request) {
       );
     }
 
-    await prisma.refreshToken.deleteMany({ where: { userId: user.id } });
-
     const updated = await prisma.user.update({
       where: { id: user.id },
       data: {

@@ -113,122 +113,30 @@ export async function authFetch<T = Record<string, unknown>>(
   }
 }
 
-let refreshInFlight: Promise<SessionRefreshResult> | null = null;
-
-export type SessionRefreshResult =
-  | { ok: true }
-  | {
-      ok: false;
-      reason: "unauthorized" | "unreachable" | "network" | "error";
-    };
-
-async function postRefresh(): Promise<Response> {
-  return fetch("/api/v1/auth/refresh", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: "{}",
-    cache: "no-store",
-  });
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-async function runRefreshAttempt(): Promise<SessionRefreshResult> {
-  try {
-    let res = await postRefresh();
-
-    // 409 = another isolate rotated; wait for Set-Cookie then retry once.
-    if (res.status === 409) {
-      await sleep(400);
-      res = await postRefresh();
-      if (res.status === 409) return { ok: true as const };
-    }
-
-    if (res.ok) return { ok: true as const };
-    if (res.status === 401) {
-      return { ok: false as const, reason: "unauthorized" as const };
-    }
-    if (res.status >= 500 || res.status === 0) {
-      return { ok: false as const, reason: "unreachable" as const };
-    }
-    return { ok: false as const, reason: "error" as const };
-  } catch {
-    return { ok: false as const, reason: "network" as const };
-  }
-}
-
 /**
- * Shared refresh mutex — SessionRefreshGate and apiFetch must share this.
- * Uses Web Locks across tabs when available so only one rotate runs.
- */
-export async function refreshSession(): Promise<SessionRefreshResult> {
-  if (refreshInFlight) return refreshInFlight;
-
-  refreshInFlight = (async () => {
-    try {
-      const locks = typeof navigator !== "undefined" ? navigator.locks : undefined;
-      if (locks?.request) {
-        return await locks.request("mlf-auth-refresh", runRefreshAttempt);
-      }
-      return await runRefreshAttempt();
-    } finally {
-      refreshInFlight = null;
-    }
-  })();
-
-  return refreshInFlight;
-}
-
-/** True when refresh succeeded (or raced 409). False on auth / network / DB failure. */
-export async function ensureSessionRefresh(): Promise<boolean> {
-  const result = await refreshSession();
-  return result.ok;
-}
-
-/** @deprecated Use ensureSessionRefresh */
-async function silentRefresh(): Promise<boolean> {
-  return ensureSessionRefresh();
-}
-
-/**
- * Portal fetch with one silent refresh retry on 401.
- * Prefer this over raw fetch for authenticated API calls.
+ * Portal fetch with credentials. Prefer this over raw fetch for authenticated API calls.
  */
 export async function apiFetch<T = Record<string, unknown>>(
   path: string,
   init?: RequestInit & { json?: Record<string, unknown> },
   timeoutMs = 15000
 ): Promise<{ ok: boolean; status: number; data: T }> {
-  const run = async (): Promise<Response> => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const headers = new Headers(init?.headers);
-      if (init?.json) {
-        headers.set("Content-Type", "application/json");
-      }
-      return await fetch(path, {
-        ...init,
-        headers,
-        body: init?.json ? JSON.stringify(init.json) : init?.body,
-        credentials: "include",
-        signal: controller.signal,
-        cache: "no-store",
-      });
-    } finally {
-      clearTimeout(timer);
-    }
-  };
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    let res = await run();
-    if (res.status === 401 && !path.includes("/auth/refresh")) {
-      const refreshed = await silentRefresh();
-      if (refreshed) res = await run();
+    const headers = new Headers(init?.headers);
+    if (init?.json) {
+      headers.set("Content-Type", "application/json");
     }
+    const res = await fetch(path, {
+      ...init,
+      headers,
+      body: init?.json ? JSON.stringify(init.json) : init?.body,
+      credentials: "include",
+      signal: controller.signal,
+      cache: "no-store",
+    });
 
     const raw = await parseJson(res);
     const data =
@@ -248,22 +156,18 @@ export async function apiFetch<T = Record<string, unknown>>(
           : "Network error. Please try again.",
       } as T,
     };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
-/** Authenticated file download with one silent refresh retry on 401. */
+/** Authenticated file download. */
 export async function apiDownload(
   path: string,
   filename: string
 ): Promise<{ ok: boolean; error?: string }> {
   try {
-    let res = await fetch(path, { credentials: "include", cache: "no-store" });
-    if (res.status === 401) {
-      const refreshed = await silentRefresh();
-      if (refreshed) {
-        res = await fetch(path, { credentials: "include", cache: "no-store" });
-      }
-    }
+    const res = await fetch(path, { credentials: "include", cache: "no-store" });
     if (!res.ok) {
       const raw = await parseJson(res);
       return {

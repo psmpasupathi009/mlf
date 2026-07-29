@@ -32,7 +32,8 @@ async function main() {
     ) {
       console.error(`
 Likely causes:
-  1. Atlas → Network Access → allow this machine’s IP (or 0.0.0.0/0 for deploy)
+  1. Atlas → Network Access → Allow Access from Anywhere (0.0.0.0/0)
+     (single-IP entries break when your ISP IP changes)
   2. Cluster paused / no primary
   3. VPN / firewall blocking *.mongodb.net:27017
 TLS "InternalError" before login usually means the IP is not allowlisted.`);
