@@ -27,7 +27,7 @@ export function SiteHeader({ brandName, className }: SiteHeaderProps) {
 
         <Link
           href="/"
-          className="min-w-0 flex-1 truncate text-center text-sm font-semibold tracking-tight text-navy sm:text-[15px]"
+          className="min-w-0 flex-1 truncate text-center text-sm font-semibold uppercase tracking-tight text-navy sm:text-[15px]"
           title={brandName}
         >
           {brandName}
