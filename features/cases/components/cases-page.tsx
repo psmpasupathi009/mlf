@@ -64,6 +64,7 @@ type QuickFilter =
 
 export function CasesPage({ user }: { user: PublicUser }) {
   const can = (action: string) => user.permissions.includes(`cases.${action}`);
+  const canExport = user.permissions.includes("reports.view");
   const searchParams = useSearchParams();
   const router = useRouter();
   const clientUnitId = searchParams.get("clientUnitId") ?? "";
@@ -261,6 +262,7 @@ export function CasesPage({ user }: { user: PublicUser }) {
           </Select>
         }
         actions={
+          canExport || can("upload") || can("edit") ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button type="button" variant="outline" className="gap-2">
@@ -269,31 +271,33 @@ export function CasesPage({ user }: { user: PublicUser }) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem
-                onSelect={async () => {
-                  const params = new URLSearchParams({ type: "cases" });
-                  if (debouncedSearch) params.set("q", debouncedSearch);
-                  if (quick === "filingDefect") {
-                    params.set("status", "filing_defect");
-                  } else if (status !== "all") {
-                    params.set("status", status);
-                  }
-                  if (clientUnitId) params.set("clientUnitId", clientUnitId);
-                  if (quick === "today") params.set("hearing", "today");
-                  if (quick === "week") params.set("hearing", "week");
-                  if (quick === "missingCourt") {
-                    params.set("missingCourtNumber", "1");
-                  }
-                  if (quick === "battaDue") params.set("battaDue", "1");
-                  const result = await apiDownload(
-                    `/api/exports?${params.toString()}`,
-                    "cases.xlsx"
-                  );
-                  if (!result.ok) toast.error(result.error ?? "Export failed");
-                }}
-              >
-                Export Excel
-              </DropdownMenuItem>
+              {canExport ? (
+                <DropdownMenuItem
+                  onSelect={async () => {
+                    const params = new URLSearchParams({ type: "cases" });
+                    if (debouncedSearch) params.set("q", debouncedSearch);
+                    if (quick === "filingDefect") {
+                      params.set("status", "filing_defect");
+                    } else if (status !== "all") {
+                      params.set("status", status);
+                    }
+                    if (clientUnitId) params.set("clientUnitId", clientUnitId);
+                    if (quick === "today") params.set("hearing", "today");
+                    if (quick === "week") params.set("hearing", "week");
+                    if (quick === "missingCourt") {
+                      params.set("missingCourtNumber", "1");
+                    }
+                    if (quick === "battaDue") params.set("battaDue", "1");
+                    const result = await apiDownload(
+                      `/api/exports?${params.toString()}`,
+                      "cases.xlsx"
+                    );
+                    if (!result.ok) toast.error(result.error ?? "Export failed");
+                  }}
+                >
+                  Export Excel
+                </DropdownMenuItem>
+              ) : null}
               {can("upload") ? (
                 <DropdownMenuItem onSelect={() => setImportOpen(true)}>
                   Import cases
@@ -306,6 +310,7 @@ export function CasesPage({ user }: { user: PublicUser }) {
               ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
+          ) : null
         }
       />
 

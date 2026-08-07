@@ -36,13 +36,18 @@ export function getAttendanceLocation(): Promise<AttendanceLocation> {
   return new Promise((resolve, reject) => {
     navigator.geolocation.getCurrentPosition(
       (pos) => {
+        const raw = pos.coords.accuracy;
+        const accuracy =
+          typeof raw === "number" &&
+          Number.isFinite(raw) &&
+          raw >= 0 &&
+          raw <= 50_000
+            ? raw
+            : undefined;
         resolve({
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
-          accuracy:
-            typeof pos.coords.accuracy === "number"
-              ? pos.coords.accuracy
-              : undefined,
+          ...(accuracy !== undefined ? { accuracy } : {}),
         });
       },
       (err) => reject(new Error(mapGeoError(err))),

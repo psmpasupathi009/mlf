@@ -60,6 +60,7 @@ function statusVariant(status: string): "default" | "success" | "muted" | "warni
 
 export function TasksPage({ user }: { user: PublicUser }) {
   const can = (action: string) => user.permissions.includes(`tasks.${action}`);
+  const canExport = user.permissions.includes("reports.view");
   const todayKey = istDateKey();
   const searchParams = useSearchParams();
   const dueFilter = searchParams.get("due");
@@ -196,29 +197,31 @@ export function TasksPage({ user }: { user: PublicUser }) {
         description="Morning allotment and evening finishing for the office work day."
         actions={
           <>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={async () => {
-                const params = new URLSearchParams({ type: "tasks" });
-                if (due) {
-                  params.set("due", due);
-                } else {
-                  params.set("workDate", workDate);
-                  if (view === "allotment") params.set("kind", "allotment");
-                }
-                if (status !== "all") params.set("status", status);
-                if (debouncedSearch) params.set("q", debouncedSearch);
-                const result = await apiDownload(
-                  `/api/exports?${params.toString()}`,
-                  "tasks.xlsx"
-                );
-                if (!result.ok) toast.error(result.error ?? "Export failed");
-              }}
-            >
-              <Download className="size-4" />
-              Export Excel
-            </Button>
+            {canExport ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={async () => {
+                  const params = new URLSearchParams({ type: "tasks" });
+                  if (due) {
+                    params.set("due", due);
+                  } else {
+                    params.set("workDate", workDate);
+                    if (view === "allotment") params.set("kind", "allotment");
+                  }
+                  if (status !== "all") params.set("status", status);
+                  if (debouncedSearch) params.set("q", debouncedSearch);
+                  const result = await apiDownload(
+                    `/api/exports?${params.toString()}`,
+                    "tasks.xlsx"
+                  );
+                  if (!result.ok) toast.error(result.error ?? "Export failed");
+                }}
+              >
+                <Download className="size-4" />
+                Export Excel
+              </Button>
+            ) : null}
             {can("create") ? (
               <Button
                 type="button"

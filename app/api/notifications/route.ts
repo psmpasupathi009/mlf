@@ -1,7 +1,7 @@
 import { apiHandler, jsonOkList, parsePagination } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
-import { toNotificationPayload } from "@/lib/notifications/notify";
+import { toNotificationPayload, unreadNotificationWhere } from "@/lib/notifications/notify";
 import {
   ALL_NOTIFICATION_TYPES,
   NOTIFICATION_CATEGORIES,
@@ -47,7 +47,7 @@ export const GET = apiHandler(async (request) => {
 
   const where = {
     userId: user.id,
-    ...(unreadOnly ? { readAt: null } : {}),
+    ...(unreadOnly ? unreadNotificationWhere : {}),
     ...typeFilter,
   };
 

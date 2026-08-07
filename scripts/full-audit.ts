@@ -456,7 +456,25 @@ async function main() {
   });
 
   // ── DOCUMENTS ──
-  await testApi(jar, "Documents", "GET", "/api/documents", "List documents");
+  await testApi(
+    jar,
+    "Documents",
+    "GET",
+    caseUnitId
+      ? `/api/documents?caseUnitId=${encodeURIComponent(caseUnitId)}`
+      : clientUnitId
+        ? `/api/documents?clientUnitId=${encodeURIComponent(clientUnitId)}`
+        : "/api/documents",
+    "List documents for case/client (parent id required)",
+    undefined,
+    caseUnitId || clientUnitId
+      ? (s) => s >= 200 && s < 300
+      : (s, json) =>
+          s === 400 &&
+          String((json as { error?: { message?: string } })?.error?.message ?? "").includes(
+            "caseUnitId"
+          )
+  );
   let docUnitId: string | undefined;
   if (caseUnitId && clientUnitId) {
     const form = new FormData();

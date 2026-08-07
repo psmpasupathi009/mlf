@@ -47,6 +47,7 @@ import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
 export function AccountsPage({ user }: { user: PublicUser }) {
   const can = (action: string) =>
     user.permissions.includes(`accounts.${action}`);
+  const canExport = can("view") && user.permissions.includes("reports.view");
   const canImport = can("upload") || user.roles.includes("admin");
   const canUploadReceipt =
     user.permissions.includes("cases.upload") ||
@@ -282,7 +283,7 @@ export function AccountsPage({ user }: { user: PublicUser }) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
-                {can("view") ? (
+                {canExport ? (
                   <DropdownMenuItem
                     disabled={exporting}
                     onSelect={() => {
@@ -373,7 +374,7 @@ export function AccountsPage({ user }: { user: PublicUser }) {
         purpose={purpose}
         search={search}
         clientPickerValue={clientPickerValue}
-        canExport={can("view")}
+        canExport={canExport}
         exporting={exporting}
         onPurposeChange={(v) => {
           setPage(1);

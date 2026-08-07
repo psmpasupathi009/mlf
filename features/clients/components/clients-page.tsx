@@ -36,6 +36,7 @@ function locationLine(c: ClientSummary) {
 
 export function ClientsPage({ user }: { user: PublicUser }) {
   const can = (action: string) => user.permissions.includes(`clients.${action}`);
+  const canExport = user.permissions.includes("reports.view");
   const searchParams = useSearchParams();
   const router = useRouter();
 
@@ -90,22 +91,24 @@ export function ClientsPage({ user }: { user: PublicUser }) {
         description="The office client book — everyone with access sees the same list."
         actions={
           <>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={async () => {
-                const params = new URLSearchParams({ type: "clients" });
-                if (debouncedSearch) params.set("q", debouncedSearch);
-                const result = await apiDownload(
-                  `/api/exports?${params.toString()}`,
-                  "clients.xlsx"
-                );
-                if (!result.ok) toast.error(result.error ?? "Export failed");
-              }}
-            >
-              <Download className="size-4" />
-              Export Excel
-            </Button>
+            {canExport ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={async () => {
+                  const params = new URLSearchParams({ type: "clients" });
+                  if (debouncedSearch) params.set("q", debouncedSearch);
+                  const result = await apiDownload(
+                    `/api/exports?${params.toString()}`,
+                    "clients.xlsx"
+                  );
+                  if (!result.ok) toast.error(result.error ?? "Export failed");
+                }}
+              >
+                <Download className="size-4" />
+                Export Excel
+              </Button>
+            ) : null}
             {can("create") ? (
               <Button type="button" variant="outline" onClick={() => setImportOpen(true)}>
                 Import CSV

@@ -184,9 +184,8 @@ export function useNotificationsInbox(filter: InboxFilter, page: number) {
     });
   }, [refetch]);
 
-  // Poll when SSE is off (serverless-safe default).
+  // Always poll as fallback (SSE hub is in-process and can miss on serverless).
   useEffect(() => {
-    if (process.env.NEXT_PUBLIC_ENABLE_SSE === "1") return;
     const id = window.setInterval(() => {
       if (document.visibilityState === "visible") void refetch();
     }, POLL_MS);

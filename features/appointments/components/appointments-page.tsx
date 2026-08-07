@@ -114,6 +114,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
   const searchParams = useSearchParams();
   const can = (action: string) =>
     user.permissions.includes(`appointments.${action}`);
+  const canExport = user.permissions.includes("reports.view");
   const canOpenCase =
     (user.permissions.includes("appointments.edit") ||
       user.permissions.includes("cases.create")) &&
@@ -338,36 +339,38 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
         }
         actions={
           <>
-            <Button
-              type="button"
-              variant="outline"
-              className="h-11 gap-2 px-4"
-              onClick={async () => {
-                const params = new URLSearchParams({ type: "appointments" });
-                if (debouncedSearch) params.set("q", debouncedSearch);
-                if (status !== "all") params.set("status", status);
-                if (bookAny && advocateFilter !== "all") {
-                  params.set("advocateMobile", advocateFilter);
-                } else if (bookAny && unassignedOnly) {
-                  params.set("unassigned", "1");
-                }
-                if (range === "today") {
-                  const { start, end } = istDayBounds(istDateKey());
-                  params.set("from", start.toISOString());
-                  params.set("to", end.toISOString());
-                } else if (range === "upcoming") {
-                  params.set("from", new Date().toISOString());
-                }
-                const result = await apiDownload(
-                  `/api/exports?${params.toString()}`,
-                  "appointments.xlsx"
-                );
-                if (!result.ok) toast.error(result.error ?? "Export failed");
-              }}
-            >
-              <Download className="size-4" />
-              Export Excel
-            </Button>
+            {canExport ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 gap-2 px-4"
+                onClick={async () => {
+                  const params = new URLSearchParams({ type: "appointments" });
+                  if (debouncedSearch) params.set("q", debouncedSearch);
+                  if (status !== "all") params.set("status", status);
+                  if (bookAny && advocateFilter !== "all") {
+                    params.set("advocateMobile", advocateFilter);
+                  } else if (bookAny && unassignedOnly) {
+                    params.set("unassigned", "1");
+                  }
+                  if (range === "today") {
+                    const { start, end } = istDayBounds(istDateKey());
+                    params.set("from", start.toISOString());
+                    params.set("to", end.toISOString());
+                  } else if (range === "upcoming") {
+                    params.set("from", new Date().toISOString());
+                  }
+                  const result = await apiDownload(
+                    `/api/exports?${params.toString()}`,
+                    "appointments.xlsx"
+                  );
+                  if (!result.ok) toast.error(result.error ?? "Export failed");
+                }}
+              >
+                <Download className="size-4" />
+                Export Excel
+              </Button>
+            ) : null}
             {can("create") ? (
               <Button
                 type="button"

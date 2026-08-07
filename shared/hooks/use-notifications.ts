@@ -8,10 +8,7 @@ import {
   emitNotificationsChanged,
   onNotificationsChanged,
 } from "@/features/notifications/lib/notifications-sync";
-import {
-  isNotificationSseEnabled,
-  useNotificationStream,
-} from "@/shared/hooks/use-notification-stream";
+import { useNotificationStream } from "@/shared/hooks/use-notification-stream";
 
 type ListEnvelope = {
   data?: NotificationPayload[];
@@ -20,15 +17,15 @@ type ListEnvelope = {
 
 type UnreadEnvelope = { unread?: number };
 
-/** Unread badge poll when SSE is off — keep light (count only). */
-const UNREAD_POLL_MS = 60_000;
+/** Unread badge poll (SSE is best-effort; always poll as fallback). */
+const UNREAD_POLL_MS = 15_000;
 const LIST_LIMIT = 20;
 
 export function useNotifications() {
   const [items, setItems] = useState<NotificationPayload[]>([]);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [listLoaded, setListLoaded] = useState(false);
+  const listLoadedRef = useRef(false);
   const seenLive = useRef(new Set<string>());
   const knownIds = useRef(new Set<string>());
   const marking = useRef(new Set<string>());
@@ -39,7 +36,29 @@ export function useNotifications() {
       "/api/notifications/unread-count"
     );
     if (countRes.ok && typeof countRes.data?.unread === "number") {
-      setUnread(countRes.data.unread);
+      const next = countRes.data.unread;
+      setUnread((prev) => {
+        if (listLoadedRef.current && next > prev) {
+          queueMicrotask(() => {
+            void apiFetch<ListEnvelope>(
+              `/api/notifications?page=1&pageSize=${LIST_LIMIT}`
+            ).then((listRes) => {
+              if (
+                listRes.ok &&
+                listRes.data &&
+                typeof listRes.data === "object"
+              ) {
+                const rows = Array.isArray(listRes.data.data)
+                  ? listRes.data.data
+                  : [];
+                knownIds.current = new Set(rows.map((r) => r.unitId));
+                setItems(rows);
+              }
+            });
+          });
+        }
+        return next;
+      });
     }
   }, []);
 
@@ -61,18 +80,14 @@ export function useNotifications() {
     if (countRes.ok && typeof countRes.data?.unread === "number") {
       setUnread(countRes.data.unread);
     }
-    setListLoaded(true);
+    listLoadedRef.current = true;
     setLoading(false);
   }, []);
 
   /** Call when the bell dropdown opens — avoids loading the list on every page. */
   const ensureList = useCallback(async () => {
-    if (listLoaded) {
-      void refetchList();
-      return;
-    }
     await refetchList();
-  }, [listLoaded, refetchList]);
+  }, [refetchList]);
 
   const markRead = useCallback(
     async (unitId: string) => {
@@ -147,13 +162,12 @@ export function useNotifications() {
         return;
       }
       void refreshUnread();
-      if (listLoaded) void refetchList();
+      if (listLoadedRef.current) void refetchList();
     });
-  }, [refreshUnread, refetchList, listLoaded]);
+  }, [refreshUnread, refetchList]);
 
+  // Always poll unread as fallback (SSE hub is in-process and can miss on serverless).
   useEffect(() => {
-    if (isNotificationSseEnabled()) return;
-
     const id = window.setInterval(() => {
       if (document.visibilityState === "visible") void refreshUnread();
     }, UNREAD_POLL_MS);

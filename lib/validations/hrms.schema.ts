@@ -33,15 +33,21 @@ export const decideLeaveSchema = z
 
 export const checkInOutSchema = z.object({
   notes: z.string().trim().max(300).optional().or(z.literal("")),
-  latitude: z
+  latitude: z.coerce
     .number({ error: "Location is required" })
     .min(-90, "Invalid latitude")
     .max(90, "Invalid latitude"),
-  longitude: z
+  longitude: z.coerce
     .number({ error: "Location is required" })
     .min(-180, "Invalid longitude")
     .max(180, "Invalid longitude"),
-  accuracy: z.number().nonnegative().max(50_000).optional(),
+  // Drop NaN / Infinity / oversized accuracy instead of failing the punch.
+  accuracy: z.preprocess((v) => {
+    if (v == null || v === "") return undefined;
+    const n = typeof v === "number" ? v : Number(v);
+    if (!Number.isFinite(n) || n < 0 || n > 50_000) return undefined;
+    return n;
+  }, z.number().nonnegative().max(50_000).optional()),
 });
 
 export const createOfficeHolidaySchema = z

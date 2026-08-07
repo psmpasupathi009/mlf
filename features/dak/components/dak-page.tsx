@@ -59,6 +59,7 @@ function directionLabel(direction: string) {
 
 export function DakPage({ user }: { user: PublicUser }) {
   const can = (action: string) => user.permissions.includes(`dak.${action}`);
+  const canExport = user.permissions.includes("reports.view");
 
   const [rows, setRows] = useState<DakSummary[]>([]);
   const [total, setTotal] = useState(0);
@@ -134,24 +135,26 @@ export function DakPage({ user }: { user: PublicUser }) {
         description="Incoming and outgoing postal / courier book for the office."
         actions={
           <>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={async () => {
-                const params = new URLSearchParams({ type: "dak" });
-                if (direction !== "all") params.set("direction", direction);
-                if (dateFilter) params.set("date", dateFilter);
-                if (debouncedSearch) params.set("q", debouncedSearch);
-                const result = await apiDownload(
-                  `/api/exports?${params.toString()}`,
-                  "dak.xlsx"
-                );
-                if (!result.ok) toast.error(result.error ?? "Export failed");
-              }}
-            >
-              <Download className="size-4" />
-              Export Excel
-            </Button>
+            {canExport ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={async () => {
+                  const params = new URLSearchParams({ type: "dak" });
+                  if (direction !== "all") params.set("direction", direction);
+                  if (dateFilter) params.set("date", dateFilter);
+                  if (debouncedSearch) params.set("q", debouncedSearch);
+                  const result = await apiDownload(
+                    `/api/exports?${params.toString()}`,
+                    "dak.xlsx"
+                  );
+                  if (!result.ok) toast.error(result.error ?? "Export failed");
+                }}
+              >
+                <Download className="size-4" />
+                Export Excel
+              </Button>
+            ) : null}
             {can("create") ? (
               <Button
                 type="button"

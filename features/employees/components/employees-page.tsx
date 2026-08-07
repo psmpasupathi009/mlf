@@ -64,6 +64,7 @@ const ROLE_FILTER_OPTIONS = (Object.keys(ROLE_LABELS) as UserRole[]).map((value)
 
 export function EmployeesPage({ user }: { user: PublicUser }) {
   const can = (action: string) => user.permissions.includes(`employees.${action}`);
+  const canExport = user.permissions.includes("reports.view");
   const searchParams = useSearchParams();
 
   const [rows, setRows] = useState<EmployeeSummary[]>([]);
@@ -131,20 +132,22 @@ export function EmployeesPage({ user }: { user: PublicUser }) {
         description="Staff directory — designation is the job title; roles control app access."
         actions={
           <>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={async () => {
-                const result = await apiDownload(
-                  "/api/exports?type=employees",
-                  "employees.xlsx"
-                );
-                if (!result.ok) toast.error(result.error ?? "Export failed");
-              }}
-            >
-              <Download className="size-4" />
-              Export Excel
-            </Button>
+            {canExport ? (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={async () => {
+                  const result = await apiDownload(
+                    "/api/exports?type=employees",
+                    "employees.xlsx"
+                  );
+                  if (!result.ok) toast.error(result.error ?? "Export failed");
+                }}
+              >
+                <Download className="size-4" />
+                Export Excel
+              </Button>
+            ) : null}
             {can("create") ? (
               <Button type="button" variant="outline" onClick={() => setImportOpen(true)}>
                 Import CSV
