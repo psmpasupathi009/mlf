@@ -12,6 +12,7 @@ export const modules = {
     appointments: true,
     cases: true,
     accounts: true,
+    expenses: true,
     hrms: true,
     dak: true,
     tasks: true,

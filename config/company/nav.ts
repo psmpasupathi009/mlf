@@ -94,6 +94,13 @@ export const navItems: NavItem[] = [
     permission: { module: "accounts", action: "view" },
   },
   {
+    href: "/expenses",
+    label: "Office expenses",
+    module: "expenses",
+    group: "office",
+    permission: { module: "expenses", action: "view" },
+  },
+  {
     href: "/hrms",
     label: "HRMS",
     module: "hrms",

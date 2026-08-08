@@ -11,6 +11,7 @@ import {
   FileSpreadsheet,
   Mail,
   Printer,
+  Receipt,
   Users,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -240,6 +241,35 @@ export function ReportsPage({ user }: ReportsPageProps) {
               >
                 <Download className="size-4" />
                 {busy === "accounts" ? "Preparing…" : "Download Excel"}
+              </Button>
+            </CardContent>
+          </Card>
+        ) : null}
+
+        {can("expenses.view") && isModuleEnabled("expenses") ? (
+          <Card>
+            <CardContent className="flex h-full flex-col gap-4 p-4 sm:p-5">
+              <div className="flex items-start gap-3">
+                <Receipt className="mt-0.5 size-5 text-navy" />
+                <div>
+                  <h2 className="font-semibold text-navy">Office expenses</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Unfiltered expense register. For date/category filters,
+                    export from Office expenses.
+                  </p>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                className="mt-auto w-full"
+                disabled={busy === "expenses"}
+                onClick={() =>
+                  void download("expenses", "office-expenses.xlsx")
+                }
+              >
+                <Download className="size-4" />
+                {busy === "expenses" ? "Preparing…" : "Download Excel"}
               </Button>
             </CardContent>
           </Card>

@@ -14,6 +14,15 @@ import {
 import { resolveActorsByIds } from "@/features/accounts/server/actors";
 import { FEE_PURPOSES } from "@/features/accounts/lib/payment-purposes";
 import {
+  buildExpensesWhere,
+  parseExpensesFilters,
+} from "@/features/expenses/server/filters";
+import { resolveExpenseActorsByIds } from "@/features/expenses/server/actors";
+import {
+  categoryLabel,
+  paymentModeLabel,
+} from "@/features/expenses/server/serialize";
+import {
   buildCaseListWhere,
   parseCaseListFilters,
 } from "@/features/cases/server/filters";
@@ -465,6 +474,61 @@ export const GET = apiHandler(async (request) => {
         status: r.status,
         paidOn: r.paidOn?.toISOString() ?? "",
         notes: r.notes ?? "",
+        voidedAt: r.voidedAt?.toISOString() ?? "",
+        voidReason: r.voidReason ?? "",
+        createdAt: r.createdAt.toISOString(),
+        createdByUnitId: r.createdById
+          ? actorMap.get(r.createdById)?.unitId ?? ""
+          : "",
+        voidedByUnitId: r.voidedById
+          ? actorMap.get(r.voidedById)?.unitId ?? ""
+          : "",
+      });
+    }
+  } else if (type === "expenses") {
+    if (!isModuleEnabled("expenses")) {
+      return jsonFail("FORBIDDEN", "This module is not available", 403);
+    }
+    const { user, response } = await requirePerm(request, "expenses", "view");
+    if (!user) return response;
+
+    const filters = parseExpensesFilters(url.searchParams);
+    const where = buildExpensesWhere(filters);
+    const rows = await prisma.officeExpense.findMany({
+      where,
+      orderBy: [{ expenseDate: "desc" }, { createdAt: "desc" }],
+      take: 5000,
+    });
+    const actorMap = await resolveExpenseActorsByIds(
+      rows.flatMap((r) => [r.createdById, r.voidedById])
+    );
+
+    const sheet = workbook.addWorksheet("Office expenses");
+    sheet.columns = [
+      { header: "unitId", key: "unitId", width: 14 },
+      { header: "expenseDate", key: "expenseDate", width: 14 },
+      { header: "category", key: "category", width: 20 },
+      { header: "vendor", key: "vendor", width: 22 },
+      { header: "description", key: "description", width: 36 },
+      { header: "amount", key: "amount", width: 12 },
+      { header: "paymentMode", key: "paymentMode", width: 14 },
+      { header: "billDocumentUnitId", key: "billDocumentUnitId", width: 16 },
+      { header: "voidedAt", key: "voidedAt", width: 20 },
+      { header: "voidReason", key: "voidReason", width: 28 },
+      { header: "createdAt", key: "createdAt", width: 20 },
+      { header: "createdByUnitId", key: "createdByUnitId", width: 14 },
+      { header: "voidedByUnitId", key: "voidedByUnitId", width: 14 },
+    ];
+    for (const r of rows) {
+      sheet.addRow({
+        unitId: r.unitId,
+        expenseDate: istDateKey(r.expenseDate),
+        category: categoryLabel(r.category),
+        vendor: r.vendor ?? "",
+        description: r.description,
+        amount: r.amount,
+        paymentMode: paymentModeLabel(r.paymentMode),
+        billDocumentUnitId: r.billDocumentUnitId ?? "",
         voidedAt: r.voidedAt?.toISOString() ?? "",
         voidReason: r.voidReason ?? "",
         createdAt: r.createdAt.toISOString(),

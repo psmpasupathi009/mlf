@@ -83,6 +83,26 @@ enum DocumentType {
   other
 }
 
+enum OfficeExpenseCategory {
+  stationery
+  utilities
+  maintenance
+  travel
+  refreshments
+  equipment
+  professional_services
+  misc
+  others
+}
+
+enum ExpensePaymentMode {
+  cash
+  upi
+  card
+  bank
+  other
+}
+
 model User {
   id                String         @id @default(auto()) @map("_id") @db.ObjectId
   unitId            String         @unique
@@ -308,28 +328,57 @@ model CashPayment {
   @@index([paidOn])
 }
 
+model OfficeExpense {
+  id                 String                @id @default(auto()) @map("_id") @db.ObjectId
+  unitId             String                @unique
+  expenseDate        DateTime
+  category           OfficeExpenseCategory
+  vendor             String?
+  description        String
+  amount             Float
+  paymentMode        ExpensePaymentMode    @default(cash)
+  billDocumentId     String?               @db.ObjectId
+  billDocumentUnitId String?
+  voidedAt           DateTime?
+  voidedById         String?               @db.ObjectId
+  voidReason         String?
+  createdById        String?               @db.ObjectId
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  @@index([expenseDate])
+  @@index([category])
+  @@index([voidedAt])
+  @@index([createdAt])
+  @@index([billDocumentUnitId])
+}
+
 model Document {
-  id           String       @id @default(auto()) @map("_id") @db.ObjectId
-  unitId       String       @unique
-  caseId       String?      @db.ObjectId
-  caseUnitId   String?
-  clientId     String?      @db.ObjectId
-  clientUnitId String?
+  id             String       @id @default(auto()) @map("_id") @db.ObjectId
+  unitId         String       @unique
+  caseId         String?      @db.ObjectId
+  caseUnitId     String?
+  clientId       String?      @db.ObjectId
+  clientUnitId   String?
+  expenseId      String?      @db.ObjectId
+  expenseUnitId  String?
   /// judgment | order | pleading | vakalatnama | petition | affidavit | evidence | id_proof | receipt | other
-  docType      DocumentType @default(other)
-  title        String
-  notes        String?
-  fileKey      String
-  mimeType     String
-  size         Int
-  originalName String
-  uploadedById String?      @db.ObjectId
-  createdAt    DateTime     @default(now())
+  docType        DocumentType @default(other)
+  title          String
+  notes          String?
+  fileKey        String
+  mimeType       String
+  size           Int
+  originalName   String
+  uploadedById   String?      @db.ObjectId
+  createdAt      DateTime     @default(now())
 
   @@index([caseId])
   @@index([caseUnitId])
   @@index([clientId])
   @@index([clientUnitId])
+  @@index([expenseId])
+  @@index([expenseUnitId])
   @@index([docType])
   @@index([createdAt])
 }

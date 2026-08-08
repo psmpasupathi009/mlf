@@ -12,6 +12,7 @@ export type DocumentSummary = {
   notes: string | null;
   caseUnitId: string | null;
   clientUnitId: string | null;
+  expenseUnitId: string | null;
   mimeType: string;
   size: number;
   originalName: string;
@@ -28,6 +29,7 @@ export function toDocumentSummary(doc: Document): DocumentSummary {
     notes: doc.notes ?? null,
     caseUnitId: doc.caseUnitId,
     clientUnitId: doc.clientUnitId,
+    expenseUnitId: doc.expenseUnitId ?? null,
     mimeType: doc.mimeType,
     size: doc.size,
     originalName: doc.originalName,

@@ -7,6 +7,7 @@ export const idConfig = {
     hearing: "HRG",
     appointment: "APT",
     payment: "PAY",
+    expense: "EXP",
     document: "DOC",
     leave: "LVE",
     attendance: "ATT",

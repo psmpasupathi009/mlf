@@ -35,8 +35,15 @@ export const documentUploadMetaSchema = z
     notes: z.string().trim().max(500).optional().or(z.literal("")),
     caseUnitId: z.string().trim().optional().or(z.literal("")),
     clientUnitId: z.string().trim().optional().or(z.literal("")),
+    expenseUnitId: z.string().trim().optional().or(z.literal("")),
   })
-  .refine((d) => Boolean(d.caseUnitId?.trim()) || Boolean(d.clientUnitId?.trim()), {
-    message: "Link the document to a case or client",
-    path: ["caseUnitId"],
-  });
+  .refine(
+    (d) =>
+      Boolean(d.caseUnitId?.trim()) ||
+      Boolean(d.clientUnitId?.trim()) ||
+      Boolean(d.expenseUnitId?.trim()),
+    {
+      message: "Link the document to a case, client, or expense",
+      path: ["caseUnitId"],
+    }
+  );

@@ -59,7 +59,11 @@ function DialogContent({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   size?: DialogContentSize;
-  /** Raise overlay with content when nesting dialogs (e.g. client intake from a form). */
+  /**
+   * Raise overlay + content together when nesting dialogs
+   * (e.g. client intake from a form). Must apply to both — overlay-only
+   * elevation blocks clicks/typing on the form.
+   */
   overlayClassName?: string;
 }) {
   return (
@@ -68,6 +72,8 @@ function DialogContent({
       <DialogPrimitive.Content
         className={cn(
           "fixed top-1/2 left-1/2 z-50 flex min-h-0 w-full max-w-[calc(100dvw-1rem)] -translate-x-1/2 -translate-y-1/2 flex-col gap-0 overflow-hidden rounded-xl border border-border bg-card p-0 shadow-lg",
+          // Keep content at/above overlay when callers pass e.g. z-[60]
+          overlayClassName,
           DIALOG_SIZE_CLASSES[size],
           "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
           className

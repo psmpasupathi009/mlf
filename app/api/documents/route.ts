@@ -12,25 +12,32 @@ import { rateLimit } from "@/lib/rate-limit";
 import { clientRateKey } from "@/lib/rate-limit/client-key";
 
 export const GET = apiHandler(async (request) => {
-  const { user, response } = await requirePerm(request, "cases", "view");
-  if (!user) return response;
-
   const { searchParams } = new URL(request.url);
   const { page, pageSize, skip } = parsePagination(searchParams);
   const caseUnitId = searchParams.get("caseUnitId")?.trim();
   const clientUnitId = searchParams.get("clientUnitId")?.trim();
+  const expenseUnitId = searchParams.get("expenseUnitId")?.trim();
 
-  if (!caseUnitId && !clientUnitId) {
+  if (!caseUnitId && !clientUnitId && !expenseUnitId) {
     return jsonFail(
       "VALIDATION",
-      "Provide caseUnitId or clientUnitId to list documents",
+      "Provide caseUnitId, clientUnitId, or expenseUnitId to list documents",
       400
     );
+  }
+
+  if (expenseUnitId) {
+    const { user, response } = await requirePerm(request, "expenses", "view");
+    if (!user) return response;
+  } else {
+    const { user, response } = await requirePerm(request, "cases", "view");
+    if (!user) return response;
   }
 
   const where = {
     ...(caseUnitId ? { caseUnitId } : {}),
     ...(clientUnitId ? { clientUnitId } : {}),
+    ...(expenseUnitId ? { expenseUnitId } : {}),
   };
 
   const [rows, total] = await Promise.all([
@@ -70,22 +77,30 @@ export const POST = apiHandler(async (request) => {
     notes: form.get("notes")?.toString() ?? "",
     caseUnitId: form.get("caseUnitId")?.toString() ?? "",
     clientUnitId: form.get("clientUnitId")?.toString() ?? "",
+    expenseUnitId: form.get("expenseUnitId")?.toString() ?? "",
   });
   if (!parsed.success) {
     return jsonFail("VALIDATION", parsed.error.issues[0]?.message ?? "Invalid request", 400, parsed.error.issues);
   }
   const input = parsed.data;
 
-  // Case docs need cases.upload; fee receipts also allowed with accounts.edit/upload.
+  // Case docs need cases.upload; fee receipts with accounts.*; expense bills with expenses.*.
   const canCasesUpload =
     isModuleEnabled("cases") &&
     (await hasPermission(user.id, "cases", "upload"));
   const canAccountsReceipt =
     input.docType === "receipt" &&
+    !input.expenseUnitId &&
     isModuleEnabled("accounts") &&
     ((await hasPermission(user.id, "accounts", "edit")) ||
       (await hasPermission(user.id, "accounts", "upload")));
-  if (!canCasesUpload && !canAccountsReceipt) {
+  const canExpenseBill =
+    Boolean(input.expenseUnitId) &&
+    isModuleEnabled("expenses") &&
+    ((await hasPermission(user.id, "expenses", "create")) ||
+      (await hasPermission(user.id, "expenses", "edit")) ||
+      (await hasPermission(user.id, "expenses", "upload")));
+  if (!canCasesUpload && !canAccountsReceipt && !canExpenseBill) {
     return jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403);
   }
 
@@ -103,6 +118,15 @@ export const POST = apiHandler(async (request) => {
     clientId = client.id;
   }
 
+  let expenseId: string | undefined;
+  if (input.expenseUnitId) {
+    const expense = await prisma.officeExpense.findUnique({
+      where: { unitId: input.expenseUnitId },
+    });
+    if (!expense) return jsonFail("VALIDATION", "Expense not found", 400);
+    expenseId = expense.id;
+  }
+
   const buffer = Buffer.from(await file.arrayBuffer());
 
   let stored;
@@ -111,7 +135,11 @@ export const POST = apiHandler(async (request) => {
       buffer,
       mimeType: file.type || "application/octet-stream",
       originalName: file.name,
-      folder: input.caseUnitId || input.clientUnitId || "misc",
+      folder:
+        input.expenseUnitId ||
+        input.caseUnitId ||
+        input.clientUnitId ||
+        "misc",
     });
   } catch (error) {
     return jsonFail("VALIDATION", error instanceof Error ? error.message : "Upload failed", 400);
@@ -128,6 +156,8 @@ export const POST = apiHandler(async (request) => {
       caseUnitId: input.caseUnitId || undefined,
       clientId,
       clientUnitId: input.clientUnitId || undefined,
+      expenseId,
+      expenseUnitId: input.expenseUnitId || undefined,
       fileKey: stored.key,
       mimeType: stored.mimeType,
       size: stored.size,
@@ -135,6 +165,16 @@ export const POST = apiHandler(async (request) => {
       uploadedById: user.id,
     },
   });
+
+  if (expenseId && input.expenseUnitId) {
+    await prisma.officeExpense.update({
+      where: { id: expenseId },
+      data: {
+        billDocumentId: created.id,
+        billDocumentUnitId: created.unitId,
+      },
+    });
+  }
 
   await writeAudit({
     actorUnitId: user.unitId,
@@ -148,6 +188,7 @@ export const POST = apiHandler(async (request) => {
         "notes",
         "caseUnitId",
         "clientUnitId",
+        "expenseUnitId",
         "mimeType",
         "size",
         "originalName",
