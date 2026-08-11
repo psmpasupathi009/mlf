@@ -102,5 +102,20 @@ export const POST = apiHandler(async (request) => {
     },
   });
 
+  if (["court", "personal", "other"].includes(parsed.data.kind)) {
+    const { istDateKey } = await import("@/lib/utils/ist");
+    const { enqueueCoverageForAdvocateRange } = await import(
+      "@/lib/hearings/coverage"
+    );
+    await enqueueCoverageForAdvocateRange({
+      advocateMobile: target.user.mobile,
+      fromDate: istDateKey(parsed.data.startsAt),
+      toDate: istDateKey(parsed.data.endsAt),
+      reason: "unavailable_block",
+      sourceBlockId: created.id,
+      createdById: user.id,
+    });
+  }
+
   return jsonOk({ block: toBlock(created) }, 201);
 });

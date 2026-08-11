@@ -23,6 +23,8 @@ import {
   type Designation,
 } from "@/config/company/designations";
 import { SearchableSelect } from "@/shared/components/forms/searchable-select";
+import { CourtCascade } from "@/shared/components/pickers/court-cascade";
+import type { DefaultCourt } from "@/lib/hearings/court-key";
 
 const DESIGNATION_OPTIONS = DESIGNATION_GROUPS.flatMap((g) =>
   g.items.map((d) => ({ value: d, label: d, group: g.label }))
@@ -135,6 +137,13 @@ export function EmployeeFormDialog({
   const [roles, setRoles] = useState<string[]>([]);
   const [email, setEmail] = useState("");
   const [address, setAddress] = useState("");
+  const [defaultCourts, setDefaultCourts] = useState<DefaultCourt[]>([]);
+  const [draftCourt, setDraftCourt] = useState<DefaultCourt>({
+    state: "Tamil Nadu",
+    district: "",
+    city: "",
+    courtName: "",
+  });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [previewKeys, setPreviewKeys] = useState<string[]>([]);
@@ -153,6 +162,13 @@ export function EmployeeFormDialog({
       setRoles(employee?.roles ?? []);
       setEmail(employee?.email ?? "");
       setAddress(employee?.address ?? "");
+      setDefaultCourts(employee?.defaultCourts ?? []);
+      setDraftCourt({
+        state: "Tamil Nadu",
+        district: "",
+        city: "",
+        courtName: "",
+      });
       setError("");
       setPreviewKeys([]);
       setPreviewError("");
@@ -246,6 +262,7 @@ export function EmployeeFormDialog({
       roles,
       email: email || undefined,
       address: address || undefined,
+      defaultCourts,
       ...(isEdit ? {} : { mobile }),
     };
 
@@ -386,11 +403,123 @@ export function EmployeeFormDialog({
                   </p>
                 </div>
               </Section>
+
+              <Section
+                title="3. Default courts"
+                description="First court is primary for new case prefills. Admin / manager edit only."
+              >
+                {defaultCourts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No default courts yet. Add the courts this advocate usually appears in.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {defaultCourts.map((c, idx) => (
+                      <li
+                        key={`${c.courtName}-${idx}`}
+                        className="flex flex-wrap items-center gap-2 rounded-lg border border-border/80 bg-card px-3 py-2 text-sm"
+                      >
+                        <span className="min-w-0 flex-1">
+                          {idx === 0 ? (
+                            <Badge variant="outline" className="mr-2">
+                              Primary
+                            </Badge>
+                          ) : null}
+                          {c.courtName}
+                          <span className="text-muted-foreground">
+                            {" "}
+                            · {c.city}, {c.district}
+                          </span>
+                        </span>
+                        <div className="flex gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={idx === 0}
+                            onClick={() =>
+                              setDefaultCourts((prev) => {
+                                const next = [...prev];
+                                const tmp = next[idx - 1]!;
+                                next[idx - 1] = next[idx]!;
+                                next[idx] = tmp;
+                                return next;
+                              })
+                            }
+                          >
+                            Up
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={idx === defaultCourts.length - 1}
+                            onClick={() =>
+                              setDefaultCourts((prev) => {
+                                const next = [...prev];
+                                const tmp = next[idx + 1]!;
+                                next[idx + 1] = next[idx]!;
+                                next[idx] = tmp;
+                                return next;
+                              })
+                            }
+                          >
+                            Down
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                              setDefaultCourts((prev) =>
+                                prev.filter((_, i) => i !== idx)
+                              )
+                            }
+                          >
+                            Remove
+                          </Button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div className="space-y-2 border-t border-border/60 pt-3">
+                  <CourtCascade
+                    state={draftCourt.state}
+                    district={draftCourt.district}
+                    city={draftCourt.city}
+                    courtName={draftCourt.courtName}
+                    onChange={(next) => setDraftCourt(next)}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={
+                      !draftCourt.state.trim() ||
+                      !draftCourt.district.trim() ||
+                      !draftCourt.city.trim() ||
+                      !draftCourt.courtName.trim()
+                    }
+                    onClick={() => {
+                      setDefaultCourts((prev) => [...prev, { ...draftCourt }]);
+                      setDraftCourt({
+                        state: draftCourt.state || "Tamil Nadu",
+                        district: "",
+                        city: "",
+                        courtName: "",
+                      });
+                    }}
+                  >
+                    Add court
+                  </Button>
+                </div>
+              </Section>
             </div>
 
             <div className="space-y-4">
               <Section
-                title="3. App access"
+                title="4. App access"
                 description="Roles grant permissions. A person can hold more than one."
               >
                 <div className="grid gap-2">
@@ -439,7 +568,7 @@ export function EmployeeFormDialog({
               </Section>
 
               <Section
-                title="4. What they can access"
+                title="5. What they can access"
                 description="Live preview from the office permissions matrix"
               >
                 {roles.length === 0 ? (

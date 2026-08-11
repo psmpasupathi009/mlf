@@ -24,7 +24,7 @@ import {
   formatCoords,
   openStreetMapUrl,
 } from "@/features/hrms/lib/get-attendance-location";
-import { formatIstTime } from "@/lib/utils/ist";
+import { formatIstTime, istDateKey } from "@/lib/utils/ist";
 import { cn } from "@/lib/utils/cn";
 import { personDisplayName } from "@/shared/lib/person";
 
@@ -242,6 +242,7 @@ export function LeaveTable({
   currentUserUnitId,
   deciding,
   cancelBusyId,
+  todayKey = istDateKey(),
   onApprove,
   onReject,
   onCancel,
@@ -251,10 +252,18 @@ export function LeaveTable({
   currentUserUnitId?: string;
   deciding?: boolean;
   cancelBusyId?: string | null;
+  /** IST YYYY-MM-DD — approved leave cancellable while toDate >= today */
+  todayKey?: string;
   onApprove?: (unitId: string) => void;
   onReject?: (row: LeaveSummary) => void;
   onCancel?: (row: LeaveSummary) => void;
 }) {
+  function canCancel(l: LeaveSummary) {
+    if (l.status === "pending") return true;
+    if (l.status === "approved" && l.toDate >= todayKey) return true;
+    return false;
+  }
+
   return (
     <>
       <div className="divide-y divide-border/70 md:hidden">
@@ -318,7 +327,7 @@ export function LeaveTable({
                 </Button>
               </div>
             ) : null}
-            {mode === "mine" && l.status === "pending" ? (
+            {mode === "mine" && canCancel(l) ? (
               <Button
                 type="button"
                 size="sm"
@@ -326,7 +335,11 @@ export function LeaveTable({
                 disabled={cancelBusyId === l.unitId}
                 onClick={() => onCancel?.(l)}
               >
-                {cancelBusyId === l.unitId ? "Cancelling…" : "Cancel request"}
+                {cancelBusyId === l.unitId
+                  ? "Cancelling…"
+                  : l.status === "approved"
+                    ? "Cancel leave"
+                    : "Cancel request"}
               </Button>
             ) : null}
           </div>
@@ -416,7 +429,7 @@ export function LeaveTable({
               ) : null}
               {mode === "mine" ? (
                 <TableCell className="text-right">
-                  {l.status === "pending" ? (
+                  {canCancel(l) ? (
                     <Button
                       type="button"
                       variant="outline"
@@ -424,7 +437,11 @@ export function LeaveTable({
                       disabled={cancelBusyId === l.unitId}
                       onClick={() => onCancel?.(l)}
                     >
-                      {cancelBusyId === l.unitId ? "Cancelling…" : "Cancel"}
+                      {cancelBusyId === l.unitId
+                        ? "Cancelling…"
+                        : l.status === "approved"
+                          ? "Cancel leave"
+                          : "Cancel"}
                     </Button>
                   ) : (
                     <span className="text-xs text-muted-foreground">—</span>

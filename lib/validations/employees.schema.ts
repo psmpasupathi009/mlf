@@ -9,6 +9,13 @@ export const employeeRoleEnum = z.enum([
   "accountant",
 ]);
 
+const defaultCourtSchema = z.object({
+  state: z.string().trim().min(1).max(80),
+  district: z.string().trim().min(1).max(80),
+  city: z.string().trim().min(1).max(80),
+  courtName: z.string().trim().min(1).max(160),
+});
+
 /** Accepts current designations and legacy aliases (e.g. Administration → Office Manager). */
 const designationField = z.preprocess(
   (value) => {
@@ -42,6 +49,7 @@ export const createEmployeeSchema = z.object({
   roles: z.array(employeeRoleEnum).min(1, "Select at least one role"),
   email: z.string().trim().email("Enter a valid email").optional().or(z.literal("")),
   address: z.string().trim().max(500).optional().or(z.literal("")),
+  defaultCourts: z.array(defaultCourtSchema).max(40).optional(),
 });
 
 export const updateEmployeeSchema = z.object({
@@ -51,6 +59,7 @@ export const updateEmployeeSchema = z.object({
   email: z.string().trim().email("Enter a valid email").optional().or(z.literal("")),
   address: z.string().trim().max(500).optional().or(z.literal("")),
   isActive: z.boolean().optional(),
+  defaultCourts: z.array(defaultCourtSchema).max(40).optional(),
 });
 
 export const importEmployeesRowSchema = z.object({
@@ -61,6 +70,10 @@ export const importEmployeesRowSchema = z.object({
     { message: "Select a designation" }
   ),
   mobile: z.string().trim().min(10, "Enter a valid mobile number").max(15),
+  defaultCourtNames: z.string().trim().optional().or(z.literal("")),
+  defaultState: z.string().trim().optional().or(z.literal("")),
+  defaultDistrict: z.string().trim().optional().or(z.literal("")),
+  defaultCity: z.string().trim().optional().or(z.literal("")),
 });
 
 export const importEmployeesSchema = z.object({

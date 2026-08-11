@@ -40,5 +40,31 @@ export const POST = apiHandler(async (request, context) => {
     meta: { before, after, changes: diffAudit(before, after) },
   });
 
+  const { scheduleNotify, notifyUsers, findUsersWithPermission } = await import(
+    "@/lib/notifications/notify"
+  );
+  scheduleNotify(async () => {
+    const admins = await findUsersWithPermission("employees", "view");
+    const recipients = [
+      ...admins.filter((a) => a.id !== user.id && a.id !== target.id),
+      { id: target.id, unitId: target.unitId },
+    ];
+    const byId = new Map(recipients.map((r) => [r.id, r]));
+    await notifyUsers(
+      [...byId.values()].map((u) => ({
+        userId: u.id,
+        userUnitId: u.unitId,
+        type: "employee_deactivated",
+        title:
+          u.id === target.id
+            ? "Your account was deactivated"
+            : "Employee deactivated",
+        body: updated.name || updated.unitId,
+        href: "/employees",
+        meta: { employeeUnitId: updated.unitId },
+      }))
+    );
+  });
+
   return jsonOk({ employee: toEmployeeSummary(updated) });
 });

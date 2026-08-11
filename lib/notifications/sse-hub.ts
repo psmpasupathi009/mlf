@@ -1,14 +1,27 @@
 export type NotificationType =
   | "leave_request"
   | "leave_decided"
+  | "leave_cancelled"
   | "task_assigned"
   | "task_done"
   | "appointment"
+  | "appointment_updated"
+  | "appointment_cancelled"
   | "case_status"
+  | "case_created"
   | "filing_defect"
   | "batta_due"
   | "hearing_tomorrow"
+  | "hearing_adjourned"
+  | "coverage_needed"
+  | "coverage_assigned"
   | "office_holiday"
+  | "dak_received"
+  | "document_uploaded"
+  | "payment_recorded"
+  | "payment_voided"
+  | "employee_deactivated"
+  | "permissions_changed"
   | "system";
 
 export type NotificationPayload = {

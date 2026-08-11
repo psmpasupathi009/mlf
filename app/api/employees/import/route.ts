@@ -9,6 +9,24 @@ import {
 import { importEmployeesSchema } from "@/lib/validations/employees.schema";
 import { findUserByUnitId } from "@/lib/imports/lookups";
 import { IMPORT_EMPLOYEE_COLUMNS } from "@/lib/imports/columns";
+import type { DefaultCourt } from "@/lib/hearings/court-key";
+
+function courtsFromImportRow(row: {
+  defaultCourtNames?: string;
+  defaultState?: string;
+  defaultDistrict?: string;
+  defaultCity?: string;
+}): DefaultCourt[] | undefined {
+  const names = (row.defaultCourtNames ?? "")
+    .split("|")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (names.length === 0) return undefined;
+  const state = (row.defaultState ?? "Tamil Nadu").trim() || "Tamil Nadu";
+  const district = (row.defaultDistrict ?? "").trim() || "Erode";
+  const city = (row.defaultCity ?? "").trim() || district;
+  return names.map((courtName) => ({ state, district, city, courtName }));
+}
 
 export const POST = createImportHandler({
   perm: ["employees", "create"],
@@ -116,6 +134,7 @@ export const POST = createImportHandler({
           (r) => r === "admin" || r === "sub_admin"
         );
         const roles = Array.from(new Set([...preserved, ...baseRoles]));
+        const defaultCourts = courtsFromImportRow(row);
 
         if (dryRun) {
           results.push({
@@ -135,6 +154,7 @@ export const POST = createImportHandler({
               designation,
               roles,
               mobile,
+              ...(defaultCourts ? { defaultCourts } : {}),
             },
           });
           results.push({
@@ -154,6 +174,7 @@ export const POST = createImportHandler({
               roles,
               createdById: user.id,
               isActive: true,
+              ...(defaultCourts ? { defaultCourts } : {}),
             },
           });
           results.push({

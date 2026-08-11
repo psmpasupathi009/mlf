@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import { AsyncSearchSelect } from "@/shared/components/forms/async-search-select";
 import { fetchPagedList } from "@/shared/lib/fetch-paged-list";
 import { displayMobile } from "@/lib/auth/mobile";
+import type { DefaultCourt } from "@/lib/hearings/court-key";
 import { personDisplayName } from "@/shared/lib/person";
 
 export type AdvocateSummary = {
@@ -13,6 +14,7 @@ export type AdvocateSummary = {
   mobile: string;
   designation?: string | null;
   photoUrl?: string | null;
+  defaultCourts?: DefaultCourt[];
 };
 
 function advocateLabel(a: AdvocateSummary): string {

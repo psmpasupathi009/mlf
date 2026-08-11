@@ -66,6 +66,36 @@ export const PATCH = apiHandler(async (request, context) => {
     },
   });
 
+  const kind = updated.kind;
+  if (["court", "personal", "other"].includes(kind)) {
+    const { istDateKey } = await import("@/lib/utils/ist");
+    const {
+      dismissOpenCoverageForBlock,
+      enqueueCoverageForAdvocateRange,
+    } = await import("@/lib/hearings/coverage");
+    // Drop open items tied to the old range, then enqueue for the new window
+    await dismissOpenCoverageForBlock(updated.id);
+    const owner = await prisma.user.findUnique({
+      where: { id: updated.userId },
+      select: { mobile: true },
+    });
+    if (owner?.mobile) {
+      await enqueueCoverageForAdvocateRange({
+        advocateMobile: owner.mobile,
+        fromDate: istDateKey(updated.startsAt),
+        toDate: istDateKey(updated.endsAt),
+        reason: "unavailable_block",
+        sourceBlockId: updated.id,
+        createdById: user.id,
+      });
+    }
+  } else if (["court", "personal", "other"].includes(block.kind)) {
+    const { dismissOpenCoverageForBlock } = await import(
+      "@/lib/hearings/coverage"
+    );
+    await dismissOpenCoverageForBlock(updated.id);
+  }
+
   return jsonOk({ block: toBlock(updated) });
 });
 
@@ -84,6 +114,13 @@ export const DELETE = apiHandler(async (request, context) => {
   }
 
   await prisma.advocateTimeBlock.delete({ where: { id: block.id } });
+
+  if (["court", "personal", "other"].includes(block.kind)) {
+    const { dismissOpenCoverageForBlock } = await import(
+      "@/lib/hearings/coverage"
+    );
+    await dismissOpenCoverageForBlock(block.id);
+  }
 
   return jsonOk({ deleted: true });
 });

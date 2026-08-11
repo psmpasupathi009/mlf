@@ -71,15 +71,15 @@ function cityCourts(
 const TN_MULTI_CITY: Record<string, { city: string; courts: string[] }[]> = {
   Erode: [
     {
-      city: "Erode",
-      courts: [...STANDARD, ...CITY_EXTRA],
-    },
-    {
       city: "Gobichettipalayam",
       courts: [
         "District Munsif Court, Gobichettipalayam",
         "JMFC, Gobichettipalayam",
+        "Judicial Magistrate Court No.I, Gobichettipalayam",
+        "Judicial Magistrate Court No.II, Gobichettipalayam",
         "Sub Court, Gobichettipalayam",
+        "Subordinate Court, Gobichettipalayam",
+        "III-Additional District Sessions Court, Gobichettipalayam",
         "Family Court, Gobichettipalayam",
       ],
     },
@@ -87,7 +87,9 @@ const TN_MULTI_CITY: Record<string, { city: string; courts: string[] }[]> = {
       city: "Sathyamangalam",
       courts: [
         "District Munsif Court, Sathyamangalam",
+        "Subordinate Court, Sathyamangalam",
         "JMFC, Sathyamangalam",
+        "Judicial Magistrate Court, Sathyamangalam",
       ],
     },
     {
@@ -95,12 +97,42 @@ const TN_MULTI_CITY: Record<string, { city: string; courts: string[] }[]> = {
       courts: ["JMFC / Taluk Court, Nambiyur"],
     },
     {
+      city: "Anthiyur",
+      courts: ["District Munsif Court, Anthiyur"],
+    },
+    {
       city: "Bhavani",
-      courts: ["District Munsif Court, Bhavani", "JMFC, Bhavani"],
+      courts: [
+        "District Munsif Court, Bhavani",
+        "Subordinate Court, Bhavani",
+        "JMFC, Bhavani",
+        "Judicial Magistrate Court No.1, Bhavani",
+        "Judicial Magistrate Court No.2, Bhavani",
+        "Additional District Sessions Court, Bhavani",
+      ],
     },
     {
       city: "Perundurai",
-      courts: ["JMFC, Perundurai"],
+      courts: [
+        "District Munsif Court, Perundurai",
+        "Subordinate Court, Perundurai",
+        "JMFC, Perundurai",
+        "Judicial Magistrate Court, Perundurai",
+      ],
+    },
+    {
+      city: "Erode",
+      courts: [
+        ...STANDARD,
+        ...CITY_EXTRA,
+        "Principal District Court, Erode",
+        "Mahila Court, Erode",
+        "Principal District Munsif Court, Erode",
+        "Principal District Subordinate Court, Erode",
+        "Judicial Magistrate Court No.3, Erode",
+        "Family Court, Erode",
+        "Employee Compensation Court, Erode",
+      ],
     },
   ],
   Coimbatore: [
@@ -111,13 +143,16 @@ const TN_MULTI_CITY: Record<string, { city: string; courts: string[] }[]> = {
         "Sub Court, Pollachi",
         "District Munsif Court, Pollachi",
         "JMFC, Pollachi",
+        "Judicial Magistrate Court, Pollachi",
       ],
     },
     {
       city: "Mettupalayam",
       courts: [
         "District Munsif Court, Mettupalayam",
+        "Subordinate Court, Mettupalayam",
         "JMFC, Mettupalayam",
+        "Judicial Magistrate Court, Mettupalayam",
       ],
     },
   ],
@@ -186,7 +221,40 @@ const TN_MULTI_CITY: Record<string, { city: string; courts: string[] }[]> = {
     },
   ],
   Tiruppur: [
-    { city: "Tiruppur", courts: [...STANDARD, ...CITY_EXTRA] },
+    {
+      city: "Tiruppur",
+      courts: [
+        ...STANDARD,
+        ...CITY_EXTRA,
+        "Additional District Court, Tiruppur",
+        "Principal District Munsif Court, Tiruppur",
+        "Family Court, Tiruppur",
+        "Special Tribunal Court, Tiruppur",
+      ],
+    },
+    {
+      city: "Avinashi",
+      courts: [
+        "District Munsif Court, Avinashi",
+        "Subordinate Court, Avinashi",
+        "Judicial Magistrate Court, Avinashi",
+      ],
+    },
+    {
+      city: "Palladam",
+      courts: [
+        "Subordinate Court, Palladam",
+        "Judicial Magistrate Court, Palladam",
+      ],
+    },
+    {
+      city: "Uthukuli",
+      courts: ["District Munsif Court, Uthukuli"],
+    },
+    {
+      city: "Kangeyam",
+      courts: ["Subordinate Court, Kangeyam"],
+    },
     {
       city: "Dharapuram",
       courts: ["District Munsif Court, Dharapuram", "JMFC, Dharapuram"],

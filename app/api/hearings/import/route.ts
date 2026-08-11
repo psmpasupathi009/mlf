@@ -116,6 +116,27 @@ export const POST = createImportHandler({
           caseStatus: caseItem.status,
         });
 
+        if (caseItem.primaryAdvocateMobile) {
+          const {
+            assertAdvocateCourtDayAvailable,
+            clashMessage,
+          } = await import("@/lib/hearings/advocate-day");
+          const clash = await assertAdvocateCourtDayAvailable({
+            advocateMobile: caseItem.primaryAdvocateMobile,
+            hearingDate,
+            court: caseItem,
+          });
+          if (!clash.ok) {
+            results.push({
+              row: rowNum,
+              unitId: null,
+              status: "error" as const,
+              message: clashMessage(clash),
+            });
+            continue;
+          }
+        }
+
         if (dryRun) {
           results.push({
             row: rowNum,

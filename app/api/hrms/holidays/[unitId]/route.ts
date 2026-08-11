@@ -151,5 +151,28 @@ export const DELETE = apiHandler(async (request, context) => {
     },
   });
 
+  const users = await prisma.user.findMany({
+    where: { isActive: true },
+    select: { id: true, unitId: true },
+  });
+  const range =
+    item.fromDate === item.toDate
+      ? item.fromDate
+      : `${item.fromDate} → ${item.toDate}`;
+  scheduleNotify(() =>
+    notifyUsers(
+      users
+        .filter((u) => u.id !== user.id)
+        .map((u) => ({
+          userId: u.id,
+          userUnitId: u.unitId,
+          type: "office_holiday",
+          title: `Office holiday removed: ${item.title}`,
+          body: `Was: ${range}`,
+          href: "/hrms?section=holidays",
+        }))
+    )
+  );
+
   return jsonOk({ deleted: true });
 });

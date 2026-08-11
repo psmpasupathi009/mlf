@@ -196,5 +196,44 @@ export const POST = apiHandler(async (request) => {
     },
   });
 
+  if (input.caseUnitId) {
+    const { scheduleNotify, notifyUsers, findCaseNotifyRecipients } =
+      await import("@/lib/notifications/notify");
+    scheduleNotify(async () => {
+      const cse = await prisma.case.findUnique({
+        where: { unitId: input.caseUnitId },
+        select: {
+          unitId: true,
+          caseNumber: true,
+          filingNumber: true,
+          advocateMobiles: true,
+          primaryAdvocateMobile: true,
+        },
+      });
+      if (!cse) return;
+      const recipients = await findCaseNotifyRecipients([
+        ...cse.advocateMobiles,
+        cse.primaryAdvocateMobile,
+      ]);
+      const label = cse.caseNumber || cse.filingNumber || cse.unitId;
+      await notifyUsers(
+        recipients
+          .filter((u) => u.id !== user.id)
+          .map((u) => ({
+            userId: u.id,
+            userUnitId: u.unitId,
+            type: "document_uploaded",
+            title: `Document uploaded: ${label}`,
+            body: created.title,
+            href: `/cases/${cse.unitId}`,
+            meta: {
+              documentUnitId: created.unitId,
+              caseUnitId: cse.unitId,
+            },
+          }))
+      );
+    });
+  }
+
   return jsonOk({ document: toDocumentSummary(created) }, 201);
 });

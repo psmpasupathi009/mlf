@@ -248,6 +248,7 @@ export const GET = apiHandler(async (request) => {
         designation: true,
         roles: true,
         isActive: true,
+        defaultCourts: true,
       },
     });
     const sheet = workbook.addWorksheet("Employees");
@@ -259,8 +260,15 @@ export const GET = apiHandler(async (request) => {
       { header: "designation", key: "designation", width: 20 },
       { header: "roles", key: "roles", width: 24 },
       { header: "isActive", key: "isActive", width: 10 },
+      { header: "defaultState", key: "defaultState", width: 16 },
+      { header: "defaultDistrict", key: "defaultDistrict", width: 16 },
+      { header: "defaultCity", key: "defaultCity", width: 16 },
+      { header: "defaultCourtNames", key: "defaultCourtNames", width: 40 },
     ];
+    const { parseDefaultCourts } = await import("@/lib/hearings/court-key");
     for (const r of rows) {
+      const courts = parseDefaultCourts(r.defaultCourts);
+      const first = courts[0];
       sheet.addRow({
         unitId: r.unitId,
         name: r.name ?? "",
@@ -269,6 +277,10 @@ export const GET = apiHandler(async (request) => {
         designation: r.designation ?? "",
         roles: r.roles.join("|"),
         isActive: r.isActive ? "true" : "false",
+        defaultState: first?.state ?? "",
+        defaultDistrict: first?.district ?? "",
+        defaultCity: first?.city ?? "",
+        defaultCourtNames: courts.map((c) => c.courtName).join("|"),
       });
     }
   } else if (type === "tasks") {

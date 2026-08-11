@@ -35,6 +35,21 @@ export const POST = apiHandler(async (request, context) => {
       ? purpose
       : undefined;
 
+  if (item.primaryAdvocateMobile) {
+    const {
+      assertAdvocateCourtDayAvailable,
+      clashMessage,
+    } = await import("@/lib/hearings/advocate-day");
+    const check = await assertAdvocateCourtDayAvailable({
+      advocateMobile: item.primaryAdvocateMobile,
+      hearingDate: input.hearingDate,
+      court: item,
+    });
+    if (!check.ok) {
+      return jsonFail("CONFLICT", clashMessage(check), 409);
+    }
+  }
+
   const hearingUnitId = await nextUnitId("hearing");
   const [hearing] = await prisma.$transaction([
     prisma.hearing.create({

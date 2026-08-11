@@ -666,7 +666,28 @@ export async function buildDashboardSummary(
   }
   if (adminBoardResult) summary.adminBoard = adminBoardResult;
 
+  let openCoverage = 0;
+  if (isOfficeAdmin) {
+    const { dismissStaleOpenCoverage } = await import(
+      "@/lib/hearings/coverage"
+    );
+    await dismissStaleOpenCoverage();
+    openCoverage = await prisma.hearingCoverageItem.count({
+      where: { status: "open" },
+    });
+    summary.openCoverage = openCoverage;
+  }
+
   const attention: AttentionItem[] = [];
+  if (openCoverage > 0) {
+    attention.push({
+      label: "Hearing coverage needed",
+      value: String(openCoverage),
+      href: "/diary",
+      cta: "Resolve",
+      tone: "warning",
+    });
+  }
   if (tasksOverdue > 0) {
     attention.push({
       label: "Overdue tasks",

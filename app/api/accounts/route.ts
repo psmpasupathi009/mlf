@@ -161,5 +161,42 @@ export const POST = apiHandler(async (request) => {
     },
   });
 
+  const { scheduleNotify, notifyUsers, findUsersWithPermission, findCaseNotifyRecipients } =
+    await import("@/lib/notifications/notify");
+  scheduleNotify(async () => {
+    const accountsUsers = await findUsersWithPermission("accounts", "view");
+    let caseRecipients: { id: string; unitId: string }[] = [];
+    if (created.caseUnitId) {
+      const cse = await prisma.case.findUnique({
+        where: { unitId: created.caseUnitId },
+        select: { advocateMobiles: true, primaryAdvocateMobile: true },
+      });
+      if (cse) {
+        caseRecipients = await findCaseNotifyRecipients([
+          ...cse.advocateMobiles,
+          cse.primaryAdvocateMobile,
+        ]);
+      }
+    }
+    const byId = new Map<string, { id: string; unitId: string }>();
+    for (const u of [...accountsUsers, ...caseRecipients]) {
+      if (u.id === user.id) continue;
+      byId.set(u.id, u);
+    }
+    await notifyUsers(
+      [...byId.values()].map((u) => ({
+        userId: u.id,
+        userUnitId: u.unitId,
+        type: "payment_recorded",
+        title: "Payment recorded",
+        body: `₹${created.amount.toLocaleString("en-IN")} · ${created.type}`,
+        href: created.caseUnitId
+          ? `/cases/${created.caseUnitId}`
+          : "/accounts",
+        meta: { paymentUnitId: created.unitId },
+      }))
+    );
+  });
+
   return jsonOk({ payment: toPaymentSummary(created) }, 201);
 });

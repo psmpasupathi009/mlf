@@ -12,13 +12,19 @@ import {
   scheduleNotify,
 } from "@/lib/notifications/notify";
 import { istDisplayDate } from "@/lib/utils/ist";
+import {
+  assertAdvocateCourtDayAvailable,
+  clashMessage,
+} from "@/lib/hearings/advocate-day";
 
 export const POST = apiHandler(async (request, context) => {
   const { user, response } = await requirePerm(request, "cases", "edit");
   if (!user) return response;
 
   const { unitId } = (await context.params) ?? {};
-  const hearing = unitId ? await prisma.hearing.findUnique({ where: { unitId } }) : null;
+  const hearing = unitId
+    ? await prisma.hearing.findUnique({ where: { unitId } })
+    : null;
   if (!hearing) return jsonFail("NOT_FOUND", "Hearing not found", 404);
   if (hearing.isAdjourned) {
     return jsonFail("CONFLICT", "This hearing is already adjourned", 409);
@@ -27,9 +33,38 @@ export const POST = apiHandler(async (request, context) => {
   const raw = await request.json();
   const parsed = adjournHearingSchema.safeParse(raw);
   if (!parsed.success) {
-    return jsonFail("VALIDATION", parsed.error.issues[0]?.message ?? "Invalid request", 400, parsed.error.issues);
+    return jsonFail(
+      "VALIDATION",
+      parsed.error.issues[0]?.message ?? "Invalid request",
+      400,
+      parsed.error.issues
+    );
   }
   const input = parsed.data;
+
+  const caseItem = await prisma.case.findUnique({
+    where: { id: hearing.caseId },
+  });
+  if (!caseItem) return jsonFail("NOT_FOUND", "Case not found", 404);
+
+  // Date-specific cover ends on adjourn; next hearing uses primary.
+  // If primary is unavailable, reject — use coverage-queue adjourn to set cover.
+  const nextAdvocate = caseItem.primaryAdvocateMobile;
+  if (nextAdvocate) {
+    const clash = await assertAdvocateCourtDayAvailable({
+      advocateMobile: nextAdvocate,
+      hearingDate: input.nextHearingDate,
+      court: caseItem,
+      excludeHearingId: hearing.id,
+    });
+    if (!clash.ok) {
+      return jsonFail(
+        "CONFLICT",
+        `${clashMessage(clash)}. Assign cover from the coverage queue, or pick another date.`,
+        409
+      );
+    }
+  }
 
   const hearingBefore = pickAuditFields(hearing as Record<string, unknown>, [
     "hearingDate",
@@ -40,7 +75,6 @@ export const POST = apiHandler(async (request, context) => {
   ] as const);
 
   const nextHearingUnitId = await nextUnitId("hearing");
-  const caseItem = await prisma.case.findUnique({ where: { id: hearing.caseId } });
 
   const [adjournedHearing, nextHearing] = await prisma.$transaction([
     prisma.hearing.update({
@@ -65,15 +99,22 @@ export const POST = apiHandler(async (request, context) => {
       where: { id: hearing.caseId },
       data: {
         nextHearingAt: input.nextHearingDate,
-        // Leave pipeline status unchanged; only normalize legacy pending/listed when numbered.
-        ...(caseItem &&
-        (caseItem.status === "pending" || caseItem.status === "listed") &&
+        ...((caseItem.status === "pending" || caseItem.status === "listed") &&
         (caseItem.caseNumber || caseItem.cnr)
           ? { status: "active" as const }
           : {}),
       },
     }),
   ]);
+
+  await prisma.hearingCoverageItem.updateMany({
+    where: { hearingId: hearing.id, status: "open" },
+    data: {
+      status: "adjourned",
+      resolvedAt: new Date(),
+      resolvedById: user.id,
+    },
+  });
 
   const hearingAfter = pickAuditFields(
     adjournedHearing as Record<string, unknown>,
@@ -98,14 +139,35 @@ export const POST = apiHandler(async (request, context) => {
     },
   });
 
-  if (caseItem && isHearingWithinNextIstDays(nextHearing.hearingDate, 2)) {
-    scheduleNotify(async () => {
-      const recipients = await findCaseNotifyRecipients([
-        ...caseItem.advocateMobiles,
-        caseItem.primaryAdvocateMobile,
-      ]);
-      const label =
-        caseItem.caseNumber || caseItem.filingNumber || caseItem.unitId;
+  const label =
+    caseItem.caseNumber || caseItem.filingNumber || caseItem.unitId;
+  const nextDateLabel = istDisplayDate(nextHearing.hearingDate);
+
+  scheduleNotify(async () => {
+    const recipients = await findCaseNotifyRecipients([
+      ...caseItem.advocateMobiles,
+      caseItem.primaryAdvocateMobile,
+      hearing.coveringAdvocateMobile,
+    ]);
+    await notifyUsers(
+      recipients
+        .filter((u) => u.id !== user.id)
+        .map((u) => ({
+          userId: u.id,
+          userUnitId: u.unitId,
+          type: "hearing_adjourned",
+          title: `Hearing adjourned: ${label}`,
+          body: `Next date ${nextDateLabel}`,
+          href: `/cases/${caseItem.unitId}`,
+          meta: {
+            hearingUnitId: nextHearing.unitId,
+            caseUnitId: caseItem.unitId,
+            previousHearingUnitId: hearing.unitId,
+          },
+        }))
+    );
+
+    if (isHearingWithinNextIstDays(nextHearing.hearingDate, 2)) {
       await notifyUsers(
         recipients
           .filter((u) => u.id !== user.id)
@@ -114,7 +176,7 @@ export const POST = apiHandler(async (request, context) => {
             userUnitId: u.unitId,
             type: "hearing_tomorrow",
             title: `Hearing soon: ${label}`,
-            body: istDisplayDate(nextHearing.hearingDate),
+            body: nextDateLabel,
             href: `/cases/${caseItem.unitId}`,
             meta: {
               hearingUnitId: nextHearing.unitId,
@@ -122,8 +184,8 @@ export const POST = apiHandler(async (request, context) => {
             },
           }))
       );
-    });
-  }
+    }
+  });
 
   return jsonOk({ hearing: toHearingSummary(nextHearing) });
 });

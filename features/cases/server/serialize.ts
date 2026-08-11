@@ -81,6 +81,7 @@ export type HearingSummary = {
   notes: string | null;
   outcome: string | null;
   isAdjourned: boolean;
+  coveringAdvocateMobile: string | null;
   smsSentAt: string | null;
   createdAt: string;
 };
@@ -94,6 +95,7 @@ export function toHearingSummary(item: Hearing): HearingSummary {
     notes: item.notes,
     outcome: item.outcome,
     isAdjourned: item.isAdjourned,
+    coveringAdvocateMobile: item.coveringAdvocateMobile ?? null,
     smsSentAt: item.smsSentAt ? item.smsSentAt.toISOString() : null,
     createdAt: item.createdAt.toISOString(),
   };

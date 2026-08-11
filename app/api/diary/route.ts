@@ -7,6 +7,7 @@ import { istDayBounds, istDateKey } from "@/lib/utils/ist";
 import { displayMobile } from "@/lib/auth/mobile";
 import { toAppointmentSummary } from "@/features/appointments/server/serialize";
 import { toOfficeTaskSummary } from "@/features/tasks/server/serialize";
+import { effectiveHearingAdvocate } from "@/lib/hearings/court-key";
 
 const DIARY_LIMIT = 100;
 
@@ -157,7 +158,11 @@ export const GET = apiHandler(async (request) => {
   let pageHearings = hearingsRaw;
   if (advocateKeySet) {
     pageHearings = hearingsRaw.filter((h) => {
-      const mob = caseMap.get(h.caseUnitId)?.primaryAdvocateMobile;
+      const cse = caseMap.get(h.caseUnitId);
+      const mob = effectiveHearingAdvocate({
+        coveringAdvocateMobile: h.coveringAdvocateMobile,
+        primaryAdvocateMobile: cse?.primaryAdvocateMobile,
+      });
       if (!mob) return false;
       return advocateKeySet.has(toTen(mob));
     });
@@ -179,6 +184,7 @@ export const GET = apiHandler(async (request) => {
     ...new Set(
       [
         ...cases.map((c) => c.primaryAdvocateMobile),
+        ...pageHearings.map((h) => h.coveringAdvocateMobile),
         ...appointmentsRaw.map((a) => a.advocateMobile),
       ].filter(Boolean) as string[]
     ),
@@ -221,7 +227,10 @@ export const GET = apiHandler(async (request) => {
     .map((h) => {
       const cse = caseMap.get(h.caseUnitId);
       const client = cse ? clientMap.get(cse.clientUnitId) : null;
-      const mob = cse?.primaryAdvocateMobile ?? null;
+      const mob = effectiveHearingAdvocate({
+        coveringAdvocateMobile: h.coveringAdvocateMobile,
+        primaryAdvocateMobile: cse?.primaryAdvocateMobile,
+      });
       return {
         hearingUnitId: h.unitId,
         hearingDate: h.hearingDate.toISOString(),
@@ -236,6 +245,9 @@ export const GET = apiHandler(async (request) => {
         clientUnitId: client?.unitId ?? null,
         courtName: cse?.courtName ?? null,
         primaryAdvocateMobile: mob ? displayMobile(mob) : null,
+        coveringAdvocateMobile: h.coveringAdvocateMobile
+          ? displayMobile(h.coveringAdvocateMobile)
+          : null,
         advocateName: mob
           ? advName.get(mob) ?? advName.get(toTen(mob)) ?? null
           : null,

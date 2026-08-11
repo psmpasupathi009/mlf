@@ -15,6 +15,7 @@ import {
   normalizeDesignation,
 } from "../config/company/designations";
 import { normalizeCaseStatus } from "../config/company/case-pipeline";
+import { OFFICE_ROSTER } from "../config/company/office-roster";
 import { normalizeMobile } from "../lib/auth/mobile";
 import { hashPin } from "../lib/auth/pin";
 import { parseCsv } from "../lib/utils/csv";
@@ -22,6 +23,7 @@ import { nextUnitId } from "../lib/ids";
 
 const prisma = new PrismaClient();
 const DATA = join(process.cwd(), "prisma", "data");
+const RESET_STAFF = process.argv.includes("--reset-staff");
 
 /** Dev/test PIN for seeded users (override with SEED_PIN). */
 const SEED_PIN = process.env.SEED_PIN ?? "123456";
@@ -217,40 +219,43 @@ async function seedAdmin() {
 }
 
 async function seedEmployees(pinHash: string) {
-  const rows = loadCsv("employees.sample.csv");
   const adminMobile = normalizeMobile(
     process.env.ADMIN_MOBILE ?? process.env.ADMIN_MOBILE_1 ?? ""
   );
   let created = 0;
   let updated = 0;
+  const rosterMobiles = new Set<string>();
 
-  for (const row of rows) {
-    const mobile = normalizeMobile(row.mobile ?? "");
+  for (const row of OFFICE_ROSTER) {
+    const mobile = normalizeMobile(row.mobile);
     if (!mobile) continue;
+    rosterMobiles.add(mobile);
 
     const designation =
       normalizeDesignation(row.designation) ?? ("Advocate" as const);
     const baseRoles = designationDefaultRoles[designation];
-
+    const forced = (row.forceRoles ?? []) as UserRole[];
     const existing = await prisma.user.findUnique({ where: { mobile } });
-    // Keep elevated roles if bootstrap admin matches this employee (or already set).
     const preserved = (existing?.roles ?? []).filter(
       (r) => r === "admin" || r === "sub_admin"
     );
     if (adminMobile && mobile === adminMobile && !preserved.includes("admin")) {
       preserved.push("admin");
     }
-    const roles = Array.from(new Set<UserRole>([...preserved, ...baseRoles]));
+    const roles = Array.from(
+      new Set<UserRole>([...preserved, ...baseRoles, ...forced])
+    );
+
+    const defaultCourts = row.defaultCourts;
 
     if (existing) {
       await prisma.user.update({
         where: { id: existing.id },
         data: {
-          name: row.name || existing.name,
+          name: row.name,
           designation,
           roles,
-          email: row.email || existing.email,
-          address: row.address || existing.address,
+          defaultCourts,
           pinHash: existing.pinHash ?? pinHash,
           isActive: true,
         },
@@ -259,16 +264,15 @@ async function seedEmployees(pinHash: string) {
       continue;
     }
 
-    const unitId = row.unitId?.trim() || (await nextUnitId("employee"));
+    const unitId = await nextUnitId("employee");
     await prisma.user.create({
       data: {
         unitId,
         mobile,
-        name: row.name || undefined,
+        name: row.name,
         designation,
         roles,
-        email: row.email || undefined,
-        address: row.address || undefined,
+        defaultCourts,
         pinHash,
         isActive: true,
       },
@@ -276,7 +280,27 @@ async function seedEmployees(pinHash: string) {
     created += 1;
   }
 
-  console.log(`Employees: created ${created}, updated ${updated}`);
+  if (RESET_STAFF) {
+    const others = await prisma.user.findMany({
+      where: { mobile: { notIn: [...rosterMobiles] } },
+      select: { id: true, mobile: true, unitId: true },
+    });
+    // Keep env bootstrap admin active even if not on roster yet.
+    let deactivated = 0;
+    for (const u of others) {
+      if (adminMobile && u.mobile === adminMobile) continue;
+      await prisma.user.update({
+        where: { id: u.id },
+        data: { isActive: false },
+      });
+      deactivated += 1;
+    }
+    console.log(
+      `Employees: created ${created}, updated ${updated}, deactivated ${deactivated} (--reset-staff)`
+    );
+  } else {
+    console.log(`Employees: created ${created}, updated ${updated}`);
+  }
 }
 
 async function seedClients() {

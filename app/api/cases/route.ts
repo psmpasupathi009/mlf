@@ -174,5 +174,29 @@ export const POST = apiHandler(async (request) => {
     },
   });
 
+  const { scheduleNotify, notifyUsers, findCaseNotifyRecipients } = await import(
+    "@/lib/notifications/notify"
+  );
+  scheduleNotify(async () => {
+    const recipients = await findCaseNotifyRecipients([
+      ...created.advocateMobiles,
+      created.primaryAdvocateMobile,
+    ]);
+    const label =
+      created.caseNumber || created.filingNumber || created.unitId;
+    await notifyUsers(
+      recipients
+        .filter((u) => u.id !== user.id)
+        .map((u) => ({
+          userId: u.id,
+          userUnitId: u.unitId,
+          type: "case_created",
+          title: `New case: ${label}`,
+          href: `/cases/${created.unitId}`,
+          meta: { caseUnitId: created.unitId },
+        }))
+    );
+  });
+
   return jsonOk({ case: toCaseSummary(created) }, 201);
 });

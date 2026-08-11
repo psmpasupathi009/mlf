@@ -161,5 +161,43 @@ export const POST = apiHandler(async (request) => {
     },
   });
 
+  const { scheduleNotify, notifyUsers, findUsersWithPermission, findCaseNotifyRecipients } =
+    await import("@/lib/notifications/notify");
+  scheduleNotify(async () => {
+    const editors = await findUsersWithPermission("dak", "edit");
+    let caseRecipients: { id: string; unitId: string }[] = [];
+    if (created.caseUnitId) {
+      const cse = await prisma.case.findUnique({
+        where: { unitId: created.caseUnitId },
+        select: {
+          advocateMobiles: true,
+          primaryAdvocateMobile: true,
+        },
+      });
+      if (cse) {
+        caseRecipients = await findCaseNotifyRecipients([
+          ...cse.advocateMobiles,
+          cse.primaryAdvocateMobile,
+        ]);
+      }
+    }
+    const byId = new Map<string, { id: string; unitId: string }>();
+    for (const u of [...editors, ...caseRecipients]) {
+      if (u.id === user.id) continue;
+      byId.set(u.id, u);
+    }
+    await notifyUsers(
+      [...byId.values()].map((u) => ({
+        userId: u.id,
+        userUnitId: u.unitId,
+        type: "dak_received",
+        title: `Dak ${created.direction === "in" ? "received" : "sent"}`,
+        body: created.subject,
+        href: "/dak",
+        meta: { dakUnitId: created.unitId },
+      }))
+    );
+  });
+
   return jsonOk({ dak: toDakSummary(created) }, 201);
 });

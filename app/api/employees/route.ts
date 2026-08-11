@@ -18,6 +18,7 @@ const EMPLOYEE_AUDIT_KEYS = [
   "address",
   "mobile",
   "isActive",
+  "defaultCourts",
 ] as const;
 
 export const GET = apiHandler(async (request) => {
@@ -98,6 +99,7 @@ export const POST = apiHandler(async (request) => {
       designation: input.designation,
       email: input.email || undefined,
       address: input.address || undefined,
+      defaultCourts: input.defaultCourts ?? [],
       createdById: user.id,
       isActive: true,
     },

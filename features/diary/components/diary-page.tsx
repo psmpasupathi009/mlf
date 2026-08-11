@@ -31,6 +31,7 @@ import {
   DiaryHearingCard,
   type DiaryItem,
 } from "@/features/diary/components/diary-hearing-card";
+import { CoverageStrip } from "@/features/diary/components/coverage-strip";
 import type { AppointmentSummary } from "@/features/appointments/server/serialize";
 import type { OfficeTaskSummary } from "@/features/tasks/server/serialize";
 import type { PublicUser } from "@/lib/auth/session";
@@ -107,6 +108,8 @@ export function DiaryPage({ user }: { user: PublicUser }) {
   const canAppointments = user.permissions.includes("appointments.view");
   const canTasks = user.permissions.includes("tasks.view");
   const bookAny = canBookForAnyAdvocate(user.roles);
+  const canResolveCoverage =
+    user.roles.includes("admin") || user.roles.includes("sub_admin");
   const todayKey = istDateKey();
 
   const dateFromUrl = searchParams.get("date");
@@ -417,6 +420,8 @@ export function DiaryPage({ user }: { user: PublicUser }) {
           {weekday}, {displayDate} · Hearings, appointments & tasks
         </p>
       </div>
+
+      <CoverageStrip enabled={canResolveCoverage} />
 
       {!tomorrowLoading && tomorrowNotify && tomorrowNotify.summary.total > 0 ? (
         <div className="rounded-2xl border border-amber-200/80 bg-amber-50/80 p-3 shadow-sm print:hidden sm:p-4 dark:border-amber-900/50 dark:bg-amber-950/30">

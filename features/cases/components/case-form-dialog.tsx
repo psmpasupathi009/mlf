@@ -543,6 +543,15 @@ export function CaseFormDialog({
                       setPrimaryAdvocateLabel(
                         `${a.displayName || a.name || "Advocate"} · ${m}`
                       );
+                      const courtEmpty =
+                        !district.trim() && !city.trim() && !courtName.trim();
+                      const primary = a.defaultCourts?.[0];
+                      if (courtEmpty && primary) {
+                        setState(primary.state || "Tamil Nadu");
+                        setDistrict(primary.district);
+                        setCity(primary.city);
+                        setCourtName(primary.courtName);
+                      }
                     }}
                     valueBy="mobile"
                     placeholder="Select advocate"

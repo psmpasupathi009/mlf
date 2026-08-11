@@ -39,6 +39,10 @@ export const IMPORT_EMPLOYEE_COLUMNS = [
   "name",
   "designation",
   "mobile",
+  "defaultState",
+  "defaultDistrict",
+  "defaultCity",
+  "defaultCourtNames",
 ] as const;
 
 export const IMPORT_DAK_COLUMNS = [

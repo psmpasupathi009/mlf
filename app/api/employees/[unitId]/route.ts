@@ -17,6 +17,7 @@ const EMPLOYEE_AUDIT_KEYS = [
   "email",
   "address",
   "isActive",
+  "defaultCourts",
 ] as const;
 
 async function findByUnitId(unitId: string) {
@@ -77,6 +78,9 @@ export const PATCH = apiHandler(async (request, context) => {
       email: input.email === "" ? null : input.email,
       address: input.address === "" ? null : input.address,
       isActive: input.isActive,
+      ...(input.defaultCourts !== undefined
+        ? { defaultCourts: input.defaultCourts }
+        : {}),
     },
   });
 

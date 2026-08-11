@@ -7,6 +7,7 @@ import { displayMobile } from "@/lib/auth/mobile";
 import { userPhotoUrl } from "@/lib/auth/user-photo";
 import { personDisplayName } from "@/shared/lib/person";
 import { containsInsensitive } from "@/lib/db/search";
+import { parseDefaultCourts } from "@/lib/hearings/court-key";
 
 /**
  * Advocates list for case assignment and appointment booking.
@@ -57,6 +58,7 @@ export const GET = apiHandler(async (request) => {
         mobile: true,
         designation: true,
         photoKey: true,
+        defaultCourts: true,
       },
     }),
     prisma.user.count({ where }),
@@ -76,6 +78,7 @@ export const GET = apiHandler(async (request) => {
         mobile,
         designation: r.designation,
         photoUrl: userPhotoUrl(r.unitId, Boolean(r.photoKey)),
+        defaultCourts: parseDefaultCourts(r.defaultCourts),
       };
     }),
     { page, pageSize, total }

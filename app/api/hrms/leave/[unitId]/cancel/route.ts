@@ -1,13 +1,19 @@
 import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
-import { requirePerm } from "@/lib/api/guard";
+import { requirePerm, requireUser } from "@/lib/api/guard";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import { writeAudit, pickAuditFields, diffAudit } from "@/lib/audit";
 import { toLeaveSummary } from "@/features/hrms/server/serialize";
+import { istDateKey } from "@/lib/utils/ist";
 
-/** Owner can withdraw a pending leave request (soft-cancel for audit). */
+/**
+ * Cancel a leave request:
+ * - Owner may cancel pending leave
+ * - Owner or leave approver may cancel approved leave that has not fully ended
+ * - Cancelling approved leave auto-dismisses open coverage items from that leave
+ */
 export const POST = apiHandler(async (request, context) => {
-  const { user, response } = await requirePerm(request, "hrms", "own_leave");
+  const { user, response } = await requireUser(request);
   if (!user) return response;
 
   const { unitId } = (await context.params) ?? {};
@@ -16,21 +22,44 @@ export const POST = apiHandler(async (request, context) => {
     : null;
   if (!leave) return jsonFail("NOT_FOUND", "Leave request not found", 404);
 
-  if (leave.userId !== user.id) {
-    return jsonFail("FORBIDDEN", "You can only cancel your own leave request", 403);
-  }
-  if (leave.status !== "pending") {
+  const isOwner = leave.userId === user.id;
+  const today = istDateKey();
+
+  if (leave.status === "pending") {
+    if (!isOwner) {
+      return jsonFail(
+        "FORBIDDEN",
+        "You can only cancel your own leave request",
+        403
+      );
+    }
+    const own = await requirePerm(request, "hrms", "own_leave");
+    if (!own.user) return own.response;
+  } else if (leave.status === "approved") {
+    if (leave.toDate < today) {
+      return jsonFail(
+        "CONFLICT",
+        "Approved leave that has already ended cannot be cancelled",
+        409
+      );
+    }
+    if (!isOwner) {
+      const approve = await requirePerm(request, "hrms", "approve_leave");
+      if (!approve.user) return approve.response;
+    } else {
+      const own = await requirePerm(request, "hrms", "own_leave");
+      if (!own.user) return own.response;
+    }
+  } else {
     return jsonFail(
       "CONFLICT",
-      "Only pending leave requests can be cancelled",
+      "Only pending or approved leave can be cancelled",
       409
     );
   }
 
   const before = pickAuditFields(leave as Record<string, unknown>, ["status"] as const);
 
-  // Soft-cancel — LeaveStatus.cancelled in schema.prisma.
-  // Assert via unknown so a stale TS server (pre-generate) does not block.
   const data = {
     status: "cancelled",
   } as unknown as Prisma.LeaveRequestUpdateInput;
@@ -46,8 +75,57 @@ export const POST = apiHandler(async (request, context) => {
     action: "leave.cancel",
     entity: "LeaveRequest",
     entityUnitId: leave.unitId,
-    meta: { before, after, changes: diffAudit(before, after) },
+    meta: {
+      before,
+      after,
+      changes: diffAudit(before, after),
+      wasApproved: leave.status === "approved",
+    },
   });
+
+  const { scheduleNotify, notifyUsers, findUsersWithPermission } = await import(
+    "@/lib/notifications/notify"
+  );
+
+  if (leave.status === "approved") {
+    const { dismissOpenCoverageForLeave } = await import(
+      "@/lib/hearings/coverage"
+    );
+    scheduleNotify(async () => {
+      await dismissOpenCoverageForLeave(leave.id);
+      const approvers = await findUsersWithPermission("hrms", "approve_leave");
+      await notifyUsers(
+        approvers
+          .filter((a) => a.id !== user.id)
+          .map((a) => ({
+            userId: a.id,
+            userUnitId: a.unitId,
+            type: "leave_cancelled",
+            title: "Approved leave cancelled",
+            body: `${leave.fromDate} → ${leave.toDate}`,
+            href: "/hrms?section=leave",
+            meta: { leaveUnitId: leave.unitId },
+          }))
+      );
+    });
+  } else {
+    scheduleNotify(async () => {
+      const approvers = await findUsersWithPermission("hrms", "approve_leave");
+      await notifyUsers(
+        approvers
+          .filter((a) => a.id !== user.id)
+          .map((a) => ({
+            userId: a.id,
+            userUnitId: a.unitId,
+            type: "leave_cancelled",
+            title: "Leave request cancelled",
+            body: `${leave.fromDate} → ${leave.toDate}`,
+            href: "/hrms?section=leave",
+            meta: { leaveUnitId: leave.unitId },
+          }))
+      );
+    });
+  }
 
   return jsonOk({
     cancelled: true,

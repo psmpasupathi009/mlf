@@ -18,11 +18,32 @@ export const NOTIFICATION_CATEGORIES: readonly NotificationCategory[] = [
 ] as const;
 
 const CATEGORY_TYPES: Record<NotificationCategory, readonly string[]> = {
-  hearings: ["hearing_tomorrow", "appointment"],
+  hearings: [
+    "hearing_tomorrow",
+    "hearing_adjourned",
+    "appointment",
+    "appointment_updated",
+    "appointment_cancelled",
+    "coverage_needed",
+    "coverage_assigned",
+  ],
   tasks: ["task_assigned", "task_done"],
-  leave: ["leave_request", "leave_decided", "office_holiday"],
-  cases: ["filing_defect", "batta_due", "case_status"],
-  system: ["system"],
+  leave: ["leave_request", "leave_decided", "leave_cancelled", "office_holiday"],
+  cases: [
+    "filing_defect",
+    "batta_due",
+    "case_status",
+    "case_created",
+    "document_uploaded",
+  ],
+  system: [
+    "system",
+    "dak_received",
+    "payment_recorded",
+    "payment_voided",
+    "employee_deactivated",
+    "permissions_changed",
+  ],
 };
 
 export const CATEGORY_LABELS: Record<NotificationCategory, string> = {
@@ -54,8 +75,21 @@ export function categoryForType(type: string): NotificationCategory {
 }
 
 export function urgencyTone(type: string): UrgencyTone | null {
-  if (type === "batta_due" || type === "filing_defect") return "danger";
-  if (type === "hearing_tomorrow" || type === "task_assigned") return "warning";
+  if (
+    type === "batta_due" ||
+    type === "filing_defect" ||
+    type === "appointment_cancelled"
+  ) {
+    return "danger";
+  }
+  if (
+    type === "hearing_tomorrow" ||
+    type === "hearing_adjourned" ||
+    type === "coverage_needed" ||
+    type === "task_assigned"
+  ) {
+    return "warning";
+  }
   if (type === "leave_request") return "info";
   return null;
 }
@@ -63,14 +97,27 @@ export function urgencyTone(type: string): UrgencyTone | null {
 const TYPE_LABELS: Record<string, string> = {
   leave_request: "Leave request",
   leave_decided: "Leave decided",
+  leave_cancelled: "Leave cancelled",
   task_assigned: "Task assigned",
   task_done: "Task done",
   appointment: "Appointment",
+  appointment_updated: "Appointment updated",
+  appointment_cancelled: "Appointment cancelled",
   case_status: "Case status",
+  case_created: "Case created",
   filing_defect: "Filing defect",
   batta_due: "Batta due",
   hearing_tomorrow: "Hearing tomorrow",
+  hearing_adjourned: "Hearing adjourned",
+  coverage_needed: "Coverage needed",
+  coverage_assigned: "Coverage assigned",
   office_holiday: "Office holiday",
+  dak_received: "Dak",
+  document_uploaded: "Document uploaded",
+  payment_recorded: "Payment recorded",
+  payment_voided: "Payment voided",
+  employee_deactivated: "Employee deactivated",
+  permissions_changed: "Permissions changed",
   system: "System",
 };
 
@@ -133,13 +180,26 @@ export const DAY_GROUP_LABELS: Record<DayGroup, string> = {
 export const ALL_NOTIFICATION_TYPES: readonly NotificationType[] = [
   "leave_request",
   "leave_decided",
+  "leave_cancelled",
   "task_assigned",
   "task_done",
   "appointment",
+  "appointment_updated",
+  "appointment_cancelled",
   "case_status",
+  "case_created",
   "filing_defect",
   "batta_due",
   "hearing_tomorrow",
+  "hearing_adjourned",
+  "coverage_needed",
+  "coverage_assigned",
   "office_holiday",
+  "dak_received",
+  "document_uploaded",
+  "payment_recorded",
+  "payment_voided",
+  "employee_deactivated",
+  "permissions_changed",
   "system",
 ] as const;

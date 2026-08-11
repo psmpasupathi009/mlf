@@ -19,6 +19,10 @@ export type ImportCaseRef = {
   nextHearingAt: Date | null;
   primaryAdvocateMobile: string | null;
   advocateMobiles: string[];
+  state: string | null;
+  district: string | null;
+  city: string | null;
+  courtName: string | null;
 };
 
 export type ImportUserRef = {
@@ -68,6 +72,10 @@ export async function findCaseByUnitId(
       nextHearingAt: true,
       primaryAdvocateMobile: true,
       advocateMobiles: true,
+      state: true,
+      district: true,
+      city: true,
+      courtName: true,
     },
   });
 }

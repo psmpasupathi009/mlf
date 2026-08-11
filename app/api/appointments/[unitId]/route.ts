@@ -194,5 +194,33 @@ export const PATCH = apiHandler(async (request, context) => {
     meta: { before, after, changes: diffAudit(before, after) },
   });
 
+  const { scheduleNotify, notifyUsers, findUsersByMobiles } = await import(
+    "@/lib/notifications/notify"
+  );
+  const { istDisplayDate, formatIstTime } = await import("@/lib/utils/ist");
+  scheduleNotify(async () => {
+    const mob = updated.advocateMobile;
+    if (!mob) return;
+    const recipients = await findUsersByMobiles([mob]);
+    const cancelled = updated.status === "cancelled";
+    const title = cancelled
+      ? "Appointment cancelled"
+      : "Appointment updated";
+    const type = cancelled ? "appointment_cancelled" : "appointment_updated";
+    await notifyUsers(
+      recipients
+        .filter((u) => u.id !== user.id)
+        .map((u) => ({
+          userId: u.id,
+          userUnitId: u.unitId,
+          type,
+          title,
+          body: `${updated.title} · ${istDisplayDate(updated.scheduledAt)} ${formatIstTime(updated.scheduledAt)}`,
+          href: "/appointments",
+          meta: { appointmentUnitId: updated.unitId },
+        }))
+    );
+  });
+
   return jsonOk({ appointment: await enrichAppointment(updated) });
 });

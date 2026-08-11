@@ -80,6 +80,34 @@ export const PATCH = apiHandler(async (request, context) => {
           }))
       );
     });
+  } else if (input.status !== item.status) {
+    scheduleNotify(async () => {
+      const recipients = await findCaseNotifyRecipients([
+        ...updated.advocateMobiles,
+        updated.primaryAdvocateMobile,
+      ]);
+      const label =
+        updated.caseNumber || updated.filingNumber || updated.unitId;
+      const { CASE_STATUS_LABEL } = await import(
+        "@/config/company/case-pipeline"
+      );
+      const statusLabel =
+        CASE_STATUS_LABEL[normalizeCaseStatus(updated.status)] ??
+        updated.status;
+      await notifyUsers(
+        recipients
+          .filter((u) => u.id !== user.id)
+          .map((u) => ({
+            userId: u.id,
+            userUnitId: u.unitId,
+            type: "case_status",
+            title: `Case status: ${label}`,
+            body: statusLabel,
+            href: `/cases/${updated.unitId}`,
+            meta: { caseUnitId: updated.unitId, status: updated.status },
+          }))
+      );
+    });
   }
 
   return jsonOk({ case: toCaseSummary(updated) });

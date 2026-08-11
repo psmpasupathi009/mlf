@@ -461,7 +461,11 @@ export function HrmsPage({ user }: { user: PublicUser }) {
       );
       return;
     }
-    toast.success("Leave request cancelled");
+    toast.success(
+      cancelTarget.status === "approved"
+        ? "Approved leave cancelled"
+        : "Leave request cancelled"
+    );
     setCancelTarget(null);
     void loadCore();
   }
@@ -811,11 +815,17 @@ export function HrmsPage({ user }: { user: PublicUser }) {
       >
         <DialogContent size="sm">
           <DialogHeader>
-            <DialogTitle>Cancel leave request?</DialogTitle>
+            <DialogTitle>
+              {cancelTarget?.status === "approved"
+                ? "Cancel approved leave?"
+                : "Cancel leave request?"}
+            </DialogTitle>
             <DialogDescription>
               {cancelTarget
-                ? `${cancelTarget.fromDate} → ${cancelTarget.toDate}. You can apply again later.`
-                : "Withdraw this pending request."}
+                ? cancelTarget.status === "approved"
+                  ? `${cancelTarget.fromDate} → ${cancelTarget.toDate}. Open hearing coverage for this leave will be cleared.`
+                  : `${cancelTarget.fromDate} → ${cancelTarget.toDate}. You can apply again later.`
+                : "Withdraw this request."}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

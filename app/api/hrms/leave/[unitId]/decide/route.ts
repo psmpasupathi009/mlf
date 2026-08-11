@@ -144,5 +144,32 @@ export const POST = apiHandler(async (request, context) => {
     });
   });
 
+  if (input.decision === "approved") {
+    const leaveUser = await prisma.user.findUnique({
+      where: { id: leave.userId },
+      select: { mobile: true },
+    });
+    if (leaveUser?.mobile) {
+      const { enqueueCoverageForAdvocateRange } = await import(
+        "@/lib/hearings/coverage"
+      );
+      scheduleNotify(async () => {
+        await enqueueCoverageForAdvocateRange({
+          advocateMobile: leaveUser.mobile,
+          fromDate: leave.fromDate,
+          toDate: leave.toDate,
+          reason: "leave",
+          sourceLeaveId: leave.id,
+          createdById: user.id,
+        });
+      });
+    }
+  } else {
+    const { dismissOpenCoverageForLeave } = await import(
+      "@/lib/hearings/coverage"
+    );
+    scheduleNotify(() => dismissOpenCoverageForLeave(leave.id));
+  }
+
   return jsonOk({ leave: toLeaveSummary(updated) });
 });

@@ -3,6 +3,10 @@ import { displayMobile } from "@/lib/auth/mobile";
 import { normalizeDesignation } from "@/config/company/designations";
 import { personDisplayName } from "@/shared/lib/person";
 import { userPhotoUrl } from "@/lib/auth/user-photo";
+import {
+  parseDefaultCourts,
+  type DefaultCourt,
+} from "@/lib/hearings/court-key";
 
 export type EmployeeSummary = {
   unitId: string;
@@ -17,6 +21,7 @@ export type EmployeeSummary = {
   photoUrl?: string;
   isActive: boolean;
   hasPin: boolean;
+  defaultCourts: DefaultCourt[];
   lastLoginAt: string | null;
   createdAt: string;
 };
@@ -40,6 +45,7 @@ export function toEmployeeSummary(user: User): EmployeeSummary {
     photoUrl: userPhotoUrl(user.unitId, Boolean(user.photoKey)),
     isActive: user.isActive,
     hasPin: Boolean(user.pinHash),
+    defaultCourts: parseDefaultCourts(user.defaultCourts),
     lastLoginAt: user.lastLoginAt ? user.lastLoginAt.toISOString() : null,
     createdAt: user.createdAt.toISOString(),
   };
