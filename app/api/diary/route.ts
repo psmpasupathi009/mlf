@@ -160,7 +160,6 @@ export const GET = apiHandler(async (request) => {
     pageHearings = hearingsRaw.filter((h) => {
       const cse = caseMap.get(h.caseUnitId);
       const mob = effectiveHearingAdvocate({
-        coveringAdvocateMobile: h.coveringAdvocateMobile,
         primaryAdvocateMobile: cse?.primaryAdvocateMobile,
       });
       if (!mob) return false;
@@ -184,7 +183,6 @@ export const GET = apiHandler(async (request) => {
     ...new Set(
       [
         ...cases.map((c) => c.primaryAdvocateMobile),
-        ...pageHearings.map((h) => h.coveringAdvocateMobile),
         ...appointmentsRaw.map((a) => a.advocateMobile),
       ].filter(Boolean) as string[]
     ),
@@ -228,7 +226,6 @@ export const GET = apiHandler(async (request) => {
       const cse = caseMap.get(h.caseUnitId);
       const client = cse ? clientMap.get(cse.clientUnitId) : null;
       const mob = effectiveHearingAdvocate({
-        coveringAdvocateMobile: h.coveringAdvocateMobile,
         primaryAdvocateMobile: cse?.primaryAdvocateMobile,
       });
       return {
@@ -245,9 +242,6 @@ export const GET = apiHandler(async (request) => {
         clientUnitId: client?.unitId ?? null,
         courtName: cse?.courtName ?? null,
         primaryAdvocateMobile: mob ? displayMobile(mob) : null,
-        coveringAdvocateMobile: h.coveringAdvocateMobile
-          ? displayMobile(h.coveringAdvocateMobile)
-          : null,
         advocateName: mob
           ? advName.get(mob) ?? advName.get(toTen(mob)) ?? null
           : null,

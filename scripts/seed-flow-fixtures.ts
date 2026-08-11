@@ -8,7 +8,6 @@ import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { normalizeMobile } from "../lib/auth/mobile";
 import { nextUnitId } from "../lib/ids";
-import { enqueueHearingCoverage } from "../lib/hearings/coverage";
 import { istDayBounds, istDateKey } from "../lib/utils/ist";
 
 const prisma = new PrismaClient();
@@ -129,30 +128,6 @@ async function ensureCase(
   return { cse, hearing };
 }
 
-async function ensureOpenCoverage(hearingId: string) {
-  const open = await prisma.hearingCoverageItem.findFirst({
-    where: { hearingId, status: "open" },
-  });
-  if (open) {
-    console.log(`Coverage: reuse open ${open.unitId}`);
-    return open;
-  }
-  const result = await enqueueHearingCoverage({
-    hearingId,
-    reason: "other",
-    reasonNote: "E2E fixture open coverage",
-    notify: false,
-  });
-  if (result) {
-    console.log(
-      `Coverage: ${result.created ? "created" : "existing"} ${result.unitId}`
-    );
-  } else {
-    console.warn("Coverage: enqueue returned null");
-  }
-  return result;
-}
-
 async function main() {
   const ajith = await prisma.user.findUnique({ where: { mobile: AJITH } });
   const surya = await prisma.user.findUnique({ where: { mobile: SURYA } });
@@ -165,7 +140,6 @@ async function main() {
   const client = await ensureClient();
   const gobi = await ensureCase(client, CASE_GOBI, GOBI_COURT, AJITH, 5);
   const erode = await ensureCase(client, CASE_ERODE, ERODE_COURT, SURYA, 7);
-  await ensureOpenCoverage(gobi.hearing.id);
 
   console.log("\nE2E fixtures ready:");
   console.log(`  client=${client.unitId}`);

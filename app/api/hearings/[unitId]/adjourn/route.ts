@@ -47,8 +47,7 @@ export const POST = apiHandler(async (request, context) => {
   });
   if (!caseItem) return jsonFail("NOT_FOUND", "Case not found", 404);
 
-  // Date-specific cover ends on adjourn; next hearing uses primary.
-  // If primary is unavailable, reject — use coverage-queue adjourn to set cover.
+  // Next hearing uses the case primary advocate.
   const nextAdvocate = caseItem.primaryAdvocateMobile;
   if (nextAdvocate) {
     const clash = await assertAdvocateCourtDayAvailable({
@@ -60,7 +59,7 @@ export const POST = apiHandler(async (request, context) => {
     if (!clash.ok) {
       return jsonFail(
         "CONFLICT",
-        `${clashMessage(clash)}. Assign cover from the coverage queue, or pick another date.`,
+        `${clashMessage(clash)}. Reassign the case primary advocate, or pick another date.`,
         409
       );
     }
@@ -107,15 +106,6 @@ export const POST = apiHandler(async (request, context) => {
     }),
   ]);
 
-  await prisma.hearingCoverageItem.updateMany({
-    where: { hearingId: hearing.id, status: "open" },
-    data: {
-      status: "adjourned",
-      resolvedAt: new Date(),
-      resolvedById: user.id,
-    },
-  });
-
   const hearingAfter = pickAuditFields(
     adjournedHearing as Record<string, unknown>,
     ["hearingDate", "isAdjourned", "outcome", "notes", "caseUnitId"] as const
@@ -147,7 +137,6 @@ export const POST = apiHandler(async (request, context) => {
     const recipients = await findCaseNotifyRecipients([
       ...caseItem.advocateMobiles,
       caseItem.primaryAdvocateMobile,
-      hearing.coveringAdvocateMobile,
     ]);
     await notifyUsers(
       recipients

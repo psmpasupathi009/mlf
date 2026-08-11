@@ -30,7 +30,6 @@ export function findCrossCourtClash(input: {
   advocateMobile91: string;
   targetCourtKey: string;
   hearings: Array<{
-    coveringAdvocateMobile?: string | null;
     caseUnitId: string;
   }>;
   casesByUnit: Map<
@@ -49,7 +48,6 @@ export function findCrossCourtClash(input: {
     const cse = input.casesByUnit.get(h.caseUnitId);
     if (!cse) continue;
     const effective = effectiveHearingAdvocate({
-      coveringAdvocateMobile: h.coveringAdvocateMobile,
       primaryAdvocateMobile: cse.primaryAdvocateMobile,
     });
     if (!effective || normalizeMobile(effective) !== mobile) continue;
@@ -135,7 +133,6 @@ export async function assertAdvocateCourtDayAvailable(input: {
     },
     select: {
       id: true,
-      coveringAdvocateMobile: true,
       caseUnitId: true,
     },
   });

@@ -2,7 +2,7 @@
 
 Login as admin (or sub_admin where noted). PIN default: `SEED_PIN` / `123456`.
 
-**Auto** = covered by `npm run test:site` (fixtures + vitest + coverage-flow + full-audit).  
+**Auto** = covered by `npm run test:site` (fixtures + vitest + full-audit).  
 **Manual** = click through UI once after Auto is green.
 
 ## Auth
@@ -42,18 +42,6 @@ Login as admin (or sub_admin where noted). PIN default: `SEED_PIN` / `123456`.
 | Diary day board | Auto | [ ] |
 | Hearing SMS notify (if configured) | Auto / SKIP | [ ] |
 | E2E fixtures (Ajith Gobi DM + Surya Erode PD) | Auto (`test:fixtures`) | [ ] |
-
-## Coverage / reassign
-
-| Check | Type | Done |
-|-------|------|------|
-| Suggest cover from defaultCourts | Auto (`test:coverage-flow`) | [ ] |
-| Date-specific **Cover** | Auto | [ ] |
-| **Permanent reassign** clears covering | Auto | [ ] |
-| Coverage list API + `/coverage` page | Auto | [ ] |
-| Leave approve → open coverage (HRMS) | Auto / Manual | [ ] |
-| Availability block → open coverage | Auto / Manual | [ ] |
-| Resolve dialog: Cover / Cover batch / Dismiss / Adjourn | Manual | [ ] |
 
 ## Appointments & availability
 
@@ -102,7 +90,6 @@ Login as admin (or sub_admin where noted). PIN default: `SEED_PIN` / `123456`.
 |------|------|------|
 | `/` Home | Auto | [ ] |
 | `/clients` `/cases` `/diary` | Auto | [ ] |
-| `/coverage` | Auto | [ ] |
 | `/appointments` `/availability` | Auto | [ ] |
 | `/accounts` `/expenses` `/hrms` | Auto | [ ] |
 | `/dak` `/tasks` `/reports` | Auto | [ ] |
@@ -116,7 +103,6 @@ npm run test:site
 # Or step by step:
 npm run test:fixtures
 npm test
-npm run test:coverage-flow
 SMOKE_PIN=123456 npm run test:audit
 ```
 

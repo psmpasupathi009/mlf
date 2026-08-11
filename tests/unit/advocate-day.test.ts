@@ -24,22 +24,20 @@ describe("courtKey", () => {
 });
 
 describe("effectiveHearingAdvocate", () => {
-  it("prefers covering over primary", () => {
+  it("returns primary advocate", () => {
     expect(
       effectiveHearingAdvocate({
-        coveringAdvocateMobile: "9876502002",
-        primaryAdvocateMobile: "9876502001",
-      })
-    ).toBe("9876502002");
-  });
-
-  it("falls back to primary", () => {
-    expect(
-      effectiveHearingAdvocate({
-        coveringAdvocateMobile: null,
         primaryAdvocateMobile: "9876502001",
       })
     ).toBe("9876502001");
+  });
+
+  it("returns null when missing", () => {
+    expect(
+      effectiveHearingAdvocate({
+        primaryAdvocateMobile: null,
+      })
+    ).toBeNull();
   });
 });
 
@@ -88,10 +86,7 @@ describe("findCrossCourtClash", () => {
     const result = findCrossCourtClash({
       advocateMobile91: advocate,
       targetCourtKey: courtKey(courtA),
-      hearings: [
-        { caseUnitId: "C1", coveringAdvocateMobile: null },
-        { caseUnitId: "C2", coveringAdvocateMobile: null },
-      ],
+      hearings: [{ caseUnitId: "C1" }, { caseUnitId: "C2" }],
       casesByUnit: cases,
     });
     expect(result).toEqual({ ok: true });
@@ -105,7 +100,7 @@ describe("findCrossCourtClash", () => {
     const result = findCrossCourtClash({
       advocateMobile91: advocate,
       targetCourtKey: courtKey(courtB),
-      hearings: [{ caseUnitId: "C1", coveringAdvocateMobile: null }],
+      hearings: [{ caseUnitId: "C1" }],
       casesByUnit: cases,
     });
     expect(result.ok).toBe(false);
@@ -129,27 +124,6 @@ describe("findCrossCourtClash", () => {
       casesByUnit: cases,
     });
     expect(result).toEqual({ ok: true });
-  });
-
-  it("uses covering advocate for clash", () => {
-    const cases = new Map([
-      [
-        "C1",
-        {
-          ...courtA,
-          primaryAdvocateMobile: "9876502999",
-        },
-      ],
-    ]);
-    const result = findCrossCourtClash({
-      advocateMobile91: advocate,
-      targetCourtKey: courtKey(courtB),
-      hearings: [
-        { caseUnitId: "C1", coveringAdvocateMobile: "9876502001" },
-      ],
-      casesByUnit: cases,
-    });
-    expect(result.ok).toBe(false);
   });
 });
 

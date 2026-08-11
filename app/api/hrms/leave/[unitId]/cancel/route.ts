@@ -10,7 +10,6 @@ import { istDateKey } from "@/lib/utils/ist";
  * Cancel a leave request:
  * - Owner may cancel pending leave
  * - Owner or leave approver may cancel approved leave that has not fully ended
- * - Cancelling approved leave auto-dismisses open coverage items from that leave
  */
 export const POST = apiHandler(async (request, context) => {
   const { user, response } = await requireUser(request);
@@ -88,11 +87,7 @@ export const POST = apiHandler(async (request, context) => {
   );
 
   if (leave.status === "approved") {
-    const { dismissOpenCoverageForLeave } = await import(
-      "@/lib/hearings/coverage"
-    );
     scheduleNotify(async () => {
-      await dismissOpenCoverageForLeave(leave.id);
       const approvers = await findUsersWithPermission("hrms", "approve_leave");
       await notifyUsers(
         approvers

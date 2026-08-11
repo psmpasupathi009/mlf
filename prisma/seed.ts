@@ -177,7 +177,6 @@ async function wipeKeepAdmin() {
   }
 
   const counts = await Promise.all([
-    prisma.hearingCoverageItem.deleteMany({}),
     prisma.hearing.deleteMany({}),
     prisma.case.deleteMany({}),
     prisma.cashPayment.deleteMany({}),

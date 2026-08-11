@@ -823,7 +823,7 @@ export function HrmsPage({ user }: { user: PublicUser }) {
             <DialogDescription>
               {cancelTarget
                 ? cancelTarget.status === "approved"
-                  ? `${cancelTarget.fromDate} → ${cancelTarget.toDate}. Open hearing coverage for this leave will be cleared.`
+                  ? `${cancelTarget.fromDate} → ${cancelTarget.toDate}.`
                   : `${cancelTarget.fromDate} → ${cancelTarget.toDate}. You can apply again later.`
                 : "Withdraw this request."}
             </DialogDescription>

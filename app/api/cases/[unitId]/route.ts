@@ -18,6 +18,7 @@ import {
   notifyUsers,
   scheduleNotify,
 } from "@/lib/notifications/notify";
+import { normalizeMobile } from "@/lib/auth/mobile";
 
 const CASE_AUDIT_KEYS = [
   "caseNumber",
@@ -140,6 +141,18 @@ export const PATCH = apiHandler(async (request, context) => {
 
   const before = pickAuditFields(item as Record<string, unknown>, CASE_AUDIT_KEYS);
 
+  const primaryAdvocateMobile =
+    input.primaryAdvocateMobile === undefined
+      ? undefined
+      : input.primaryAdvocateMobile === ""
+        ? null
+        : normalizeMobile(input.primaryAdvocateMobile) ??
+          input.primaryAdvocateMobile;
+  const advocateMobiles =
+    input.advocateMobiles === undefined
+      ? undefined
+      : input.advocateMobiles.map((m) => normalizeMobile(m) ?? m);
+
   const updated = await prisma.case.update({
     where: { id: item.id },
     data: {
@@ -151,8 +164,8 @@ export const PATCH = apiHandler(async (request, context) => {
       district: input.district === "" ? null : input.district,
       city: input.city === "" ? null : input.city,
       courtName: input.courtName === "" ? null : input.courtName,
-      advocateMobiles: input.advocateMobiles,
-      primaryAdvocateMobile: input.primaryAdvocateMobile === "" ? null : input.primaryAdvocateMobile,
+      advocateMobiles,
+      primaryAdvocateMobile,
       opposingParty: input.opposingParty === "" ? null : input.opposingParty,
       ourSide: input.ourSide === "" ? null : input.ourSide,
       underActs: input.underActs === "" ? null : input.underActs,

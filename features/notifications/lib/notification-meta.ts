@@ -24,8 +24,6 @@ const CATEGORY_TYPES: Record<NotificationCategory, readonly string[]> = {
     "appointment",
     "appointment_updated",
     "appointment_cancelled",
-    "coverage_needed",
-    "coverage_assigned",
   ],
   tasks: ["task_assigned", "task_done"],
   leave: ["leave_request", "leave_decided", "leave_cancelled", "office_holiday"],
@@ -85,7 +83,6 @@ export function urgencyTone(type: string): UrgencyTone | null {
   if (
     type === "hearing_tomorrow" ||
     type === "hearing_adjourned" ||
-    type === "coverage_needed" ||
     type === "task_assigned"
   ) {
     return "warning";
@@ -109,8 +106,6 @@ const TYPE_LABELS: Record<string, string> = {
   batta_due: "Batta due",
   hearing_tomorrow: "Hearing tomorrow",
   hearing_adjourned: "Hearing adjourned",
-  coverage_needed: "Coverage needed",
-  coverage_assigned: "Coverage assigned",
   office_holiday: "Office holiday",
   dak_received: "Dak",
   document_uploaded: "Document uploaded",
@@ -192,8 +187,6 @@ export const ALL_NOTIFICATION_TYPES: readonly NotificationType[] = [
   "batta_due",
   "hearing_tomorrow",
   "hearing_adjourned",
-  "coverage_needed",
-  "coverage_assigned",
   "office_holiday",
   "dak_received",
   "document_uploaded",

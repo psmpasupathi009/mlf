@@ -14,6 +14,7 @@ import {
   OPEN_CASE_STATUSES,
   PRE_NUMBER_STATUSES,
 } from "@/config/company/case-pipeline";
+import { effectiveHearingAdvocate } from "@/lib/hearings/court-key";
 
 function toTen(mobile: string): string {
   const d = mobile.replace(/\D/g, "");
@@ -144,33 +145,59 @@ export async function buildDashboardSummary(
               isAdjourned: false,
             },
           }),
-          prisma.case.findMany({
+          prisma.hearing.findMany({
             where: {
-              nextHearingAt: { gte: todayStart, lte: todayEnd },
-              status: { in: [...OPEN_CASE_STATUSES] },
+              hearingDate: { gte: todayStart, lte: todayEnd },
+              isAdjourned: false,
             },
-            orderBy: { nextHearingAt: "asc" },
-            take: 20,
+            orderBy: { hearingDate: "asc" },
+            take: 40,
             select: {
               unitId: true,
-              caseNumber: true,
-              courtName: true,
-              district: true,
-              status: true,
-              nextHearingAt: true,
-              clientUnitId: true,
-              clientId: true,
-              primaryAdvocateMobile: true,
-              caseType: true,
+              caseUnitId: true,
+              hearingDate: true,
             },
           }),
         ]);
 
-        const clientIds = [...new Set(todayCases.map((c) => c.clientId))];
+        const caseUnitIds = [...new Set(todayCases.map((h) => h.caseUnitId))];
+        const casesForToday = caseUnitIds.length
+          ? await prisma.case.findMany({
+              where: {
+                unitId: { in: caseUnitIds },
+                status: { in: [...OPEN_CASE_STATUSES] },
+              },
+              select: {
+                unitId: true,
+                caseNumber: true,
+                courtName: true,
+                district: true,
+                status: true,
+                nextHearingAt: true,
+                clientUnitId: true,
+                clientId: true,
+                primaryAdvocateMobile: true,
+                caseType: true,
+              },
+            })
+          : [];
+        const caseByUnit = new Map(casesForToday.map((c) => [c.unitId, c]));
+        const todayHearingRows = todayCases.filter((h) =>
+          caseByUnit.has(h.caseUnitId)
+        );
+
+        const clientIds = [
+          ...new Set(casesForToday.map((c) => c.clientId)),
+        ];
         const advocateMobiles = [
           ...new Set(
-            todayCases
-              .map((c) => c.primaryAdvocateMobile)
+            todayHearingRows
+              .map((h) => {
+                const cse = caseByUnit.get(h.caseUnitId);
+                return effectiveHearingAdvocate({
+                  primaryAdvocateMobile: cse?.primaryAdvocateMobile,
+                });
+              })
               .filter(Boolean) as string[]
           ),
         ];
@@ -210,9 +237,12 @@ export async function buildDashboardSummary(
           }
         }
 
-        const todayHearings = todayCases.map((c) => {
+        const todayHearings = todayHearingRows.slice(0, 20).map((h) => {
+          const c = caseByUnit.get(h.caseUnitId)!;
           const client = clientById.get(c.clientId);
-          const mob = c.primaryAdvocateMobile;
+          const mob = effectiveHearingAdvocate({
+            primaryAdvocateMobile: c.primaryAdvocateMobile,
+          });
           return {
             caseUnitId: c.unitId,
             caseNumber: c.caseNumber,
@@ -220,7 +250,7 @@ export async function buildDashboardSummary(
             courtName: c.courtName,
             district: c.district,
             status: c.status,
-            nextHearingAt: c.nextHearingAt?.toISOString() ?? null,
+            nextHearingAt: h.hearingDate.toISOString(),
             clientName: client?.name ?? "—",
             clientUnitId: client?.unitId ?? c.clientUnitId,
             clientMobile: client?.mobile ? displayMobile(client.mobile) : null,
@@ -666,28 +696,7 @@ export async function buildDashboardSummary(
   }
   if (adminBoardResult) summary.adminBoard = adminBoardResult;
 
-  let openCoverage = 0;
-  if (isOfficeAdmin) {
-    const { dismissStaleOpenCoverage } = await import(
-      "@/lib/hearings/coverage"
-    );
-    await dismissStaleOpenCoverage();
-    openCoverage = await prisma.hearingCoverageItem.count({
-      where: { status: "open" },
-    });
-    summary.openCoverage = openCoverage;
-  }
-
   const attention: AttentionItem[] = [];
-  if (openCoverage > 0) {
-    attention.push({
-      label: "Hearing coverage needed",
-      value: String(openCoverage),
-      href: "/coverage",
-      cta: "Resolve",
-      tone: "warning",
-    });
-  }
   if (tasksOverdue > 0) {
     attention.push({
       label: "Overdue tasks",

@@ -11,6 +11,7 @@ import {
   buildCaseListWhere,
   parseCaseListFilters,
 } from "@/features/cases/server/filters";
+import { normalizeMobile } from "@/lib/auth/mobile";
 
 const CASE_AUDIT_KEYS = [
   "clientUnitId",
@@ -129,6 +130,13 @@ export const POST = apiHandler(async (request) => {
     if (dupe) return jsonFail("CONFLICT", "A case with this case number already exists", 409);
   }
 
+  const primaryAdvocateMobile = input.primaryAdvocateMobile
+    ? normalizeMobile(input.primaryAdvocateMobile) ?? input.primaryAdvocateMobile
+    : undefined;
+  const advocateMobiles = (input.advocateMobiles ?? [])
+    .map((m) => normalizeMobile(m) ?? m)
+    .filter(Boolean);
+
   const unitId = await nextUnitId("case");
   const created = await prisma.case.create({
     data: {
@@ -143,8 +151,8 @@ export const POST = apiHandler(async (request) => {
       district: input.district || undefined,
       city: input.city || undefined,
       courtName: input.courtName || undefined,
-      advocateMobiles: input.advocateMobiles ?? [],
-      primaryAdvocateMobile: input.primaryAdvocateMobile || undefined,
+      advocateMobiles,
+      primaryAdvocateMobile,
       opposingParty: input.opposingParty || undefined,
       ourSide: input.ourSide || undefined,
       underActs: input.underActs || undefined,

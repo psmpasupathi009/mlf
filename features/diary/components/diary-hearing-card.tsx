@@ -35,7 +35,6 @@ export type DiaryItem = {
   clientUnitId: string | null;
   courtName: string | null;
   primaryAdvocateMobile: string | null;
-  coveringAdvocateMobile?: string | null;
   advocateName: string | null;
 };
 
@@ -91,11 +90,6 @@ export function DiaryHearingCard({ item, canEdit, onAdjourn }: Props) {
                 SMS Pending
               </Badge>
             )}
-            {item.coveringAdvocateMobile ? (
-              <Badge variant="outline" className="print:hidden">
-                Covering
-              </Badge>
-            ) : null}
           </div>
 
           <p className="text-sm text-muted-foreground">
@@ -112,11 +106,7 @@ export function DiaryHearingCard({ item, canEdit, onAdjourn }: Props) {
           {item.advocateName || item.primaryAdvocateMobile ? (
             <div className="print:hidden">
               <PersonChip
-                name={
-                  item.coveringAdvocateMobile
-                    ? `${item.advocateName ?? "Advocate"} (covering)`
-                    : item.advocateName
-                }
+                name={item.advocateName}
                 mobile={item.primaryAdvocateMobile}
               />
             </div>

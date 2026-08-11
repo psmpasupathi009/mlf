@@ -28,8 +28,6 @@ const TYPE_ICONS: Record<string, LucideIcon> = {
   batta_due: Landmark,
   hearing_tomorrow: Gavel,
   hearing_adjourned: Gavel,
-  coverage_needed: Gavel,
-  coverage_assigned: UserCheck,
   office_holiday: Calendar,
   dak_received: ClipboardList,
   document_uploaded: FileWarning,

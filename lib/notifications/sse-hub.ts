@@ -13,8 +13,6 @@ export type NotificationType =
   | "batta_due"
   | "hearing_tomorrow"
   | "hearing_adjourned"
-  | "coverage_needed"
-  | "coverage_assigned"
   | "office_holiday"
   | "dak_received"
   | "document_uploaded"

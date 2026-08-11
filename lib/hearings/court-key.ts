@@ -37,11 +37,8 @@ export function parseDefaultCourts(raw: unknown): DefaultCourt[] {
 }
 
 export function effectiveHearingAdvocate(input: {
-  coveringAdvocateMobile?: string | null;
   primaryAdvocateMobile?: string | null;
 }): string | null {
-  const cover = input.coveringAdvocateMobile?.trim();
-  if (cover) return cover;
   const primary = input.primaryAdvocateMobile?.trim();
   return primary || null;
 }
