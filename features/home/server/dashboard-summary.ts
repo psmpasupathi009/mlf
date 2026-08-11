@@ -683,7 +683,7 @@ export async function buildDashboardSummary(
     attention.push({
       label: "Hearing coverage needed",
       value: String(openCoverage),
-      href: "/diary",
+      href: "/coverage",
       cta: "Resolve",
       tone: "warning",
     });

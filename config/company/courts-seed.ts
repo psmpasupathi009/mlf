@@ -136,7 +136,16 @@ const TN_MULTI_CITY: Record<string, { city: string; courts: string[] }[]> = {
     },
   ],
   Coimbatore: [
-    { city: "Coimbatore", courts: [...STANDARD, ...CITY_EXTRA, "Labour Court"] },
+    {
+      city: "Coimbatore",
+      courts: [
+        ...STANDARD,
+        ...CITY_EXTRA,
+        "Labour Court",
+        "Additional Subordinate Court, Coimbatore",
+        "Principal District Munsif Court, Coimbatore",
+      ],
+    },
     {
       city: "Pollachi",
       courts: [
@@ -162,6 +171,7 @@ const TN_MULTI_CITY: Record<string, { city: string; courts: string[] }[]> = {
       courts: [
         "Madras High Court (Principal Seat)",
         "Principal District Court, Chennai",
+        "Chief Judicial Court, Chennai",
         "City Civil Court — Main (Madras High Court Campus)",
         "City Civil Court — Singaravelar Maligai",
         "City Civil Court — Egmore",
@@ -188,11 +198,62 @@ const TN_MULTI_CITY: Record<string, { city: string; courts: string[] }[]> = {
     { city: "Salem", courts: [...STANDARD, ...CITY_EXTRA] },
     {
       city: "Attur",
-      courts: ["District Munsif Court, Attur", "JMFC, Attur"],
+      courts: [
+        "District Munsif Court, Attur",
+        "Subordinate Court, Attur",
+        "JMFC, Attur",
+      ],
     },
     {
       city: "Mettur",
-      courts: ["JMFC, Mettur"],
+      courts: ["District Munsif Court, Mettur", "JMFC, Mettur"],
+    },
+    {
+      city: "Omalur",
+      courts: ["District Munsif Court, Omalur", "JMFC, Omalur"],
+    },
+  ],
+  Namakkal: [
+    {
+      city: "Namakkal",
+      courts: [...STANDARD],
+    },
+    {
+      city: "Komarapalayam",
+      courts: ["Judicial Magistrate Court, Komarapalayam", "JMFC, Komarapalayam"],
+    },
+  ],
+  Dharmapuri: [
+    {
+      city: "Dharmapuri",
+      courts: [...STANDARD],
+    },
+    {
+      city: "Pappireddipatti",
+      courts: [
+        "Judicial Magistrate Court, Papirettipatti",
+        "JMFC, Pappireddipatti",
+      ],
+    },
+  ],
+  Thanjavur: [
+    {
+      city: "Thanjavur",
+      courts: [
+        ...STANDARD,
+        ...CITY_EXTRA,
+        "Judicial Magistrate Court No.1, Thanjavur",
+      ],
+    },
+  ],
+  Tirunelveli: [
+    {
+      city: "Tirunelveli",
+      courts: [
+        ...STANDARD,
+        ...CITY_EXTRA,
+        "Special Subordinate Court, Tirunelveli",
+      ],
     },
   ],
   Tiruchirappalli: [
@@ -283,8 +344,22 @@ const KA_MULTI_CITY: Record<string, { city: string; courts: string[] }[]> = {
         "Mayo Hall Court Complex",
         "CMM Courts, Bengaluru",
         "Commercial Court, Bengaluru",
+        "Additional Chief Judicial Magistrate Court, Bangalore",
         ...STANDARD,
         ...CITY_EXTRA,
+      ],
+    },
+  ],
+  Chamarajanagara: [
+    {
+      city: "Chamarajanagara",
+      courts: [...STANDARD],
+    },
+    {
+      city: "Kollegal",
+      courts: [
+        "Judicial Magistrate Fastrack Court, Kollegal",
+        "JMFC, Kollegal",
       ],
     },
   ],
@@ -369,6 +444,7 @@ const TN_CITY_DISTRICTS = new Set([
   "Erode",
   "Vellore",
   "Thoothukudi",
+  "Chennai",
 ]);
 
 const KA_CITY_DISTRICTS = new Set([
@@ -378,7 +454,100 @@ const KA_CITY_DISTRICTS = new Set([
   "Shivamogga",
   "Tumakuru",
   "Davanagere",
+  "Bengaluru Urban",
+  "Dakshina Kannada",
+  "Dharwad",
 ]);
+
+/**
+ * Capitals + major metros get CITY_EXTRA (City Civil, MM, CMM, etc.)
+ * at district HQ. Keyed as `state::district` to match court-districts.json.
+ * Overlay TN/KA multi-city districts are skipped in buildAllIndia — they keep
+ * their own city packs.
+ */
+const METRO_OR_CAPITAL = new Set<string>([
+  // Capitals / seats of government
+  "Andaman and Nicobar Islands::South Andaman",
+  "Andhra Pradesh::Guntur", // Amaravati region
+  "Arunachal Pradesh::Itanagar capital complex",
+  "Assam::Kamrup Metropolitan",
+  "Bihar::Patna",
+  "Chandigarh::Chandigarh",
+  "Chhattisgarh::Raipur",
+  "Dadra and Nagar Haveli and Daman and Diu::Daman",
+  "Delhi::New Delhi",
+  "Delhi::Central Delhi",
+  "Delhi::South Delhi",
+  "Delhi::East Delhi",
+  "Delhi::West Delhi",
+  "Delhi::North Delhi",
+  "Delhi::North East Delhi",
+  "Delhi::North West Delhi",
+  "Delhi::South East Delhi",
+  "Delhi::South West Delhi",
+  "Delhi::Shahdara district",
+  "Goa::North Goa",
+  "Gujarat::Ahmedabad",
+  "Gujarat::Gandhinagar",
+  "Haryana::Gurugram",
+  "Haryana::Faridabad",
+  "Himachal Pradesh::Shimla",
+  "Jammu and Kashmir::Srinagar",
+  "Jammu and Kashmir::Jammu",
+  "Jharkhand::Ranchi",
+  "Jharkhand::East Singhbhum",
+  "Karnataka::Bengaluru Urban",
+  "Kerala::Thiruvananthapuram",
+  "Kerala::Ernakulam",
+  "Ladakh::Leh",
+  "Lakshadweep::Lakshadweep",
+  "Madhya Pradesh::Bhopal",
+  "Madhya Pradesh::Indore",
+  "Maharashtra::Mumbai City",
+  "Maharashtra::Mumbai Suburban",
+  "Maharashtra::Pune",
+  "Maharashtra::Nagpur",
+  "Maharashtra::Thane",
+  "Maharashtra::Nashik",
+  "Manipur::Imphal West",
+  "Manipur::Imphal East",
+  "Meghalaya::East Khasi Hills",
+  "Mizoram::Aizawl",
+  "Nagaland::Kohima",
+  "Nagaland::Dimapur",
+  "Odisha::Khordha",
+  "Odisha::Cuttack",
+  "Puducherry::Puducherry",
+  "Punjab::Ludhiana",
+  "Punjab::Amritsar",
+  "Punjab::Jalandhar",
+  "Rajasthan::Jaipur",
+  "Rajasthan::Jodhpur",
+  "Sikkim::East Sikkim",
+  "Tamil Nadu::Chennai",
+  "Tamil Nadu::Coimbatore",
+  "Tamil Nadu::Madurai",
+  "Telangana::Hyderabad",
+  "Tripura::West Tripura",
+  "Uttar Pradesh::Lucknow",
+  "Uttar Pradesh::Prayagraj",
+  "Uttar Pradesh::Varanasi",
+  "Uttar Pradesh::Kanpur Nagar",
+  "Uttar Pradesh::Ghaziabad",
+  "Uttar Pradesh::Gautam Buddha Nagar",
+  "Uttarakhand::Dehradun",
+  "West Bengal::Kolkata",
+  "West Bengal::Howrah",
+  "West Bengal::North 24 Parganas",
+  "West Bengal::South 24 Parganas",
+]);
+
+function wantsCityExtra(state: string, district: string): boolean {
+  if (METRO_OR_CAPITAL.has(`${state}::${district}`)) return true;
+  if (state === TN && TN_CITY_DISTRICTS.has(district)) return true;
+  if (state === KA && KA_CITY_DISTRICTS.has(district)) return true;
+  return false;
+}
 
 /**
  * All 25 High Courts + permanent/circuit benches (public directory).
@@ -703,11 +872,9 @@ function buildAllIndiaDistrictCourts(): CourtSeed[] {
     const key = `${loc.state}::${loc.district}`;
     if (overlayDistricts.has(key)) continue;
 
-    const cityPack =
-      (loc.state === TN && TN_CITY_DISTRICTS.has(loc.district)) ||
-      (loc.state === KA && KA_CITY_DISTRICTS.has(loc.district))
-        ? [...STANDARD, ...CITY_EXTRA]
-        : [...STANDARD];
+    const cityPack = wantsCityExtra(loc.state, loc.district)
+      ? [...STANDARD, ...CITY_EXTRA]
+      : [...STANDARD];
 
     rows.push(...pack(loc.state, loc.district, loc.district, cityPack));
   }
@@ -732,6 +899,13 @@ export const courtsSeed: CourtSeed[] = dedupe([
   ...buildOverlay(KA, KA_MULTI_CITY),
   ...HIGH_COURT_BENCHES,
   ...SUPREME_COURT,
+  // Office practice courts from staffs & court details.pdf (other states)
+  {
+    state: "West Bengal",
+    district: "Kolkata",
+    city: "Kolkata",
+    courtName: "Metropolitan Magistrate Court, Kolkata",
+  },
 ]);
 
 /** States present in the courts seed (includes Supreme Court path). */

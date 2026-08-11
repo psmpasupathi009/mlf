@@ -252,6 +252,43 @@ async function main() {
     "/api/courts?state=Tamil%20Nadu&district=Erode",
     "List courts for location"
   );
+  // State → District → City → Court cascade (all-India meta)
+  await testApi(
+    jar,
+    "Courts",
+    "GET",
+    "/api/courts/meta?level=districts&state=TN&pageSize=20",
+    "Cascade: districts for Tamil Nadu",
+    undefined,
+    (s, json) => {
+      const opts = (json as { data?: { options?: unknown[] } })?.data?.options;
+      return s >= 200 && s < 300 && Array.isArray(opts) && opts.length > 0;
+    }
+  );
+  await testApi(
+    jar,
+    "Courts",
+    "GET",
+    "/api/courts/meta?level=complexes&state=TN&district=Erode&pageSize=20",
+    "Cascade: cities for Erode",
+    undefined,
+    (s, json) => {
+      const opts = (json as { data?: { options?: unknown[] } })?.data?.options;
+      return s >= 200 && s < 300 && Array.isArray(opts) && opts.length > 0;
+    }
+  );
+  await testApi(
+    jar,
+    "Courts",
+    "GET",
+    "/api/courts/meta?level=courts&state=TN&district=Erode&complex=Gobichettipalayam&pageSize=20",
+    "Cascade: courts for Gobichettipalayam",
+    undefined,
+    (s, json) => {
+      const opts = (json as { data?: { options?: unknown[] } })?.data?.options;
+      return s >= 200 && s < 300 && Array.isArray(opts) && opts.length > 0;
+    }
+  );
   await testApi(jar, "Advocates", "GET", "/api/advocates", "List advocates for assignment");
 
   // ── CLIENTS ──
@@ -408,6 +445,143 @@ async function main() {
     },
     (s) => s >= 200 && s < 500
   );
+
+  // ── COVERAGE / REASSIGN (before adjourn so hearing is still active) ──
+  const covList = await testApi(
+    jar,
+    "Coverage",
+    "GET",
+    "/api/hearings/coverage?status=open&pageSize=10",
+    "List open hearing coverage items"
+  );
+  const covRows = (
+    covList.json as { data?: Array<{ unitId?: string }> } | null
+  )?.data;
+  let covUnitId =
+    Array.isArray(covRows) && covRows[0]?.unitId
+      ? covRows[0].unitId
+      : undefined;
+
+  const liveHearing =
+    (await prisma.hearing.findFirst({
+      where: { isAdjourned: false, purpose: "E2E fixture hearing" },
+      select: { unitId: true },
+    })) ??
+    (hearingUnitId
+      ? await prisma.hearing.findFirst({
+          where: { unitId: hearingUnitId, isAdjourned: false },
+          select: { unitId: true },
+        })
+      : null);
+  const coverageHearingUnitId = liveHearing?.unitId ?? hearingUnitId;
+
+  if (!covUnitId && coverageHearingUnitId) {
+    const opened = await testApi(
+      jar,
+      "Coverage",
+      "POST",
+      "/api/hearings/coverage",
+      "Open coverage for audit hearing",
+      {
+        hearingUnitId: coverageHearingUnitId,
+        reason: "other",
+        reasonNote: "Full audit coverage item",
+      }
+    );
+    const data = opened.json as {
+      data?: { coverageUnitId?: string };
+      coverageUnitId?: string;
+    } | null;
+    covUnitId =
+      data?.data?.coverageUnitId ?? data?.coverageUnitId ?? undefined;
+  }
+
+  if (covUnitId) {
+    const coverMobile =
+      (
+        await prisma.user.findFirst({
+          where: {
+            isActive: true,
+            roles: { has: "advocate" },
+            mobile: { not: user.mobile },
+          },
+          select: { mobile: true },
+        })
+      )?.mobile ?? user.mobile;
+
+    await testApi(
+      jar,
+      "Coverage",
+      "POST",
+      `/api/hearings/coverage/${covUnitId}/resolve`,
+      "Resolve coverage: date-specific cover",
+      { action: "cover", toMobile: coverMobile.replace(/^91/, "") },
+      (s) => (s >= 200 && s < 300) || s === 409
+    );
+
+    // Second open item on another live hearing → dismiss
+    const dismissHearing =
+      (await prisma.hearing.findFirst({
+        where: {
+          isAdjourned: false,
+          purpose: "E2E fixture hearing",
+          unitId: { not: coverageHearingUnitId ?? "" },
+        },
+        select: { unitId: true },
+      })) ?? null;
+    if (dismissHearing) {
+      const again = await req(jar, "POST", "/api/hearings/coverage", {
+        hearingUnitId: dismissHearing.unitId,
+        reason: "other",
+        reasonNote: "Full audit dismiss target",
+      });
+      const againId =
+        (again.json as { data?: { coverageUnitId?: string } })?.data
+          ?.coverageUnitId ??
+        (again.json as { coverageUnitId?: string })?.coverageUnitId;
+      if (againId && again.res.ok) {
+        await testApi(
+          jar,
+          "Coverage",
+          "POST",
+          `/api/hearings/coverage/${againId}/resolve`,
+          "Resolve coverage: dismiss",
+          { action: "dismiss", notes: "audit dismiss" }
+        );
+      } else {
+        push({
+          module: "Coverage",
+          method: "POST",
+          path: "/api/hearings/coverage/[unitId]/resolve",
+          purpose: "Resolve coverage: dismiss",
+          status: "SKIP",
+          detail: "Could not open second coverage item",
+          kind: "flow",
+        });
+      }
+    } else {
+      push({
+        module: "Coverage",
+        method: "POST",
+        path: "/api/hearings/coverage/[unitId]/resolve",
+        purpose: "Resolve coverage: dismiss",
+        status: "SKIP",
+        detail: "No second live hearing for dismiss",
+        kind: "flow",
+      });
+    }
+  } else {
+    push({
+      module: "Coverage",
+      method: "POST",
+      path: "/api/hearings/coverage/[unitId]/resolve",
+      purpose: "Resolve coverage cover/dismiss",
+      status: "SKIP",
+      detail: "No open coverage item available",
+      kind: "flow",
+    });
+  }
+
   if (hearingUnitId) {
     await testApi(
       jar,
@@ -590,6 +764,8 @@ async function main() {
     },
     (s) => s >= 200 && s < 500
   );
+
+  await testApi(jar, "Expenses", "GET", "/api/expenses", "List office expenses");
 
   // ── APPOINTMENTS / AVAILABILITY ──
   await testApi(jar, "Appointments", "GET", "/api/appointments", "List appointments");
@@ -1022,9 +1198,11 @@ async function main() {
     ["/clients", "Clients list UI"],
     ["/cases", "Cases list UI"],
     ["/diary", "Diary day board UI"],
+    ["/coverage", "Hearing coverage / reassign UI"],
     ["/appointments", "Appointments UI"],
     ["/availability", "Advocate availability UI"],
     ["/accounts", "Accounts cash register UI"],
+    ["/expenses", "Office expenses UI"],
     ["/hrms", "HRMS attendance/leave UI"],
     ["/dak", "Dak register UI"],
     ["/tasks", "Work allotment UI"],

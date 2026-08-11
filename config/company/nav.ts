@@ -73,6 +73,13 @@ export const navItems: NavItem[] = [
     ],
   },
   {
+    href: "/coverage",
+    label: "Coverage",
+    module: "cases",
+    group: "matters",
+    permission: { module: "cases", action: "edit" },
+  },
+  {
     href: "/appointments",
     label: "Appointments",
     module: "appointments",

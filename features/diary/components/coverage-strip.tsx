@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { Users } from "lucide-react";
 import { apiFetch } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
@@ -82,9 +83,25 @@ export function CoverageStrip({ enabled }: Props) {
         </ul>
         {total > items.length ? (
           <p className="mt-2 text-xs text-muted-foreground">
-            Showing {items.length} of {total} open items
+            Showing {items.length} of {total} open items.{" "}
+            <Link
+              href="/coverage"
+              className="text-navy underline-offset-2 hover:underline"
+            >
+              Open Coverage
+            </Link>
           </p>
-        ) : null}
+        ) : (
+          <p className="mt-2 text-xs text-muted-foreground">
+            <Link
+              href="/coverage"
+              className="text-navy underline-offset-2 hover:underline"
+            >
+              Open Coverage page
+            </Link>{" "}
+            for cover / permanent reassign.
+          </p>
+        )}
       </section>
 
       <CoverageResolveDialog

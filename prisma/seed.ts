@@ -24,6 +24,8 @@ import { nextUnitId } from "../lib/ids";
 const prisma = new PrismaClient();
 const DATA = join(process.cwd(), "prisma", "data");
 const RESET_STAFF = process.argv.includes("--reset-staff");
+/** Delete all business data + non-admin users; keep env ADMIN_MOBILE + RolePermission. */
+const WIPE_KEEP_ADMIN = process.argv.includes("--wipe-keep-admin");
 
 /** Dev/test PIN for seeded users (override with SEED_PIN). */
 const SEED_PIN = process.env.SEED_PIN ?? "123456";
@@ -162,6 +164,64 @@ async function migrateLegacyUsers() {
   console.log(`User migrate: updated ${migrated} document(s), employee seq=${seq}`);
 }
 
+/**
+ * Wipe operational data. Keeps RolePermission and the env bootstrap admin user.
+ * Resets IdCounter so unit IDs start fresh after reseed.
+ */
+async function wipeKeepAdmin() {
+  const adminMobile = normalizeMobile(
+    process.env.ADMIN_MOBILE ?? process.env.ADMIN_MOBILE_1 ?? ""
+  );
+  if (!adminMobile) {
+    throw new Error("--wipe-keep-admin requires ADMIN_MOBILE (or ADMIN_MOBILE_1)");
+  }
+
+  const counts = await Promise.all([
+    prisma.hearingCoverageItem.deleteMany({}),
+    prisma.hearing.deleteMany({}),
+    prisma.case.deleteMany({}),
+    prisma.cashPayment.deleteMany({}),
+    prisma.officeExpense.deleteMany({}),
+    prisma.document.deleteMany({}),
+    prisma.appointment.deleteMany({}),
+    prisma.dakEntry.deleteMany({}),
+    prisma.officeTask.deleteMany({}),
+    prisma.attendance.deleteMany({}),
+    prisma.leaveRequest.deleteMany({}),
+    prisma.advocateWeeklyHours.deleteMany({}),
+    prisma.advocateTimeBlock.deleteMany({}),
+    prisma.officeHoliday.deleteMany({}),
+    prisma.notification.deleteMany({}),
+    prisma.client.deleteMany({}),
+    prisma.auditLog.deleteMany({}),
+    prisma.otpSession.deleteMany({}),
+    prisma.consumedOtpProof.deleteMany({}),
+    prisma.rateLimit.deleteMany({}),
+  ]);
+
+  const deletedUsers = await prisma.user.deleteMany({
+    where: { mobile: { not: adminMobile } },
+  });
+
+  await prisma.idCounter.deleteMany({});
+
+  // Keep employee seq above the remaining admin so new EMP-* IDs do not collide.
+  const admin = await prisma.user.findUnique({
+    where: { mobile: adminMobile },
+    select: { unitId: true },
+  });
+  const adminSeq = Number(admin?.unitId?.match(/(\d+)$/)?.[1] ?? "0");
+  if (adminSeq > 0) {
+    await prisma.idCounter.create({
+      data: { entity: "employee", seq: adminSeq },
+    });
+  }
+
+  console.log(
+    `--wipe-keep-admin: cleared business collections (${counts.reduce((a, c) => a + c.count, 0)} docs), deleted ${deletedUsers.count} user(s); kept admin ${adminMobile}`
+  );
+}
+
 async function seedAdmin() {
   const adminMobile = normalizeMobile(
     process.env.ADMIN_MOBILE ?? process.env.ADMIN_MOBILE_1 ?? ""
@@ -255,6 +315,8 @@ async function seedEmployees(pinHash: string) {
           name: row.name,
           designation,
           roles,
+          email: row.email ?? null,
+          address: row.address ?? null,
           defaultCourts,
           pinHash: existing.pinHash ?? pinHash,
           isActive: true,
@@ -272,6 +334,8 @@ async function seedEmployees(pinHash: string) {
         name: row.name,
         designation,
         roles,
+        email: row.email,
+        address: row.address,
         defaultCourts,
         pinHash,
         isActive: true,
@@ -668,17 +732,25 @@ async function printSummary() {
 }
 
 async function main() {
+  if (WIPE_KEEP_ADMIN) {
+    await wipeKeepAdmin();
+  }
   await seedPermissions();
   await migrateLegacyUsers();
   const pinHash = await hashPin(SEED_PIN);
   await seedAdmin();
   await seedEmployees(pinHash);
-  const clients = await seedClients();
-  const cases = await seedCases(clients);
-  await seedHearings(cases);
-  await seedAppointments(clients);
-  await seedPayments(clients, cases);
-  await seedOfficeHoliday();
+  // After a wipe, only restore office staff — skip demo clients/cases/etc.
+  if (!WIPE_KEEP_ADMIN) {
+    const clients = await seedClients();
+    const cases = await seedCases(clients);
+    await seedHearings(cases);
+    await seedAppointments(clients);
+    await seedPayments(clients, cases);
+    await seedOfficeHoliday();
+  } else {
+    console.log("Sample CSV data skipped (--wipe-keep-admin)");
+  }
   await printSummary();
 }
 

@@ -428,7 +428,7 @@ export function EmployeeFormDialog({
                           {c.courtName}
                           <span className="text-muted-foreground">
                             {" "}
-                            · {c.city}, {c.district}
+                            · {c.city}, {c.district}, {c.state}
                           </span>
                         </span>
                         <div className="flex gap-1">

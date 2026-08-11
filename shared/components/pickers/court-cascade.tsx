@@ -178,8 +178,8 @@ export function CourtCascade({
   return (
     <div className="space-y-4">
       <p className="text-xs text-muted-foreground">
-        Free office list (no external court API). Search or scroll for more;
-        choose Other to type any name.
+        All India: State → District → City / complex → Court. Search or scroll
+        for more; choose Other to type any name not listed.
       </p>
       <div className="grid min-w-0 grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="grid min-w-0 gap-2">
