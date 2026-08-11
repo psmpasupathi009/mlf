@@ -429,6 +429,7 @@ export function CaseDetailPage({
         open={hearingOpen}
         onOpenChange={setHearingOpen}
         caseUnitId={item.unitId}
+        caseType={item.caseType}
         onSaved={load}
       />
       {adjourning ? (

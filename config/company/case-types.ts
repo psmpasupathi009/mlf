@@ -4,6 +4,7 @@ export const CASE_TYPE_GROUPS = [
     types: [
       { value: "OS", label: "OS — Original Suit" },
       { value: "CS", label: "CS — Civil Suit" },
+      { value: "CIBIL", label: "CIBIL — Credit / recovery suit" },
       { value: "WP", label: "WP — Writ Petition" },
       { value: "WA", label: "WA — Writ Appeal" },
       { value: "AS", label: "AS — Appeal Suit" },

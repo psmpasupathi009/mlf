@@ -5,6 +5,7 @@ import { nextUnitId } from "@/lib/ids";
 import { writeAudit, pickAuditFields } from "@/lib/audit";
 import { addHearingSchema } from "@/lib/validations/cases.schema";
 import { toHearingSummary } from "@/features/cases/server/serialize";
+import { isKnownStageForCaseType } from "@/config/company/case-stages";
 import {
   findCaseNotifyRecipients,
   isHearingWithinNextIstDays,
@@ -28,6 +29,12 @@ export const POST = apiHandler(async (request, context) => {
   }
   const input = parsed.data;
 
+  const purpose = input.purpose?.trim() || undefined;
+  const syncStage =
+    purpose && isKnownStageForCaseType(purpose, item.caseType)
+      ? purpose
+      : undefined;
+
   const hearingUnitId = await nextUnitId("hearing");
   const [hearing] = await prisma.$transaction([
     prisma.hearing.create({
@@ -36,7 +43,7 @@ export const POST = apiHandler(async (request, context) => {
         caseId: item.id,
         caseUnitId: item.unitId,
         hearingDate: input.hearingDate,
-        purpose: input.purpose || undefined,
+        purpose,
         notes: input.notes || undefined,
         createdById: user.id,
       },
@@ -45,6 +52,7 @@ export const POST = apiHandler(async (request, context) => {
       where: { id: item.id },
       data: {
         nextHearingAt: input.hearingDate,
+        ...(syncStage ? { stage: syncStage } : {}),
         // Do not auto-promote pipeline status on hearing create.
         // Legacy pending/listed → active only when already numbered.
         ...((item.status === "pending" || item.status === "listed") &&

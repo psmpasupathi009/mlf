@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -15,7 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { apiFetch, getErrorMessage } from "@/lib/api/client";
-import { HEARING_PURPOSE_OPTIONS } from "@/config/company/form-options";
+import { getHearingPurposeOptionsForCaseType } from "@/config/company/case-stages";
 import { SelectOrOther } from "@/shared/components/forms/select-or-other";
 import { DatePicker } from "@/shared/components/forms/date-picker";
 
@@ -23,18 +23,35 @@ export function AddHearingDialog({
   open,
   onOpenChange,
   caseUnitId,
+  caseType,
   onSaved,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   caseUnitId: string;
+  caseType?: string | null;
   onSaved: () => void;
 }) {
+  const purposeOptions = useMemo(
+    () => getHearingPurposeOptionsForCaseType(caseType),
+    [caseType]
+  );
   const [hearingDate, setHearingDate] = useState("");
   const [purpose, setPurpose] = useState("");
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!open) return;
+    queueMicrotask(() => {
+      setHearingDate("");
+      setPurpose("");
+      setNotes("");
+      setError("");
+      setBusy(false);
+    });
+  }, [open]);
 
   async function handleSubmit() {
     setError("");
@@ -85,7 +102,7 @@ export function AddHearingDialog({
             <SelectOrOther
               value={purpose}
               onChange={setPurpose}
-              options={HEARING_PURPOSE_OPTIONS}
+              options={purposeOptions}
               placeholder="Select purpose"
               className="h-10"
             />

@@ -6,22 +6,8 @@
 
 export type FormOption = { value: string; label: string };
 
-export const CASE_STAGE_OPTIONS: FormOption[] = [
-  { value: "Filing", label: "Filing" },
-  { value: "Registration", label: "Registration" },
-  { value: "Summon / Notice", label: "Summon / Notice" },
-  { value: "Appearance", label: "Appearance" },
-  { value: "Pleadings", label: "Pleadings" },
-  { value: "Issues framed", label: "Issues framed" },
-  { value: "Evidence", label: "Evidence" },
-  { value: "Cross-examination", label: "Cross-examination" },
-  { value: "Arguments", label: "Arguments" },
-  { value: "Judgment reserved", label: "Judgment reserved" },
-  { value: "Judgment / Order", label: "Judgment / Order" },
-  { value: "Execution", label: "Execution" },
-  { value: "Appeal pending", label: "Appeal pending" },
-  { value: "Disposed", label: "Disposed" },
-];
+/** @deprecated Prefer getStageOptionsForCaseType from case-stages.ts */
+export { CASE_STAGE_OPTIONS } from "@/config/company/case-stages";
 
 export const UNDER_ACTS_OPTIONS: FormOption[] = [
   { value: "IPC", label: "IPC" },
@@ -107,18 +93,8 @@ export const APPOINTMENT_LOCATION_OPTIONS: FormOption[] = [
   { value: "Video call", label: "Video call" },
 ];
 
-export const HEARING_PURPOSE_OPTIONS: FormOption[] = [
-  { value: "Appearance", label: "Appearance" },
-  { value: "Summon / Notice", label: "Summon / Notice" },
-  { value: "Pleadings", label: "Pleadings" },
-  { value: "Evidence", label: "Evidence" },
-  { value: "Cross-examination", label: "Cross-examination" },
-  { value: "Arguments", label: "Arguments" },
-  { value: "Judgment", label: "Judgment" },
-  { value: "Interim application", label: "Interim application" },
-  { value: "Bail", label: "Bail" },
-  { value: "Settlement / compromise", label: "Settlement / compromise" },
-];
+/** @deprecated Prefer getHearingPurposeOptionsForCaseType from case-stages.ts */
+export { GENERAL_CASE_STAGES as HEARING_PURPOSE_OPTIONS } from "@/config/company/case-stages";
 
 export const ADJOURN_OUTCOME_OPTIONS: FormOption[] = [
   { value: "Adjourned — counsel request", label: "Adjourned — counsel request" },

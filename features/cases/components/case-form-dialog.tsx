@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +31,10 @@ import {
   normalizeCnr,
 } from "@/config/company/case-types";
 import {
-  CASE_STAGE_OPTIONS,
+  getStageOptionsForCaseType,
+  isKnownStageForCaseType,
+} from "@/config/company/case-stages";
+import {
   UNDER_ACTS_OPTIONS,
   caseYearOptions,
 } from "@/config/company/form-options";
@@ -123,6 +126,22 @@ export function CaseFormDialog({
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  const stageOptions = useMemo(
+    () => getStageOptionsForCaseType(caseType || null),
+    [caseType]
+  );
+
+  function handleCaseTypeChange(nextType: string) {
+    setCaseType(nextType);
+    setStage((prev) => {
+      if (!prev) return prev;
+      if (isKnownStageForCaseType(prev, nextType)) return prev;
+      // Keep free-text "Other" values that were not from the previous catalog
+      if (!isKnownStageForCaseType(prev, caseType || null)) return prev;
+      return "";
+    });
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -352,7 +371,7 @@ export function CaseFormDialog({
                   </Label>
                   <SearchableSelect
                     value={caseType}
-                    onChange={setCaseType}
+                    onChange={handleCaseTypeChange}
                     options={CASE_TYPE_OPTIONS}
                     grouped
                     placeholder="Select type"
@@ -429,9 +448,14 @@ export function CaseFormDialog({
                   <SelectOrOther
                     value={stage}
                     onChange={setStage}
-                    options={CASE_STAGE_OPTIONS}
-                    placeholder="Select stage"
+                    options={stageOptions}
+                    placeholder={
+                      caseType
+                        ? "Select stage"
+                        : "Select case type first"
+                    }
                     otherPlaceholder="Type stage"
+                    disabled={!caseType}
                   />
                 </div>
               </div>
