@@ -69,6 +69,7 @@ export const POST = createImportHandler({
         mode = modeParsed.data;
       }
 
+      let clientId: string | undefined;
       let clientUnitId: string | undefined;
       if (row.clientUnitId?.trim()) {
         const client = await findClientByUnitId(row.clientUnitId);
@@ -81,6 +82,7 @@ export const POST = createImportHandler({
           });
           continue;
         }
+        clientId = client.id;
         clientUnitId = client.unitId;
       }
 
@@ -165,6 +167,7 @@ export const POST = createImportHandler({
         const created = await prisma.appointment.create({
           data: {
             unitId,
+            clientId,
             clientUnitId,
             caseId,
             caseUnitId,

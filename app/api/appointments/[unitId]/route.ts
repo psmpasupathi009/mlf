@@ -75,11 +75,21 @@ export const PATCH = apiHandler(async (request, context) => {
     }
   }
 
-  if (input.clientUnitId) {
-    const client = await prisma.client.findUnique({
-      where: { unitId: input.clientUnitId },
-    });
-    if (!client) return jsonFail("VALIDATION", "Client not found", 400);
+  let clientId: string | null | undefined = undefined;
+  let clientUnitId: string | null | undefined = undefined;
+  if (input.clientUnitId !== undefined) {
+    if (input.clientUnitId === "") {
+      clientId = null;
+      clientUnitId = null;
+    } else {
+      const client = await prisma.client.findUnique({
+        where: { unitId: input.clientUnitId },
+        select: { id: true, unitId: true },
+      });
+      if (!client) return jsonFail("VALIDATION", "Client not found", 400);
+      clientId = client.id;
+      clientUnitId = client.unitId;
+    }
   }
 
   let caseId: string | null | undefined = undefined;
@@ -131,9 +141,7 @@ export const PATCH = apiHandler(async (request, context) => {
   const nextAdvocate =
     advocateMobile !== undefined ? advocateMobile : item.advocateMobile;
   const nextClient =
-    input.clientUnitId !== undefined
-      ? input.clientUnitId || null
-      : item.clientUnitId;
+    clientUnitId !== undefined ? clientUnitId : item.clientUnitId;
 
   if (
     nextStatus === "scheduled" &&
@@ -161,7 +169,7 @@ export const PATCH = apiHandler(async (request, context) => {
   const updated = await prisma.appointment.update({
     where: { id: item.id },
     data: {
-      clientUnitId: input.clientUnitId === "" ? null : input.clientUnitId,
+      ...(input.clientUnitId !== undefined ? { clientId, clientUnitId } : {}),
       ...(input.caseUnitId !== undefined ? { caseId, caseUnitId } : {}),
       advocateMobile,
       title: input.title,

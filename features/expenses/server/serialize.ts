@@ -26,8 +26,6 @@ export type ExpenseSummary = {
   voidReason: string | null;
   createdAt: string;
   updatedAt: string;
-  createdById: string | null;
-  voidedById: string | null;
   createdBy: ExpenseActor | null;
   voidedBy: ExpenseActor | null;
 };
@@ -68,8 +66,6 @@ export function toExpenseSummary(
     voidReason: item.voidReason,
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
-    createdById: item.createdById,
-    voidedById: item.voidedById,
     createdBy: actors?.createdBy ?? null,
     voidedBy: actors?.voidedBy ?? null,
   };

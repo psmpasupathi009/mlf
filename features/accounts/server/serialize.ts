@@ -23,8 +23,6 @@ export type PaymentSummary = {
   voidReason: string | null;
   createdAt: string;
   updatedAt: string;
-  createdById: string | null;
-  voidedById: string | null;
   createdBy: PaymentActor | null;
   voidedBy: PaymentActor | null;
 };
@@ -54,8 +52,6 @@ export function toPaymentSummary(
     voidReason: item.voidReason,
     createdAt: item.createdAt.toISOString(),
     updatedAt: item.updatedAt.toISOString(),
-    createdById: item.createdById,
-    voidedById: item.voidedById,
     createdBy: actors?.createdBy ?? null,
     voidedBy: actors?.voidedBy ?? null,
   };

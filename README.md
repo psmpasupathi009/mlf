@@ -16,9 +16,13 @@ Open [http://localhost:3000](http://localhost:3000). Home lives at `app/(portal)
 
 ## Docs
 
+APIs and URLs use public **`unitId`** (`CLI-…`, `CSE-…`, `EMP-…`), never Mongo `_id`.
+
 | Doc | What it covers |
 |-----|----------------|
-| [docs/application-flows.md](docs/application-flows.md) | Folder layout, auth layers, each feature flow, what to keep/clean |
+| [docs/website-guide.md](docs/website-guide.md) | How the site works — pages, flows, which IDs each feature uses |
+| [docs/schema-api-reference.md](docs/schema-api-reference.md) | ID glossary, models, dual-FK rules, full API catalog |
+| [docs/application-flows.md](docs/application-flows.md) | Deeper flow notes / maintainability |
 | [docs/prisma-database.md](docs/prisma-database.md) | Atlas connection, Prisma client, deploy DB checklist |
 | [prisma/data/README.md](prisma/data/README.md) | CSV import order and sample rules |
 

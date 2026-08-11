@@ -114,11 +114,16 @@ export const POST = apiHandler(async (request) => {
   }
   const input = parsed.data;
 
+  let clientId: string | undefined;
+  let clientUnitId: string | undefined;
   if (input.clientUnitId) {
     const client = await prisma.client.findUnique({
       where: { unitId: input.clientUnitId },
+      select: { id: true, unitId: true },
     });
     if (!client) return jsonFail("VALIDATION", "Client not found", 400);
+    clientId = client.id;
+    clientUnitId = client.unitId;
   }
 
   let caseId: string | undefined;
@@ -180,7 +185,8 @@ export const POST = apiHandler(async (request) => {
   const created = await prisma.appointment.create({
     data: {
       unitId,
-      clientUnitId: input.clientUnitId || undefined,
+      clientId,
+      clientUnitId,
       caseId,
       caseUnitId,
       advocateMobile: resolved.mobile,
