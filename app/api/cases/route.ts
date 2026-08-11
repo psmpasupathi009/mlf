@@ -1,5 +1,11 @@
 import type { Prisma } from "@prisma/client";
-import { apiHandler, jsonFail, jsonOk, jsonOkList, parsePagination } from "@/lib/api/response";
+import {
+  apiHandler,
+  jsonFail,
+  jsonOk,
+  jsonOkList,
+  parsePagination,
+} from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
 import { nextUnitId } from "@/lib/ids";
@@ -12,6 +18,10 @@ import {
   parseCaseListFilters,
 } from "@/features/cases/server/filters";
 import { normalizeMobile } from "@/lib/auth/mobile";
+import { resolveStageForSave } from "@/config/company/case-stages";
+
+/** Board view may load more cards than the list page size cap. */
+const BOARD_MAX_PAGE_SIZE = 200;
 
 const CASE_AUDIT_KEYS = [
   "clientUnitId",
@@ -47,8 +57,19 @@ export const GET = apiHandler(async (request) => {
   if (!user) return response;
 
   const { searchParams } = new URL(request.url);
-  const { page, pageSize, skip } = parsePagination(searchParams);
-  const where = buildCaseListWhere(parseCaseListFilters(searchParams));
+  const filters = parseCaseListFilters(searchParams);
+  const isBoard = filters.view === "board";
+  const { page, pageSize, skip } = isBoard
+    ? (() => {
+        const p = Math.max(1, Number(searchParams.get("page") ?? "1") || 1);
+        const raw =
+          Number(searchParams.get("pageSize") ?? BOARD_MAX_PAGE_SIZE) ||
+          BOARD_MAX_PAGE_SIZE;
+        const size = Math.min(BOARD_MAX_PAGE_SIZE, Math.max(1, raw));
+        return { page: p, pageSize: size, skip: (p - 1) * size };
+      })()
+    : parsePagination(searchParams);
+  const where = buildCaseListWhere(filters);
 
   const [rows, total] = await Promise.all([
     prisma.case.findMany({
@@ -130,6 +151,18 @@ export const POST = apiHandler(async (request) => {
     if (dupe) return jsonFail("CONFLICT", "A case with this case number already exists", 409);
   }
 
+  const stageResolved = resolveStageForSave({
+    nextStage: input.stage,
+    nextCaseType: input.caseType || null,
+    prevStage: null,
+    prevCaseType: null,
+    stageProvided: true,
+    caseTypeProvided: true,
+  });
+  if (!stageResolved.ok) {
+    return jsonFail("VALIDATION", stageResolved.message, 400);
+  }
+
   const primaryAdvocateMobile = input.primaryAdvocateMobile
     ? normalizeMobile(input.primaryAdvocateMobile) ?? input.primaryAdvocateMobile
     : undefined;
@@ -158,7 +191,7 @@ export const POST = apiHandler(async (request) => {
       underActs: input.underActs || undefined,
       policeStation: input.policeStation || undefined,
       firNumber: input.firNumber || undefined,
-      stage: input.stage || undefined,
+      stage: stageResolved.stage || undefined,
       caseType: input.caseType || undefined,
       status: input.status ?? "enquiry",
       filingDate: input.filingDate,

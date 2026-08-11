@@ -10,10 +10,9 @@ import { PaginationBar } from "@/shared/components/data/pagination-bar";
 import { EmptyState } from "@/shared/components/feedback/empty-state";
 import { UnitIdBadge } from "@/shared/components/data/unit-id-badge";
 import { ImportDialog } from "@/shared/components/data/import-dialog";
-import { MoreHorizontal } from "lucide-react";
+import { MoreHorizontal, LayoutList, Columns3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,14 +38,10 @@ import { apiFetch, apiDownload, getErrorMessage } from "@/lib/api/client";
 import type { PublicUser } from "@/lib/auth/session";
 import type { CaseSummary } from "@/features/cases/server/serialize";
 import { CaseFormDialog } from "@/features/cases/components/case-form-dialog";
+import { CasesBoard } from "@/features/cases/components/cases-board";
 import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
 import { cn } from "@/lib/utils/cn";
-import {
-  CASE_STATUS_LABEL,
-  CASE_STATUS_OPTIONS,
-  CASE_STATUS_VARIANT,
-  normalizeCaseStatus,
-} from "@/config/company/case-pipeline";
+import { CASE_TYPES } from "@/config/company/case-types";
 
 type CaseRow = CaseSummary & { clientName: string | null };
 type ListResponse = {
@@ -61,6 +56,21 @@ type QuickFilter =
   | "missingCourt"
   | "battaDue"
   | "filingDefect";
+
+type CasesView = "list" | "board";
+
+const VIEW_STORAGE_KEY = "mlf.cases.view";
+const BOARD_PAGE_SIZE = 200;
+
+function readStoredView(): CasesView {
+  if (typeof window === "undefined") return "list";
+  try {
+    const v = window.localStorage.getItem(VIEW_STORAGE_KEY);
+    return v === "board" ? "board" : "list";
+  } catch {
+    return "list";
+  }
+}
 
 export function CasesPage({ user }: { user: PublicUser }) {
   const can = (action: string) => user.permissions.includes(`cases.${action}`);
@@ -94,8 +104,12 @@ export function CasesPage({ user }: { user: PublicUser }) {
       ? (searchParams.get("status") as string)
       : "all"
   );
+  const [caseType, setCaseType] = useState<string>(
+    searchParams.get("caseType")?.trim() || "all"
+  );
   const [quick, setQuick] = useState<QuickFilter>(initialQuick);
   const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<CasesView>("list");
   const [formOpen, setFormOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const [hearingsImportOpen, setHearingsImportOpen] = useState(false);
@@ -145,18 +159,39 @@ export function CasesPage({ user }: { user: PublicUser }) {
     };
   }, [clientUnitId, rows]);
 
+  useEffect(() => {
+    queueMicrotask(() => {
+      setView(readStoredView());
+    });
+  }, []);
+
+  function setCasesView(next: CasesView) {
+    setView(next);
+    setPage(1);
+    try {
+      window.localStorage.setItem(VIEW_STORAGE_KEY, next);
+    } catch {
+      /* ignore */
+    }
+  }
+
   const load = useCallback(async () => {
     setLoading(true);
+    const isBoard = view === "board";
     const params = new URLSearchParams({
-      page: String(page),
-      pageSize: String(pageSize),
+      page: String(isBoard ? 1 : page),
+      pageSize: String(isBoard ? BOARD_PAGE_SIZE : pageSize),
     });
+    if (isBoard) {
+      params.set("view", "board");
+    }
     if (debouncedSearch) params.set("q", debouncedSearch);
     if (quick === "filingDefect") {
       params.set("status", "filing_defect");
     } else if (status !== "all") {
       params.set("status", status);
     }
+    if (caseType !== "all") params.set("caseType", caseType);
     if (clientUnitId) params.set("clientUnitId", clientUnitId);
     if (quick === "today") params.set("hearing", "today");
     if (quick === "week") params.set("hearing", "week");
@@ -175,7 +210,15 @@ export function CasesPage({ user }: { user: PublicUser }) {
     }
     setRows((data as unknown as ListResponse).data ?? []);
     setTotal((data as unknown as ListResponse).meta?.total ?? 0);
-  }, [page, debouncedSearch, status, clientUnitId, quick]);
+  }, [
+    page,
+    debouncedSearch,
+    status,
+    caseType,
+    clientUnitId,
+    quick,
+    view,
+  ]);
 
   useEffect(() => {
     queueMicrotask(() => {
@@ -198,11 +241,41 @@ export function CasesPage({ user }: { user: PublicUser }) {
         title="Cases"
         description="Office-shared cause list — search by CSE id, court number, or client."
         actions={
-          can("create") ? (
-            <Button type="button" onClick={() => setFormOpen(true)}>
-              Register case
-            </Button>
-          ) : undefined
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex w-auto rounded-lg border border-border/80 bg-muted/40 p-0.5 sm:w-auto!">
+              <button
+                type="button"
+                onClick={() => setCasesView("list")}
+                className={cn(
+                  "inline-flex w-auto! items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                  view === "list"
+                    ? "bg-card text-navy shadow-sm"
+                    : "text-muted-foreground hover:text-navy"
+                )}
+              >
+                <LayoutList className="size-3.5" />
+                List
+              </button>
+              <button
+                type="button"
+                onClick={() => setCasesView("board")}
+                className={cn(
+                  "inline-flex w-auto! items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                  view === "board"
+                    ? "bg-card text-navy shadow-sm"
+                    : "text-muted-foreground hover:text-navy"
+                )}
+              >
+                <Columns3 className="size-3.5" />
+                Board
+              </button>
+            </div>
+            {can("create") ? (
+              <Button type="button" onClick={() => setFormOpen(true)}>
+                Register case
+              </Button>
+            ) : null}
+          </div>
         }
       />
 
@@ -242,20 +315,20 @@ export function CasesPage({ user }: { user: PublicUser }) {
         }
         filters={
           <Select
-            value={status}
+            value={caseType}
             onValueChange={(v) => {
               setPage(1);
-              setStatus(v);
+              setCaseType(v);
             }}
           >
             <SelectTrigger className="w-full sm:w-44">
-              <SelectValue />
+              <SelectValue placeholder="Case type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All statuses</SelectItem>
-              {CASE_STATUS_OPTIONS.map((s) => (
-                <SelectItem key={s.value} value={s.value}>
-                  {s.label}
+              <SelectItem value="all">All types</SelectItem>
+              {CASE_TYPES.map((t) => (
+                <SelectItem key={t.value} value={t.value}>
+                  {t.value}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -281,6 +354,7 @@ export function CasesPage({ user }: { user: PublicUser }) {
                     } else if (status !== "all") {
                       params.set("status", status);
                     }
+                    if (caseType !== "all") params.set("caseType", caseType);
                     if (clientUnitId) params.set("clientUnitId", clientUnitId);
                     if (quick === "today") params.set("hearing", "today");
                     if (quick === "week") params.set("hearing", "week");
@@ -336,6 +410,30 @@ export function CasesPage({ user }: { user: PublicUser }) {
             ) : undefined
           }
         />
+      ) : view === "board" ? (
+        caseType === "all" ? (
+          <EmptyState
+            title="Select a case type"
+            description="The board shows court status columns for one case type (CC, OS, Bail, …)."
+          />
+        ) : (
+          <CasesBoard
+            rows={rows}
+            total={total}
+            canEdit={can("edit")}
+            caseType={caseType}
+            loading={loading}
+            onCaseUpdated={(next) => {
+              setRows((prev) =>
+                prev.map((r) =>
+                  r.unitId === next.unitId
+                    ? { ...r, ...next, clientName: r.clientName }
+                    : r
+                )
+              );
+            }}
+          />
+        )
       ) : (
         <>
           <Table>
@@ -346,7 +444,6 @@ export function CasesPage({ user }: { user: PublicUser }) {
                 <TableHead className="hidden md:table-cell">Client</TableHead>
                 <TableHead className="hidden lg:table-cell">Court</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="hidden md:table-cell">Stage</TableHead>
                 <TableHead className="hidden md:table-cell">Next hearing</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
               </TableRow>
@@ -355,13 +452,12 @@ export function CasesPage({ user }: { user: PublicUser }) {
               {loading
                 ? Array.from({ length: 5 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={8}>
+                      <TableCell colSpan={7}>
                         <div className="h-8 animate-pulse rounded bg-muted" />
                       </TableCell>
                     </TableRow>
                   ))
                 : rows.map((c) => {
-                    const st = normalizeCaseStatus(c.status);
                     return (
                     <TableRow key={c.unitId}>
                       <TableCell className="hidden md:table-cell">
@@ -388,13 +484,12 @@ export function CasesPage({ user }: { user: PublicUser }) {
                       <TableCell className="hidden lg:table-cell">
                         {c.courtName ?? "—"}
                       </TableCell>
-                      <TableCell>
-                        <Badge variant={CASE_STATUS_VARIANT[st] ?? "outline"}>
-                          {CASE_STATUS_LABEL[st]}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell text-muted-foreground">
-                        {c.stage ?? "—"}
+                      <TableCell className="text-sm text-navy">
+                        {c.stage?.trim() ? (
+                          c.stage
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="hidden md:table-cell">
                         {c.nextHearingAt

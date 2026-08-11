@@ -9,24 +9,34 @@ import {
 export type CaseListFilters = {
   q?: string;
   status?: string;
+  caseType?: string;
   clientUnitId?: string;
   hearing?: string;
   missingCourtNumber?: boolean;
   battaDue?: boolean;
+  /** Board view: exclude archived unless includeArchived. */
+  view?: "board";
+  includeArchived?: boolean;
 };
 
 export function parseCaseListFilters(
   searchParams: URLSearchParams
 ): CaseListFilters {
+  const viewRaw = searchParams.get("view")?.trim();
   return {
     q: searchParams.get("q")?.trim() || undefined,
     status: searchParams.get("status")?.trim() || undefined,
+    caseType: searchParams.get("caseType")?.trim() || undefined,
     clientUnitId: searchParams.get("clientUnitId")?.trim() || undefined,
     hearing: searchParams.get("hearing")?.trim() || undefined,
     missingCourtNumber: searchParams.get("missingCourtNumber") === "1",
     battaDue:
       searchParams.get("battaDue") === "1" ||
       searchParams.get("battaDue") === "true",
+    view: viewRaw === "board" ? "board" : undefined,
+    includeArchived:
+      searchParams.get("includeArchived") === "1" ||
+      searchParams.get("includeArchived") === "true",
   };
 }
 
@@ -37,15 +47,19 @@ export function buildCaseListWhere(
   const {
     q,
     status,
+    caseType,
     clientUnitId,
     hearing,
     missingCourtNumber,
     battaDue,
+    view,
+    includeArchived,
   } = filters;
 
   const where: Prisma.CaseWhereInput = {
     ...(clientUnitId ? { clientUnitId } : {}),
     ...(status ? { status: status as never } : {}),
+    ...(caseType ? { caseType } : {}),
     ...(battaDue ? { battaDue: true } : {}),
     ...(q
       ? {
@@ -59,6 +73,11 @@ export function buildCaseListWhere(
         }
       : {}),
   };
+
+  // Kanban board: hide archived by default (unless explicitly filtered by status).
+  if (view === "board" && !includeArchived && !status) {
+    where.status = { not: "archived" };
+  }
 
   if (missingCourtNumber) {
     where.AND = [

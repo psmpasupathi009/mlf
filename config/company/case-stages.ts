@@ -384,6 +384,90 @@ export function isKnownStageForCaseType(
   return getStageOptionsForCaseType(caseType).some((o) => o.value === stage);
 }
 
+/** True if `stage` appears in any track catalog. */
+export function isCatalogStage(stage: string): boolean {
+  const s = stage.trim();
+  if (!s) return false;
+  return (Object.values(STAGES_BY_TRACK) as FormOption[][]).some((opts) =>
+    opts.some((o) => o.value === s)
+  );
+}
+
+/**
+ * Stage is allowed for a case type when:
+ * - empty, or
+ * - in the type's track catalog, or
+ * - free-text (not in any track catalog).
+ * Rejects cross-track catalog stages (e.g. CIBIL stage on a CC matter).
+ */
+export function isStageAllowedForCaseType(
+  stage: string | null | undefined,
+  caseType: string | null | undefined
+): boolean {
+  const s = (stage ?? "").trim();
+  if (!s) return true;
+  if (isKnownStageForCaseType(s, caseType)) return true;
+  if (!isCatalogStage(s)) return true; // genuine free-text
+  return false;
+}
+
+export function stageValidationMessage(
+  stage: string,
+  caseType: string | null | undefined
+): string {
+  const track = resolveCaseStageTrack(caseType);
+  return `Stage “${stage}” does not belong to case type ${caseType || "(none)"} (${track} track). Pick a stage for this type or clear it.`;
+}
+
+/**
+ * Resolve stage to persist when caseType and/or stage change.
+ * Clears incompatible stages (same as form handleCaseTypeChange).
+ */
+export function resolveStageForSave(input: {
+  nextStage: string | null | undefined;
+  nextCaseType: string | null | undefined;
+  prevStage: string | null | undefined;
+  prevCaseType: string | null | undefined;
+  stageProvided: boolean;
+  caseTypeProvided: boolean;
+}): { ok: true; stage: string | null } | { ok: false; message: string } {
+  const caseType = input.caseTypeProvided
+    ? input.nextCaseType || null
+    : input.prevCaseType || null;
+
+  let stage: string | null;
+  if (input.stageProvided) {
+    const raw = input.nextStage;
+    stage = raw === "" || raw == null ? null : String(raw).trim() || null;
+  } else {
+    stage = input.prevStage ?? null;
+  }
+
+  if (!stage) return { ok: true, stage: null };
+
+  if (!isStageAllowedForCaseType(stage, caseType)) {
+    // Type changed and old stage is incompatible → clear (form parity)
+    if (
+      input.caseTypeProvided &&
+      !input.stageProvided &&
+      (input.nextCaseType || null) !== (input.prevCaseType || null)
+    ) {
+      return { ok: true, stage: null };
+    }
+    // Explicit incompatible stage on create/update → reject
+    if (input.stageProvided) {
+      return {
+        ok: false,
+        message: stageValidationMessage(stage, caseType),
+      };
+    }
+    // Type changed without sending stage, and prev incompatible → clear
+    return { ok: true, stage: null };
+  }
+
+  return { ok: true, stage };
+}
+
 /** Assert coverage: every seeded case type has an explicit track. */
 export function unmappedCaseTypes(): string[] {
   return CASE_TYPES.map((t) => t.value).filter(

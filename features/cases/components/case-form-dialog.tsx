@@ -25,7 +25,6 @@ import { ClientPicker } from "@/features/clients/components/client-picker";
 import { CourtCascade } from "@/shared/components/pickers/court-cascade";
 import type { CaseSummary } from "@/features/cases/server/serialize";
 import {
-  CASE_STATUS_OPTIONS,
   CASE_TYPE_GROUPS,
   isValidCnr,
   normalizeCnr,
@@ -119,7 +118,6 @@ export function CaseFormDialog({
   const [firNumber, setFirNumber] = useState("");
   const [stage, setStage] = useState("");
   const [caseType, setCaseType] = useState("");
-  const [status, setStatus] = useState("enquiry");
   const [filingDate, setFilingDate] = useState("");
   const [nextHearingAt, setNextHearingAt] = useState("");
   const [agreedFee, setAgreedFee] = useState("");
@@ -174,7 +172,6 @@ export function CaseFormDialog({
         setFirNumber(caseItem.firNumber ?? "");
         setStage(caseItem.stage ?? "");
         setCaseType(caseItem.caseType ?? "");
-        setStatus(caseItem.status);
         setFilingDate(caseItem.filingDate ? caseItem.filingDate.slice(0, 10) : "");
         setNextHearingAt(
           caseItem.nextHearingAt ? caseItem.nextHearingAt.slice(0, 10) : ""
@@ -202,7 +199,6 @@ export function CaseFormDialog({
         setFirNumber("");
         setStage("");
         setCaseType("");
-        setStatus("enquiry");
         setFilingDate("");
         setNextHearingAt("");
         setAgreedFee("");
@@ -263,7 +259,7 @@ export function CaseFormDialog({
       firNumber: firNumber || undefined,
       stage: stage || undefined,
       caseType,
-      status,
+      ...(isEdit ? {} : { status: "enquiry" as const }),
       filingDate: filingDate || undefined,
       nextHearingAt: nextHearingAt || undefined,
       agreedFee:
@@ -362,7 +358,7 @@ export function CaseFormDialog({
 
             <Section
               title="3. Case type & status"
-              description="Type is required"
+              description="Type is required — status list follows the case type"
             >
               <div className="grid gap-3 sm:grid-cols-2">
                 <div className="grid gap-2">
@@ -380,18 +376,18 @@ export function CaseFormDialog({
                 </div>
                 <div className="grid gap-2">
                   <Label>Status</Label>
-                  <Select value={status} onValueChange={setStatus}>
-                    <SelectTrigger className="h-11">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="z-200">
-                      {CASE_STATUS_OPTIONS.map((s) => (
-                        <SelectItem key={s.value} value={s.value}>
-                          {s.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SelectOrOther
+                    value={stage}
+                    onChange={setStage}
+                    options={stageOptions}
+                    placeholder={
+                      caseType
+                        ? "Select status"
+                        : "Select case type first"
+                    }
+                    otherPlaceholder="Type status"
+                    disabled={!caseType}
+                  />
                 </div>
               </div>
             </Section>
@@ -441,21 +437,6 @@ export function CaseFormDialog({
                     onChange={(e) => setCnr(e.target.value.toUpperCase())}
                     placeholder="16 chars, e.g. TNCH012345678901"
                     maxLength={20}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label>Current stage</Label>
-                  <SelectOrOther
-                    value={stage}
-                    onChange={setStage}
-                    options={stageOptions}
-                    placeholder={
-                      caseType
-                        ? "Select stage"
-                        : "Select case type first"
-                    }
-                    otherPlaceholder="Type stage"
-                    disabled={!caseType}
                   />
                 </div>
               </div>

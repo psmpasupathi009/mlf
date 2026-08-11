@@ -35,14 +35,12 @@ import type { DocumentSummary } from "@/features/documents/server/serialize";
 import { CaseFormDialog } from "@/features/cases/components/case-form-dialog";
 import { AddHearingDialog } from "@/features/cases/components/add-hearing-dialog";
 import { AdjournHearingDialog } from "@/features/cases/components/adjourn-hearing-dialog";
-import { CasePipelineStrip } from "@/features/cases/components/case-pipeline-strip";
+import { CaseCourtStatusStrip } from "@/features/cases/components/case-court-status-strip";
 import { CaseFilingChecklist } from "@/features/cases/components/case-filing-checklist";
 import { UploadDocumentDialog } from "@/features/documents/components/upload-document-dialog";
 import { CaseDocumentsPanel } from "@/features/documents/components/case-documents-panel";
 import type { DocumentTypeValue } from "@/lib/validations/documents.schema";
 import {
-  CASE_STATUS_LABEL,
-  CASE_STATUS_VARIANT,
   normalizeCaseStatus,
   PRE_NUMBER_STATUSES,
 } from "@/config/company/case-pipeline";
@@ -182,14 +180,14 @@ export function CaseDetailPage({
           <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">
             <div className="flex flex-wrap items-center gap-2">
               <UnitIdBadge value={item.unitId} />
-              <Badge variant={CASE_STATUS_VARIANT[status] ?? "outline"}>
-                {CASE_STATUS_LABEL[status]}
-              </Badge>
-              {item.stage ? (
-                <span className="text-xs text-muted-foreground">
-                  Stage: {item.stage}
-                </span>
+              {item.caseType ? (
+                <Badge variant="outline">{item.caseType}</Badge>
               ) : null}
+              {item.stage ? (
+                <Badge variant="default">{item.stage}</Badge>
+              ) : (
+                <span className="text-xs text-muted-foreground">No status</span>
+              )}
             </div>
             {can("cases", "edit") ? (
               <Button
@@ -207,10 +205,9 @@ export function CaseDetailPage({
         }
       />
 
-      <CasePipelineStrip
+      <CaseCourtStatusStrip
         caseItem={item}
         canEdit={can("cases", "edit")}
-        feeOutstanding={fee?.outstanding ?? null}
         onUpdated={applyCaseUpdate}
       />
 

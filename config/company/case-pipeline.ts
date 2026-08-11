@@ -123,6 +123,23 @@ export function canTransitionStatus(
   return CASE_STATUS_TRANSITIONS[f]?.includes(t) ?? false;
 }
 
+/** Statuses selectable in the edit form: current + allowed transitions. */
+export function editableStatusValues(
+  current: string
+): CasePipelineStatus[] {
+  const f = normalizeCaseStatus(current);
+  const allowed = new Set<CasePipelineStatus>([f]);
+  for (const to of CASE_STATUS_TRANSITIONS[f] ?? []) {
+    allowed.add(to);
+  }
+  return CASE_PIPELINE_STATUSES.filter((s) => allowed.has(s));
+}
+
+/** Create form: seed at enquiry only (pipeline starts here). */
+export function creatableStatusValues(): CasePipelineStatus[] {
+  return ["enquiry"];
+}
+
 /** Statuses that still need office filing work (pre-number). */
 export const PRE_NUMBER_STATUSES: CasePipelineStatus[] = [
   "enquiry",

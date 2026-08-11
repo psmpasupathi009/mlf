@@ -13,6 +13,7 @@ import {
   PRE_NUMBER_STATUSES,
   type FilingChecklistState,
 } from "@/config/company/case-pipeline";
+import { resolveStageForSave } from "@/config/company/case-stages";
 import {
   findCaseNotifyRecipients,
   notifyUsers,
@@ -139,6 +140,24 @@ export const PATCH = apiHandler(async (request, context) => {
     };
   }
 
+  const stageProvided = Object.prototype.hasOwnProperty.call(input, "stage");
+  const caseTypeProvided = Object.prototype.hasOwnProperty.call(
+    input,
+    "caseType"
+  );
+  const stageResolved = resolveStageForSave({
+    nextStage: input.stage,
+    nextCaseType:
+      input.caseType === "" ? null : (input.caseType ?? null),
+    prevStage: item.stage,
+    prevCaseType: item.caseType,
+    stageProvided,
+    caseTypeProvided,
+  });
+  if (!stageResolved.ok) {
+    return jsonFail("VALIDATION", stageResolved.message, 400);
+  }
+
   const before = pickAuditFields(item as Record<string, unknown>, CASE_AUDIT_KEYS);
 
   const primaryAdvocateMobile =
@@ -171,7 +190,7 @@ export const PATCH = apiHandler(async (request, context) => {
       underActs: input.underActs === "" ? null : input.underActs,
       policeStation: input.policeStation === "" ? null : input.policeStation,
       firNumber: input.firNumber === "" ? null : input.firNumber,
-      stage: input.stage === "" ? null : input.stage,
+      stage: stageProvided || caseTypeProvided ? stageResolved.stage : undefined,
       caseType: input.caseType === "" ? null : input.caseType,
       status: nextStatus,
       filingDate: input.filingDate,
