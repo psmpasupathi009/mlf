@@ -52,6 +52,8 @@ export const PATCH = apiHandler(async (request, context) => {
 
   const nextRoles = input.roles ?? target.roles;
   const nextIsActive = input.isActive ?? target.isActive;
+  const nextCourts =
+    input.defaultCourts !== undefined ? input.defaultCourts : undefined;
 
   const manageMsg = requireAdminToManageAdmin(user, target);
   if (manageMsg) return jsonFail("FORBIDDEN", manageMsg, 403);
@@ -67,6 +69,20 @@ export const PATCH = apiHandler(async (request, context) => {
     return jsonFail("CONFLICT", "This is the last active admin — assign another admin first", 409);
   }
 
+  if (nextRoles.includes("advocate")) {
+    const courts =
+      nextCourts !== undefined
+        ? nextCourts
+        : toEmployeeSummary(target).defaultCourts;
+    if (courts.length === 0) {
+      return jsonFail(
+        "VALIDATION",
+        "Advocates need at least one default court",
+        400
+      );
+    }
+  }
+
   const before = pickAuditFields(target as Record<string, unknown>, EMPLOYEE_AUDIT_KEYS);
 
   const updated = await prisma.user.update({
@@ -78,9 +94,7 @@ export const PATCH = apiHandler(async (request, context) => {
       email: input.email === "" ? null : input.email,
       address: input.address === "" ? null : input.address,
       isActive: input.isActive,
-      ...(input.defaultCourts !== undefined
-        ? { defaultCourts: input.defaultCourts }
-        : {}),
+      ...(nextCourts !== undefined ? { defaultCourts: nextCourts } : {}),
     },
   });
 

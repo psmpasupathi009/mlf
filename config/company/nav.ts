@@ -87,6 +87,13 @@ export const navItems: NavItem[] = [
     permission: { module: "appointments", action: "view" },
   },
   {
+    href: "/court-roster",
+    label: "Court roster",
+    module: "employees",
+    group: "schedule",
+    permission: { module: "employees", action: "view" },
+  },
+  {
     href: "/accounts",
     label: "Accounts",
     module: "accounts",

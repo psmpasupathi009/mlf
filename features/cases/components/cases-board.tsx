@@ -56,7 +56,7 @@ function BoardColumn({
     <div
       ref={setNodeRef}
       className={cn(
-        "flex w-[15.5rem] shrink-0 flex-col rounded-xl border bg-muted/30",
+        "flex w-62 shrink-0 flex-col rounded-xl border bg-muted/30",
         highlight
           ? "border-brand bg-brand/5 ring-1 ring-brand/30"
           : "border-border/70"
@@ -158,7 +158,7 @@ export function CasesBoard({
         {Array.from({ length: 5 }).map((_, i) => (
           <div
             key={i}
-            className="h-64 w-[15.5rem] shrink-0 animate-pulse rounded-xl bg-muted"
+            className="h-64 w-62 shrink-0 animate-pulse rounded-xl bg-muted"
           />
         ))}
       </div>

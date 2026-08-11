@@ -17,6 +17,7 @@ export const idConfig = {
     officeTask: "TSK",
     notification: "NTF",
     holiday: "HOL",
+    courtDuty: "CDU",
   },
 } as const;
 

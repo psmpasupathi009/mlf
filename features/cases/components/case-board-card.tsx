@@ -104,7 +104,7 @@ export function CaseBoardCard({
 }: Props) {
   if (isDraggingOverlay) {
     return (
-      <div className="w-[14.5rem] rounded-lg border border-border/80 bg-card p-2.5 shadow-md ring-1 ring-brand/40">
+      <div className="w-58 rounded-lg border border-border/80 bg-card p-2.5 shadow-md ring-1 ring-brand/40">
         <CardBody caseItem={caseItem} canEdit={canEdit} showHandle={false} />
       </div>
     );

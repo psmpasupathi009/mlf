@@ -63,7 +63,7 @@ export function CaseCourtStatusStrip({
                   onClick={() => void select(opt.value)}
                   title={opt.label}
                   className={cn(
-                    "h-full max-w-[9rem] rounded-lg border px-2.5 py-2 text-left transition-colors",
+                    "h-full max-w-36 rounded-lg border px-2.5 py-2 text-left transition-colors",
                     isCurrent
                       ? "border-brand bg-brand text-brand-foreground shadow-sm"
                       : "border-border/80 bg-card text-muted-foreground hover:border-brand/50 hover:text-navy",

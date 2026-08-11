@@ -562,6 +562,31 @@ model OfficeHoliday {
   @@index([fromDate, toDate])
 }
 
+/// Temporary court cover: advocate X covers court Y for inclusive IST date range.
+/// Permanent follow lists stay on User.defaultCourts; this wins for effective cover on a date.
+model CourtDutyOverride {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  unitId         String   @unique
+  state          String
+  district       String
+  city           String
+  courtName      String
+  advocateUserId String   @db.ObjectId
+  advocateUnitId String
+  advocateMobile String
+  /// IST YYYY-MM-DD inclusive
+  fromDate       String
+  toDate         String
+  reason         String?
+  createdById    String?  @db.ObjectId
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([fromDate, toDate])
+  @@index([advocateUserId])
+  @@index([courtName])
+}
+
 /// In-app portal notifications (per logged-in user).
 model Notification {
   id         String    @id @default(auto()) @map("_id") @db.ObjectId

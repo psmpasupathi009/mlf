@@ -62,7 +62,7 @@ export function CasePipelineStrip({
         title={CASE_STATUS_LABEL[step]}
         className={cn(
           "h-full rounded-lg border px-2.5 py-2 text-left transition-colors",
-          opts.compact ? "min-w-[5rem]" : "min-w-[4.5rem] sm:min-w-[5.25rem]",
+          opts.compact ? "min-w-20" : "min-w-18 sm:min-w-21",
           isCurrent
             ? "border-brand bg-brand text-brand-foreground shadow-sm"
             : isPast

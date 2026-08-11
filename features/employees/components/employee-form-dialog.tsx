@@ -254,6 +254,14 @@ export function EmployeeFormDialog({
       setError("Select at least one role");
       return;
     }
+    if (roles.includes("advocate") && defaultCourts.length === 0) {
+      setError(
+        isEdit
+          ? "Advocates need at least one default court"
+          : "Add at least one default court for advocates"
+      );
+      return;
+    }
 
     setBusy(true);
     const payload = {
@@ -406,13 +414,23 @@ export function EmployeeFormDialog({
 
               <Section
                 title="3. Default courts"
-                description="First court is primary for new case prefills. Admin / manager edit only."
+                description={
+                  roles.includes("advocate")
+                    ? "Required for advocates. First court is primary for new case prefills."
+                    : "First court is primary for new case prefills. Optional for non-advocates."
+                }
               >
-                {defaultCourts.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No default courts yet. Add the courts this advocate usually appears in.
+                {roles.includes("advocate") && defaultCourts.length === 0 ? (
+                  <p className="text-sm text-amber-800 dark:text-amber-200">
+                    Add at least one court this advocate usually appears in.
                   </p>
-                ) : (
+                ) : null}
+                {defaultCourts.length === 0 && !roles.includes("advocate") ? (
+                  <p className="text-sm text-muted-foreground">
+                    No default courts yet. Add courts if this person follows any.
+                  </p>
+                ) : null}
+                {defaultCourts.length > 0 ? (
                   <ul className="space-y-2">
                     {defaultCourts.map((c, idx) => (
                       <li
@@ -482,7 +500,7 @@ export function EmployeeFormDialog({
                       </li>
                     ))}
                   </ul>
-                )}
+                ) : null}
                 <div className="space-y-2 border-t border-border/60 pt-3">
                   <CourtCascade
                     state={draftCourt.state}
