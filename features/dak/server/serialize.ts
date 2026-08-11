@@ -12,13 +12,15 @@ export type DakSummary = {
   trackingNo: string | null;
   caseUnitId: string | null;
   caseNumber: string | null;
+  clientUnitId: string | null;
+  clientName: string | null;
   notes: string | null;
   createdAt: string;
 };
 
 export function toDakSummary(
   item: DakEntry,
-  extras?: { caseNumber?: string | null }
+  extras?: { caseNumber?: string | null; clientName?: string | null }
 ): DakSummary {
   return {
     unitId: item.unitId,
@@ -31,6 +33,8 @@ export function toDakSummary(
     trackingNo: item.trackingNo,
     caseUnitId: item.caseUnitId,
     caseNumber: extras?.caseNumber ?? null,
+    clientUnitId: item.clientUnitId,
+    clientName: extras?.clientName ?? null,
     notes: item.notes,
     createdAt: item.createdAt.toISOString(),
   };

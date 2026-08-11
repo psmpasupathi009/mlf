@@ -25,6 +25,7 @@ import {
 import { DatePicker } from "@/shared/components/forms/date-picker";
 import { FormError } from "@/shared/components/feedback/form-error";
 import { CasePicker } from "@/features/cases/components/case-picker";
+import { ClientPicker } from "@/features/clients/components/client-picker";
 import { apiFetch, getErrorMessage } from "@/lib/api/client";
 import type { DakSummary } from "@/features/dak/server/serialize";
 import {
@@ -52,6 +53,10 @@ export function DakFormDialog({ open, onOpenChange, entry, onSaved }: Props) {
     unitId: string;
     label: string;
   } | null>(null);
+  const [clientLink, setClientLink] = useState<{
+    unitId: string;
+    name: string;
+  } | null>(null);
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -75,6 +80,14 @@ export function DakFormDialog({ open, onOpenChange, entry, onSaved }: Props) {
             }
           : null
       );
+      setClientLink(
+        entry.clientUnitId
+          ? {
+              unitId: entry.clientUnitId,
+              name: entry.clientName || entry.clientUnitId,
+            }
+          : null
+      );
       setNotes(entry.notes ?? "");
     } else {
       setDirection("in");
@@ -84,6 +97,7 @@ export function DakFormDialog({ open, onOpenChange, entry, onSaved }: Props) {
       setMode("");
       setTrackingNo("");
       setCaseLink(null);
+      setClientLink(null);
       setNotes("");
     }
     setError("");
@@ -109,6 +123,7 @@ export function DakFormDialog({ open, onOpenChange, entry, onSaved }: Props) {
       mode: mode || "",
       trackingNo: trackingNo.trim() || "",
       caseUnitId: caseLink?.unitId ?? "",
+      clientUnitId: clientLink?.unitId ?? "",
       notes: notes.trim() || "",
     };
 
@@ -222,6 +237,13 @@ export function DakFormDialog({ open, onOpenChange, entry, onSaved }: Props) {
           </div>
 
           <CasePicker value={caseLink} onChange={setCaseLink} />
+
+          <ClientPicker
+            value={clientLink}
+            onChange={setClientLink}
+            label="Client (optional)"
+            placeholder="Link a client…"
+          />
 
           <div className="grid gap-2">
             <Label>Notes</Label>

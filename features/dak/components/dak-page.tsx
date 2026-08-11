@@ -331,9 +331,14 @@ export function DakPage({ user }: { user: PublicUser }) {
                             {row.fromTo || "—"}
                             {row.trackingNo ? ` · ${row.trackingNo}` : ""}
                           </p>
-                          {row.caseUnitId ? (
+                          {row.caseUnitId || row.clientUnitId ? (
                             <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                              {row.caseNumber || row.caseUnitId}
+                              {[
+                                row.caseNumber || row.caseUnitId,
+                                row.clientName || row.clientUnitId,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ")}
                             </p>
                           ) : null}
                         </div>

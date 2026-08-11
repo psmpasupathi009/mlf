@@ -216,9 +216,9 @@ Static PDFs: `GET /api/office-files/[slug]` (logged-in).
 
 **Purpose:** In/out postal register.
 
-**IDs:** `DAK` · soft `caseUnitId` / `clientUnitId` (no ObjectId FKs) · optional `trackingNo`
+**IDs:** `DAK` · soft `caseUnitId` / `clientUnitId` (no ObjectId FKs; validated on write) · optional `trackingNo`
 
-**Path:** `/dak` → CRUD `/api/dak`. Soft links are display/filter hints — may dangle if case/client removed.
+**Path:** `/dak` → CRUD `/api/dak`. Form can link case and/or client; list shows both. Soft links are display/filter hints — may dangle if case/client removed.
 
 ### 12. HRMS
 

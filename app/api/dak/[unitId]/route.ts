@@ -43,6 +43,22 @@ export const PATCH = apiHandler(async (request, context) => {
     nextCaseUnitId = caseItem.unitId;
   }
 
+  let nextClientUnitId =
+    input.clientUnitId === undefined
+      ? undefined
+      : input.clientUnitId === ""
+        ? null
+        : input.clientUnitId;
+
+  if (typeof nextClientUnitId === "string") {
+    const client = await prisma.client.findUnique({
+      where: { unitId: nextClientUnitId },
+      select: { unitId: true },
+    });
+    if (!client) return jsonFail("VALIDATION", "Client not found", 400);
+    nextClientUnitId = client.unitId;
+  }
+
   const dakAuditKeys = [
     "direction",
     "entryDate",
@@ -72,6 +88,9 @@ export const PATCH = apiHandler(async (request, context) => {
         ? { trackingNo: input.trackingNo === "" ? null : input.trackingNo }
         : {}),
       ...(nextCaseUnitId !== undefined ? { caseUnitId: nextCaseUnitId } : {}),
+      ...(nextClientUnitId !== undefined
+        ? { clientUnitId: nextClientUnitId }
+        : {}),
       ...(input.notes !== undefined
         ? { notes: input.notes === "" ? null : input.notes }
         : {}),

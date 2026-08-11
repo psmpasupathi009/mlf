@@ -6,6 +6,7 @@ import { nextUnitId } from "@/lib/ids";
 import { writeAudit, pickAuditFields } from "@/lib/audit";
 import { createCaseSchema } from "@/lib/validations/cases.schema";
 import { toCaseSummary } from "@/features/cases/server/serialize";
+import type { Case } from "@prisma/client";
 import {
   buildCaseListWhere,
   parseCaseListFilters,
@@ -49,19 +50,60 @@ export const GET = apiHandler(async (request) => {
   const where = buildCaseListWhere(parseCaseListFilters(searchParams));
 
   const [rows, total] = await Promise.all([
-    prisma.case.findMany({ where, orderBy: { createdAt: "desc" }, skip, take: pageSize }),
+    prisma.case.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: pageSize,
+      select: {
+        id: true,
+        unitId: true,
+        clientId: true,
+        clientUnitId: true,
+        caseNumber: true,
+        filingNumber: true,
+        caseYear: true,
+        cnr: true,
+        state: true,
+        district: true,
+        city: true,
+        courtName: true,
+        advocateMobiles: true,
+        primaryAdvocateMobile: true,
+        opposingParty: true,
+        ourSide: true,
+        underActs: true,
+        policeStation: true,
+        firNumber: true,
+        stage: true,
+        caseType: true,
+        status: true,
+        filingDate: true,
+        nextHearingAt: true,
+        agreedFee: true,
+        notes: true,
+        filingChecklist: true,
+        battaDue: true,
+        awaitingService: true,
+        createdAt: true,
+        updatedAt: true,
+        createdById: true,
+      },
+    }),
     prisma.case.count({ where }),
   ]);
 
   const clientIds = Array.from(new Set(rows.map((r) => r.clientId)));
-  const clients = await prisma.client.findMany({
-    where: { id: { in: clientIds } },
-    select: { id: true, name: true, unitId: true },
-  });
+  const clients = clientIds.length
+    ? await prisma.client.findMany({
+        where: { id: { in: clientIds } },
+        select: { id: true, name: true, unitId: true },
+      })
+    : [];
   const clientMap = new Map(clients.map((c) => [c.id, c]));
 
   const data = rows.map((r) => ({
-    ...toCaseSummary(r),
+    ...toCaseSummary(r as Case),
     clientName: clientMap.get(r.clientId)?.name ?? null,
   }));
 

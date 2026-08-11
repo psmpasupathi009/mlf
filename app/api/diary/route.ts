@@ -25,15 +25,17 @@ export const GET = apiHandler(async (request) => {
   const { user, response } = await requireUser(request);
   if (!user) return response;
 
-  const canCases =
-    isModuleEnabled("cases") &&
-    (await hasPermission(user.id, "cases", "view"));
-  const canAppointments =
-    isModuleEnabled("appointments") &&
-    (await hasPermission(user.id, "appointments", "view"));
-  const canTasks =
-    isModuleEnabled("tasks") &&
-    (await hasPermission(user.id, "tasks", "view"));
+  const [canCases, canAppointments, canTasks] = await Promise.all([
+    isModuleEnabled("cases")
+      ? hasPermission(user.id, "cases", "view")
+      : Promise.resolve(false),
+    isModuleEnabled("appointments")
+      ? hasPermission(user.id, "appointments", "view")
+      : Promise.resolve(false),
+    isModuleEnabled("tasks")
+      ? hasPermission(user.id, "tasks", "view")
+      : Promise.resolve(false),
+  ]);
 
   if (!canCases && !canAppointments && !canTasks) {
     return jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403);

@@ -35,6 +35,7 @@ export const GET = apiHandler(async (request) => {
             { trackingNo: containsInsensitive(q) },
             { unitId: containsInsensitive(q) },
             { caseUnitId: containsInsensitive(q) },
+            { clientUnitId: containsInsensitive(q) },
             { notes: containsInsensitive(q) },
           ],
         }
@@ -54,18 +55,33 @@ export const GET = apiHandler(async (request) => {
   const caseUnitIds = [
     ...new Set(rows.map((r) => r.caseUnitId).filter(Boolean) as string[]),
   ];
-  const cases = caseUnitIds.length
-    ? await prisma.case.findMany({
-        where: { unitId: { in: caseUnitIds } },
-        select: { unitId: true, caseNumber: true },
-      })
-    : [];
+  const clientUnitIds = [
+    ...new Set(rows.map((r) => r.clientUnitId).filter(Boolean) as string[]),
+  ];
+  const [cases, clients] = await Promise.all([
+    caseUnitIds.length
+      ? prisma.case.findMany({
+          where: { unitId: { in: caseUnitIds } },
+          select: { unitId: true, caseNumber: true },
+        })
+      : Promise.resolve([]),
+    clientUnitIds.length
+      ? prisma.client.findMany({
+          where: { unitId: { in: clientUnitIds } },
+          select: { unitId: true, name: true },
+        })
+      : Promise.resolve([]),
+  ]);
   const caseMap = new Map(cases.map((c) => [c.unitId, c.caseNumber]));
+  const clientMap = new Map(clients.map((c) => [c.unitId, c.name]));
 
   return jsonOkList(
     rows.map((r) =>
       toDakSummary(r, {
         caseNumber: r.caseUnitId ? caseMap.get(r.caseUnitId) ?? null : null,
+        clientName: r.clientUnitId
+          ? clientMap.get(r.clientUnitId) ?? null
+          : null,
       })
     ),
     { page, pageSize, total }

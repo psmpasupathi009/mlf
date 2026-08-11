@@ -7,6 +7,7 @@ Local / CI helpers. Run from repo root with `npx tsx scripts/<name>.ts` (or the 
 | `db-ping.ts` | Verify `DATABASE_URL` / Prisma can reach Mongo |
 | `full-audit.ts` | Broader consistency checks |
 | `smoke-confidence.ts` | HTTP smoke against a running app |
+| `backfill-appointment-client-ids.ts` | Set `Appointment.clientId` where only `clientUnitId` was stored |
 
 ## Smoke env
 

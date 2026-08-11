@@ -48,7 +48,35 @@ export const GET = apiHandler(async (request) => {
     : {};
 
   const [rows, total] = await Promise.all([
-    prisma.client.findMany({ where, orderBy: { createdAt: "desc" }, skip, take: pageSize }),
+    prisma.client.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: pageSize,
+      select: {
+        id: true,
+        unitId: true,
+        name: true,
+        fatherOrSpouse: true,
+        occupation: true,
+        gender: true,
+        mobile: true,
+        altMobile: true,
+        email: true,
+        address: true,
+        city: true,
+        district: true,
+        state: true,
+        aadhaarLast4: true,
+        referredBy: true,
+        matterBrief: true,
+        notes: true,
+        smsConsent: true,
+        createdAt: true,
+        updatedAt: true,
+        createdById: true,
+      },
+    }),
     prisma.client.count({ where }),
   ]);
 

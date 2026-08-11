@@ -11,10 +11,14 @@ export function ClientPicker({
   value,
   onChange,
   label = "Client",
+  placeholder = "Filter by client…",
+  searchPlaceholder = "Search client by name or mobile…",
 }: {
   value: { unitId: string; name: string } | null;
   onChange: (client: { unitId: string; name: string } | null) => void;
   label?: string;
+  placeholder?: string;
+  searchPlaceholder?: string;
 }) {
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -55,8 +59,8 @@ export function ClientPicker({
             </span>
           </span>
         )}
-        placeholder="Filter by client…"
-        searchPlaceholder="Search client by name or mobile…"
+        placeholder={placeholder}
+        searchPlaceholder={searchPlaceholder}
         clearable={Boolean(value)}
         clearLabel="Clear client"
         footer={
