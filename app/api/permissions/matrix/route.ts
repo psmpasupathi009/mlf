@@ -4,17 +4,22 @@ import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
 import { writeAudit, type AuditChangeMap } from "@/lib/audit";
 import { ensureDefaultPermissions } from "@/lib/rbac";
-import { PERMISSION_CATALOG } from "@/config/company/permissions-defaults";
+import {
+  EMPLOYEE_ROLES,
+  PERMISSION_CATALOG,
+} from "@/config/company/permissions-defaults";
 import { permissionsMatrixPutSchema } from "@/lib/validations/employees.schema";
 
-const ALL_ROLES: UserRole[] = ["admin", "sub_admin", "staff", "advocate", "accountant"];
+const ALL_ROLES: UserRole[] = [...EMPLOYEE_ROLES];
 
 export const GET = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "permissions", "view");
   if (!user) return response;
 
   const didSeed = await ensureDefaultPermissions();
-  const rows = await prisma.rolePermission.findMany();
+  const rows = await prisma.rolePermission.findMany({
+    where: { role: { in: ALL_ROLES } },
+  });
 
   const map = new Map<string, boolean>();
   for (const row of rows) {

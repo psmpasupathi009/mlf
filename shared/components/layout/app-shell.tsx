@@ -17,6 +17,7 @@ export function AppShell({ user, children }: AppShellProps) {
       <SidebarInset className="bg-background print:bg-white">
         <SiteHeader
           brandName={brand.name}
+          user={user}
           className="print:hidden"
         />
         <main className="min-w-0 flex-1 overflow-x-auto print:overflow-visible">

@@ -4,11 +4,15 @@ import { prisma } from "@/lib/db/prisma";
 import { writeAudit, pickAuditFields, diffAudit } from "@/lib/audit";
 import {
   canBookForAnyAdvocate,
+  canViewAnyAdvocateDiary,
   resolveBookingAdvocateMobile,
 } from "@/lib/appointments/booking-rules";
 import { assertSlotBookable } from "@/lib/appointments/availability";
 import { updateAppointmentSchema } from "@/lib/validations/appointments.schema";
 import { enrichAppointment } from "@/features/appointments/server/enrich";
+import { isClientOnlyUser } from "@/lib/auth/client-portal";
+import { requireClientUnitId } from "@/lib/auth/client-scope";
+import type { UserRole } from "@prisma/client";
 
 const APPOINTMENT_AUDIT_KEYS = [
   "title",
@@ -23,6 +27,24 @@ const APPOINTMENT_AUDIT_KEYS = [
   "status",
 ] as const;
 
+function canAccessAppointment(
+  user: {
+    roles: UserRole[];
+    mobile: string;
+    clientUnitId?: string | null;
+  },
+  item: { advocateMobile: string | null; clientUnitId: string | null }
+): boolean {
+  if (isClientOnlyUser(user.roles)) {
+    const cid = requireClientUnitId(user);
+    return Boolean(cid && item.clientUnitId === cid);
+  }
+  if (canViewAnyAdvocateDiary(user.roles)) return true;
+  const ten = user.mobile.replace(/\D/g, "").slice(-10);
+  const aptTen = (item.advocateMobile ?? "").replace(/\D/g, "").slice(-10);
+  return !aptTen || aptTen === ten;
+}
+
 export const GET = apiHandler(async (request, context) => {
   const { user, response } = await requirePerm(request, "appointments", "view");
   if (!user) return response;
@@ -33,15 +55,15 @@ export const GET = apiHandler(async (request, context) => {
     : null;
   if (!item) return jsonFail("NOT_FOUND", "Appointment not found", 404);
 
-  if (!canBookForAnyAdvocate(user.roles)) {
-    const ten = user.mobile.replace(/\D/g, "").slice(-10);
-    const aptTen = (item.advocateMobile ?? "").replace(/\D/g, "").slice(-10);
-    if (aptTen && aptTen !== ten) {
-      return jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403);
-    }
+  if (!canAccessAppointment(user, item)) {
+    return jsonFail("NOT_FOUND", "Appointment not found", 404);
   }
 
-  return jsonOk({ appointment: await enrichAppointment(item) });
+  return jsonOk({
+    appointment: await enrichAppointment(item, {
+      stripNotes: isClientOnlyUser(user.roles),
+    }),
+  });
 });
 
 export const PATCH = apiHandler(async (request, context) => {
@@ -67,12 +89,47 @@ export const PATCH = apiHandler(async (request, context) => {
     : null;
   if (!item) return jsonFail("NOT_FOUND", "Appointment not found", 404);
 
-  if (!canBookForAnyAdvocate(user.roles)) {
-    const ten = user.mobile.replace(/\D/g, "").slice(-10);
-    const aptTen = (item.advocateMobile ?? "").replace(/\D/g, "").slice(-10);
-    if (aptTen && aptTen !== ten) {
-      return jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403);
+  if (!canAccessAppointment(user, item)) {
+    return jsonFail("NOT_FOUND", "Appointment not found", 404);
+  }
+
+  if (isClientOnlyUser(user.roles)) {
+    if (action !== "cancel" || input.status !== "cancelled") {
+      return jsonFail(
+        "FORBIDDEN",
+        "Clients can cancel appointments only. Contact the office to reschedule.",
+        403
+      );
     }
+    if (item.status !== "scheduled") {
+      return jsonFail(
+        "VALIDATION",
+        "Only scheduled appointments can be cancelled",
+        400
+      );
+    }
+    const updated = await prisma.appointment.update({
+      where: { id: item.id },
+      data: { status: "cancelled" },
+    });
+    const before = pickAuditFields(
+      item as Record<string, unknown>,
+      APPOINTMENT_AUDIT_KEYS
+    );
+    const after = pickAuditFields(
+      updated as Record<string, unknown>,
+      APPOINTMENT_AUDIT_KEYS
+    );
+    await writeAudit({
+      actorUnitId: user.unitId,
+      action: "appointment.cancel",
+      entity: "Appointment",
+      entityUnitId: updated.unitId,
+      meta: { before, after, changes: diffAudit(before, after) },
+    });
+    return jsonOk({
+      appointment: await enrichAppointment(updated, { stripNotes: true }),
+    });
   }
 
   let clientId: string | null | undefined = undefined;

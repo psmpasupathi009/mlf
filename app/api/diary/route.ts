@@ -1,5 +1,5 @@
 import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
-import { requireUser } from "@/lib/api/guard";
+import { requireStaffUser } from "@/lib/api/guard";
 import { hasPermission } from "@/lib/rbac";
 import { isModuleEnabled } from "@/config/company/modules";
 import { prisma } from "@/lib/db/prisma";
@@ -23,7 +23,7 @@ function mobileMatchKeys(mobile: string): string[] {
 }
 
 export const GET = apiHandler(async (request) => {
-  const { user, response } = await requireUser(request);
+  const { user, response } = await requireStaffUser(request);
   if (!user) return response;
 
   const [canCases, canAppointments, canTasks] = await Promise.all([

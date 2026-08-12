@@ -29,6 +29,7 @@ import {
 import { brand } from "@/config/company/brand";
 import { isModuleEnabled, type AppModule } from "@/config/company/modules";
 import type { PublicUser } from "@/lib/auth/session";
+import { isClientOnlyUser } from "@/lib/auth/client-portal";
 import { UserMenu } from "@/shared/components/layout/user-menu";
 import {
   Sidebar,
@@ -69,6 +70,7 @@ const ICONS: Partial<
 function iconForHref(href: string, module: AppModule) {
   if (href === "/availability") return Clock3;
   if (href === "/diary") return BookOpen;
+  if (href === "/documents") return FileInput;
   return ICONS[module] ?? Home;
 }
 
@@ -104,7 +106,10 @@ export function SiteSidebar({ user }: { user: PublicUser }) {
     if (isMobile) setOpenMobile(false);
   };
 
+  const isClient = isClientOnlyUser(user.roles);
   const items = navItems.filter((item) => {
+    if (item.clientOnly && !isClient) return false;
+    if (item.staffOnly && isClient) return false;
     if (item.gates?.length) {
       return item.gates.some(
         (g) => isModuleEnabled(g.module) && perms.has(g.permission)

@@ -57,10 +57,12 @@ function formatLastLogin(iso: string | null) {
   }
 }
 
-const ROLE_FILTER_OPTIONS = (Object.keys(ROLE_LABELS) as UserRole[]).map((value) => ({
-  value,
-  label: ROLE_LABELS[value],
-}));
+const ROLE_FILTER_OPTIONS = (Object.keys(ROLE_LABELS) as UserRole[])
+  .filter((value) => value !== "client")
+  .map((value) => ({
+    value,
+    label: ROLE_LABELS[value],
+  }));
 
 export function EmployeesPage({ user }: { user: PublicUser }) {
   const can = (action: string) => user.permissions.includes(`employees.${action}`);

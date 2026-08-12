@@ -19,6 +19,11 @@ import {
 } from "@/features/cases/server/filters";
 import { normalizeMobile } from "@/lib/auth/mobile";
 import { resolveStageForSave } from "@/config/company/case-stages";
+import { isClientOnlyUser } from "@/lib/auth/client-portal";
+import {
+  requireClientUnitId,
+  toClientCaseSummary,
+} from "@/lib/auth/client-scope";
 
 /** Board view may load more cards than the list page size cap. */
 const BOARD_MAX_PAGE_SIZE = 200;
@@ -58,6 +63,15 @@ export const GET = apiHandler(async (request) => {
 
   const { searchParams } = new URL(request.url);
   const filters = parseCaseListFilters(searchParams);
+
+  if (isClientOnlyUser(user.roles)) {
+    const cid = requireClientUnitId(user);
+    if (!cid) {
+      return jsonFail("FORBIDDEN", "Client portal link is missing.", 403);
+    }
+    filters.clientUnitId = cid;
+  }
+
   const isBoard = filters.view === "board";
   const { page, pageSize, skip } = isBoard
     ? (() => {
@@ -124,8 +138,11 @@ export const GET = apiHandler(async (request) => {
     : [];
   const clientMap = new Map(clients.map((c) => [c.id, c]));
 
+  const clientActor = isClientOnlyUser(user.roles);
   const data = rows.map((r) => ({
-    ...toCaseSummary(r as Case),
+    ...(clientActor
+      ? toClientCaseSummary(r as Case)
+      : toCaseSummary(r as Case)),
     clientName: clientMap.get(r.clientId)?.name ?? null,
   }));
 
@@ -135,6 +152,10 @@ export const GET = apiHandler(async (request) => {
 export const POST = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "cases", "create");
   if (!user) return response;
+
+  if (isClientOnlyUser(user.roles)) {
+    return jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403);
+  }
 
   const raw = await request.json();
   const parsed = createCaseSchema.safeParse(raw);

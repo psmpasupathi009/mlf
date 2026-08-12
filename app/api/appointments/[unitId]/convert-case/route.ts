@@ -8,6 +8,7 @@ import { displayMobile } from "@/lib/auth/mobile";
 import { canBookForAnyAdvocate } from "@/lib/appointments/booking-rules";
 import { enrichAppointment } from "@/features/appointments/server/enrich";
 import { toCaseSummary } from "@/features/cases/server/serialize";
+import { isClientOnlyUser } from "@/lib/auth/client-portal";
 
 /**
  * Convert a consultation appointment into an enquiry case and link them.
@@ -21,6 +22,10 @@ export const POST = apiHandler(async (request, context) => {
 
   const { user, response } = await requireUser(request);
   if (!user) return response;
+
+  if (isClientOnlyUser(user.roles)) {
+    return jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403);
+  }
 
   const canEditApt = await hasPermission(user.id, "appointments", "edit");
   const canCreateCase = await hasPermission(user.id, "cases", "create");

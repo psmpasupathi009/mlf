@@ -5,7 +5,10 @@ import { personDisplayName } from "@/shared/lib/person";
 import { userPhotoUrl } from "@/lib/auth/user-photo";
 
 /** Attach client + advocate display fields for list/detail responses. */
-export async function enrichAppointments(rows: Appointment[]) {
+export async function enrichAppointments(
+  rows: Appointment[],
+  opts?: { stripNotes?: boolean }
+) {
   if (rows.length === 0) return [];
 
   const clientUnitIds = [
@@ -68,7 +71,7 @@ export async function enrichAppointments(rows: Appointment[]) {
       ? advocateByMobile.get(r.advocateMobile) ??
         advocateByMobile.get(r.advocateMobile.replace(/\D/g, "").slice(-10))
       : undefined;
-    return toAppointmentSummary(r, {
+    const summary = toAppointmentSummary(r, {
       clientName: r.clientUnitId
         ? clientByUnit.get(r.clientUnitId) ?? null
         : null,
@@ -76,10 +79,17 @@ export async function enrichAppointments(rows: Appointment[]) {
       advocatePhotoUrl: adv?.photoUrl ?? null,
       advocateUnitId: adv?.unitId ?? null,
     });
+    if (opts?.stripNotes) {
+      return { ...summary, notes: null };
+    }
+    return summary;
   });
 }
 
-export async function enrichAppointment(row: Appointment) {
-  const [enriched] = await enrichAppointments([row]);
+export async function enrichAppointment(
+  row: Appointment,
+  opts?: { stripNotes?: boolean }
+) {
+  const [enriched] = await enrichAppointments([row], opts);
   return enriched!;
 }

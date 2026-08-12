@@ -20,6 +20,11 @@ import {
   scheduleNotify,
 } from "@/lib/notifications/notify";
 import { normalizeMobile } from "@/lib/auth/mobile";
+import { isClientOnlyUser } from "@/lib/auth/client-portal";
+import {
+  requireClientUnitId,
+  toClientCaseSummary,
+} from "@/lib/auth/client-scope";
 
 const CASE_AUDIT_KEYS = [
   "caseNumber",
@@ -62,6 +67,13 @@ export const GET = apiHandler(async (request, context) => {
   const item = unitId ? await prisma.case.findUnique({ where: { unitId } }) : null;
   if (!item) return jsonFail("NOT_FOUND", "Case not found", 404);
 
+  if (isClientOnlyUser(user.roles)) {
+    const cid = requireClientUnitId(user);
+    if (!cid || item.clientUnitId !== cid) {
+      return jsonFail("NOT_FOUND", "Case not found", 404);
+    }
+  }
+
   const [client, hearings, documents] = await Promise.all([
     prisma.client.findUnique({ where: { id: item.clientId } }),
     prisma.hearing.findMany({
@@ -76,17 +88,41 @@ export const GET = apiHandler(async (request, context) => {
     }),
   ]);
 
+    const clientActor = isClientOnlyUser(user.roles);
   return jsonOk({
-    case: toCaseSummary(item),
-    client: client ? toClientSummary(client) : null,
-    hearings: hearings.map(toHearingSummary),
-    documents: documents.map(toDocumentSummary),
+    case: clientActor ? toClientCaseSummary(item) : toCaseSummary(item),
+    client: client
+      ? clientActor
+        ? {
+            unitId: client.unitId,
+            name: client.name,
+            mobile: client.mobile,
+          }
+        : toClientSummary(client)
+      : null,
+    hearings: hearings.map((h) => {
+      const summary = toHearingSummary(h);
+      if (!clientActor) return summary;
+      return { ...summary, notes: null, outcome: summary.outcome };
+    }),
+    documents: documents
+      .filter((d) => {
+        if (!clientActor) return true;
+        // Hide fee receipts / expense bills from client portal
+        if (d.docType === "receipt" || d.expenseUnitId) return false;
+        return true;
+      })
+      .map(toDocumentSummary),
   });
 });
 
 export const PATCH = apiHandler(async (request, context) => {
   const { user, response } = await requirePerm(request, "cases", "edit");
   if (!user) return response;
+
+  if (isClientOnlyUser(user.roles)) {
+    return jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403);
+  }
 
   const { unitId } = (await context.params) ?? {};
   const item = unitId ? await prisma.case.findUnique({ where: { unitId } }) : null;

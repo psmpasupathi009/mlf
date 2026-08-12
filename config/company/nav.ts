@@ -19,6 +19,10 @@ export type NavItem = {
    * Used for Day board (cases | appointments | tasks).
    */
   gates?: Array<{ module: AppModule; permission: string }>;
+  /** Only client portal users see this item. */
+  clientOnly?: boolean;
+  /** Hide from client portal users even when they hold the permission. */
+  staffOnly?: boolean;
 };
 
 export const NAV_GROUP_LABELS: Record<NavGroupId, string> = {
@@ -52,6 +56,7 @@ export const navItems: NavItem[] = [
     module: "clients",
     group: "matters",
     permission: { module: "clients", action: "view" },
+    staffOnly: true,
   },
   {
     href: "/cases",
@@ -66,11 +71,20 @@ export const navItems: NavItem[] = [
     module: "cases",
     group: "matters",
     permission: { module: "cases", action: "view" },
+    staffOnly: true,
     gates: [
       { module: "cases", permission: "cases.view" },
       { module: "appointments", permission: "appointments.view" },
       { module: "tasks", permission: "tasks.view" },
     ],
+  },
+  {
+    href: "/documents",
+    label: "Documents",
+    module: "cases",
+    group: "matters",
+    permission: { module: "cases", action: "upload" },
+    clientOnly: true,
   },
   {
     href: "/appointments",
@@ -85,6 +99,7 @@ export const navItems: NavItem[] = [
     module: "appointments",
     group: "schedule",
     permission: { module: "appointments", action: "view" },
+    staffOnly: true,
   },
   {
     href: "/court-roster",
@@ -92,6 +107,7 @@ export const navItems: NavItem[] = [
     module: "employees",
     group: "schedule",
     permission: { module: "employees", action: "view" },
+    staffOnly: true,
   },
   {
     href: "/accounts",
@@ -99,6 +115,7 @@ export const navItems: NavItem[] = [
     module: "accounts",
     group: "office",
     permission: { module: "accounts", action: "view" },
+    staffOnly: true,
   },
   {
     href: "/expenses",
@@ -106,6 +123,7 @@ export const navItems: NavItem[] = [
     module: "expenses",
     group: "office",
     permission: { module: "expenses", action: "view" },
+    staffOnly: true,
   },
   {
     href: "/hrms",
@@ -113,6 +131,7 @@ export const navItems: NavItem[] = [
     module: "hrms",
     group: "office",
     permission: { module: "hrms", action: "view" },
+    staffOnly: true,
   },
   {
     href: "/dak",
@@ -120,6 +139,7 @@ export const navItems: NavItem[] = [
     module: "dak",
     group: "office",
     permission: { module: "dak", action: "view" },
+    staffOnly: true,
   },
   {
     href: "/tasks",
@@ -127,6 +147,7 @@ export const navItems: NavItem[] = [
     module: "tasks",
     group: "office",
     permission: { module: "tasks", action: "view" },
+    staffOnly: true,
   },
   {
     href: "/reports",
@@ -134,6 +155,7 @@ export const navItems: NavItem[] = [
     module: "reports",
     group: "office",
     permission: { module: "reports", action: "view" },
+    staffOnly: true,
   },
   {
     href: "/employees",
@@ -141,6 +163,7 @@ export const navItems: NavItem[] = [
     module: "employees",
     group: "admin",
     permission: { module: "employees", action: "view" },
+    staffOnly: true,
   },
   {
     href: "/activity",
@@ -148,6 +171,7 @@ export const navItems: NavItem[] = [
     module: "activity",
     group: "admin",
     permission: { module: "activity", action: "view" },
+    staffOnly: true,
   },
   {
     href: "/permissions",
@@ -155,5 +179,6 @@ export const navItems: NavItem[] = [
     module: "permissions",
     group: "admin",
     permission: { module: "permissions", action: "view" },
+    staffOnly: true,
   },
 ];

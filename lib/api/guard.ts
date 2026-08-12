@@ -1,6 +1,7 @@
 import type { NextResponse } from "next/server";
 import type { User } from "@prisma/client";
 import { getCurrentUser } from "@/lib/auth/session";
+import { clientUnitIdOf, isClientOnlyUser } from "@/lib/auth/client-portal";
 import { hasPermission, requireModuleEnabled } from "@/lib/rbac";
 import { jsonFail } from "@/lib/api/response";
 import { modules, type AppModule } from "@/config/company/modules";
@@ -59,6 +60,57 @@ export async function requireRole(
 
   const ok = user.roles.some((r) => roles.includes(r));
   if (!ok) {
+    return {
+      user: null,
+      response: jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403),
+    };
+  }
+  return { user, response: null };
+}
+
+/**
+ * Client portal actor with a linked Client.unitId.
+ * Returns 403 if the user is not a pure client session (or missing link).
+ */
+export async function requireClientScope(
+  request: Request
+): Promise<
+  | { user: User; clientUnitId: string; response: null }
+  | { user: null; clientUnitId: null; response: NextResponse }
+> {
+  const { user, response } = await requireUser(request);
+  if (!user) {
+    return { user: null, clientUnitId: null, response };
+  }
+  if (!isClientOnlyUser(user.roles)) {
+    return {
+      user: null,
+      clientUnitId: null,
+      response: jsonFail("FORBIDDEN", "Client portal access only.", 403),
+    };
+  }
+  const clientUnitId = clientUnitIdOf(user);
+  if (!clientUnitId) {
+    return {
+      user: null,
+      clientUnitId: null,
+      response: jsonFail(
+        "FORBIDDEN",
+        "Client portal link is missing. Ask the office to re-invite you.",
+        403
+      ),
+    };
+  }
+  return { user, clientUnitId, response: null };
+}
+
+/** Staff-only: reject pure client sessions. */
+export async function requireStaffUser(
+  request: Request
+): Promise<GuardResult> {
+  const { user, response } = await requireUser(request);
+  if (!user) return { user: null, response };
+  if (isClientOnlyUser(user.roles)) {
     return {
       user: null,
       response: jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403),

@@ -42,6 +42,7 @@ import { SelectOrOther } from "@/shared/components/forms/select-or-other";
 import { AvailabilitySlotPicker } from "@/features/availability/components/availability-slot-picker";
 import type { PublicUser } from "@/lib/auth/session";
 import { canBookForAnyAdvocate } from "@/lib/appointments/booking-rules";
+import { isClientOnlyUser } from "@/lib/auth/client-portal";
 import { displayMobile } from "@/lib/auth/mobile";
 import { PersonChip } from "@/shared/components/user/person-chip";
 import { personDisplayName } from "@/shared/lib/person";
@@ -123,13 +124,20 @@ function FormSection({
 function ModePicker({
   value,
   onChange,
+  options = APPOINTMENT_MODE_OPTIONS,
 }: {
   value: string;
   onChange: (v: string) => void;
+  options?: readonly { value: string; label: string }[];
 }) {
   return (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-      {APPOINTMENT_MODE_OPTIONS.map((m) => {
+    <div
+      className={cn(
+        "grid grid-cols-1 gap-2",
+        options.length >= 3 ? "sm:grid-cols-3" : "sm:grid-cols-2"
+      )}
+    >
+      {options.map((m) => {
         const active = value === m.value;
         return (
           <button
@@ -170,6 +178,10 @@ export function AppointmentFormDialog({
   const isEditOnly = formMode === "edit";
   const isReschedule = formMode === "reschedule";
   const bookAny = canBookForAnyAdvocate(user.roles);
+  const clientPortal = isClientOnlyUser(user.roles);
+  const modeOptions = clientPortal
+    ? APPOINTMENT_MODE_OPTIONS.filter((m) => m.value !== "video")
+    : APPOINTMENT_MODE_OPTIONS;
   const selfMobile10 = tenDigit(user.mobile);
 
   const [client, setClient] = useState<{ unitId: string; name: string } | null>(
@@ -198,12 +210,17 @@ export function AppointmentFormDialog({
     if (!open) return;
     queueMicrotask(() => {
       setClient(
-        appointment?.clientUnitId
+        clientPortal && user.clientUnitId
           ? {
-              unitId: appointment.clientUnitId,
-              name: appointment.clientName ?? appointment.clientUnitId,
+              unitId: user.clientUnitId,
+              name: user.name ?? user.clientUnitId,
             }
-          : null
+          : appointment?.clientUnitId
+            ? {
+                unitId: appointment.clientUnitId,
+                name: appointment.clientName ?? appointment.clientUnitId,
+              }
+            : null
       );
       setLinkedCase(
         appointment?.caseUnitId
@@ -240,7 +257,7 @@ export function AppointmentFormDialog({
       setNotes(appointment?.notes ?? "");
       setError("");
     });
-  }, [open, appointment, bookAny, selfMobile10]);
+  }, [open, appointment, bookAny, selfMobile10, clientPortal, user.clientUnitId, user.name]);
 
   const originalAdvocate = useMemo(() => {
     if (!appointment?.advocateMobile) return null;
@@ -352,7 +369,9 @@ export function AppointmentFormDialog({
       : "Pick a new free slot on your diary. Ask office staff to hand off to another advocate."
     : isEditOnly
       ? "Update client, title, mode, or notes. Use Reschedule to change advocate or time."
-      : "Client called — book into the advocate diary. Only free slots are shown.";
+      : clientPortal
+        ? "Book an office visit or phone call with an advocate. Only free slots are shown."
+        : "Client called — book into the advocate diary. Only free slots are shown.";
 
   const submitLabel = busy
     ? "Saving…"
@@ -500,17 +519,31 @@ export function AppointmentFormDialog({
             <FormSection
               step={1}
               title="Client & purpose"
-              description="Who called, and why"
+              description={
+                clientPortal
+                  ? "What is this appointment for?"
+                  : "Who called, and why"
+              }
             >
               <div className="grid gap-4 md:grid-cols-2">
-                <ClientPicker
-                  value={client}
-                  onChange={(c) => {
-                    setClient(c);
-                    setScheduledAt("");
-                  }}
-                  label="Client (recommended for call-ins)"
-                />
+                {clientPortal ? (
+                  <div className="grid gap-2">
+                    <Label>You</Label>
+                    <p className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2.5 text-sm text-navy">
+                      {user.name ?? "Client"}
+                      {user.clientUnitId ? ` · ${user.clientUnitId}` : ""}
+                    </p>
+                  </div>
+                ) : (
+                  <ClientPicker
+                    value={client}
+                    onChange={(c) => {
+                      setClient(c);
+                      setScheduledAt("");
+                    }}
+                    label="Client (recommended for call-ins)"
+                  />
+                )}
                 <div className="grid gap-2">
                   <Label>Title / purpose</Label>
                   <SelectOrOther
@@ -522,13 +555,15 @@ export function AppointmentFormDialog({
                     otherPlaceholder="Custom title"
                   />
                 </div>
-                <div className="md:col-span-2">
-                  <CasePicker
-                    value={linkedCase}
-                    onChange={setLinkedCase}
-                    clientUnitId={client?.unitId}
-                  />
-                </div>
+                {!clientPortal ? (
+                  <div className="md:col-span-2">
+                    <CasePicker
+                      value={linkedCase}
+                      onChange={setLinkedCase}
+                      clientUnitId={client?.unitId}
+                    />
+                  </div>
+                ) : null}
               </div>
             </FormSection>
           ) : null}
@@ -574,7 +609,11 @@ export function AppointmentFormDialog({
                 </div>
                 <div className="grid gap-2 md:col-span-2">
                   <Label>Mode</Label>
-                  <ModePicker value={mode} onChange={setMode} />
+                  <ModePicker
+                    value={mode}
+                    onChange={setMode}
+                    options={modeOptions}
+                  />
                 </div>
                 <div className="grid gap-2">
                   <Label>Duration</Label>
@@ -626,7 +665,11 @@ export function AppointmentFormDialog({
               <div className="grid gap-4">
                 <div className="grid gap-2">
                   <Label>Mode</Label>
-                  <ModePicker value={mode} onChange={setMode} />
+                  <ModePicker
+                    value={mode}
+                    onChange={setMode}
+                    options={modeOptions}
+                  />
                 </div>
                 <div className="grid gap-2 sm:max-w-xs">
                   <Label>Duration</Label>
@@ -719,7 +762,11 @@ export function AppointmentFormDialog({
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   rows={3}
-                  placeholder="Call-in notes, papers to bring…"
+                  placeholder={
+                    clientPortal
+                      ? "Anything the office should know…"
+                      : "Call-in notes, papers to bring…"
+                  }
                 />
               </div>
             </FormSection>

@@ -43,11 +43,13 @@ import { cn } from "@/lib/utils/cn";
 import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
 import { UnitIdBadge } from "@/shared/components/data/unit-id-badge";
 
-const ROLE_OPTIONS = (Object.keys(ROLE_LABELS) as UserRole[]).map((value) => ({
-  value,
-  label: ROLE_LABELS[value],
-  blurb: ROLE_BLURBS[value],
-}));
+const ROLE_OPTIONS = (Object.keys(ROLE_LABELS) as UserRole[])
+  .filter((value) => value !== "client")
+  .map((value) => ({
+    value,
+    label: ROLE_LABELS[value],
+    blurb: ROLE_BLURBS[value],
+  }));
 
 type PreviewResponse = {
   roles: string[];

@@ -10,13 +10,100 @@ import { documentUploadMetaSchema } from "@/lib/validations/documents.schema";
 import { toDocumentSummary } from "@/features/documents/server/serialize";
 import { rateLimit } from "@/lib/rate-limit";
 import { clientRateKey } from "@/lib/rate-limit/client-key";
+import {
+  CLIENT_UPLOAD_DOC_TYPES,
+  isClientOnlyUser,
+  isClientUploadDocType,
+} from "@/lib/auth/client-portal";
+import { requireClientUnitId } from "@/lib/auth/client-scope";
 
 export const GET = apiHandler(async (request) => {
   const { searchParams } = new URL(request.url);
   const { page, pageSize, skip } = parsePagination(searchParams);
-  const caseUnitId = searchParams.get("caseUnitId")?.trim();
-  const clientUnitId = searchParams.get("clientUnitId")?.trim();
-  const expenseUnitId = searchParams.get("expenseUnitId")?.trim();
+  let caseUnitId = searchParams.get("caseUnitId")?.trim() || undefined;
+  let clientUnitId = searchParams.get("clientUnitId")?.trim() || undefined;
+  const expenseUnitId = searchParams.get("expenseUnitId")?.trim() || undefined;
+
+  const { user, response } = await requireUser(request);
+  if (!user) return response;
+
+  if (isClientOnlyUser(user.roles)) {
+    const cid = requireClientUnitId(user);
+    if (!cid) {
+      return jsonFail("FORBIDDEN", "Client portal link is missing.", 403);
+    }
+    if (expenseUnitId) {
+      return jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403);
+    }
+    if (clientUnitId && clientUnitId !== cid) {
+      return jsonFail("NOT_FOUND", "Documents not found", 404);
+    }
+    if (caseUnitId) {
+      const cse = await prisma.case.findUnique({
+        where: { unitId: caseUnitId },
+        select: { clientUnitId: true },
+      });
+      if (!cse || cse.clientUnitId !== cid) {
+        return jsonFail("NOT_FOUND", "Documents not found", 404);
+      }
+    }
+
+    // No parent filter → all docs for this client (direct + on own cases)
+    if (!caseUnitId && !clientUnitId) {
+      const ownCases = await prisma.case.findMany({
+        where: { clientUnitId: cid },
+        select: { unitId: true },
+      });
+      const caseUnitIds = ownCases.map((c) => c.unitId);
+      const whereAll = {
+        AND: [
+          { docType: { not: "receipt" as const } },
+          { OR: [{ expenseUnitId: null }, { expenseUnitId: { isSet: false } }] },
+          {
+            OR: [
+              { clientUnitId: cid },
+              ...(caseUnitIds.length
+                ? [{ caseUnitId: { in: caseUnitIds } }]
+                : []),
+            ],
+          },
+        ],
+      };
+      const [rows, total] = await Promise.all([
+        prisma.document.findMany({
+          where: whereAll,
+          orderBy: { createdAt: "desc" },
+          skip,
+          take: pageSize,
+        }),
+        prisma.document.count({ where: whereAll }),
+      ]);
+      return jsonOkList(rows.map(toDocumentSummary), { page, pageSize, total });
+    }
+  } else {
+    if (!caseUnitId && !clientUnitId && !expenseUnitId) {
+      return jsonFail(
+        "VALIDATION",
+        "Provide caseUnitId, clientUnitId, or expenseUnitId to list documents",
+        400
+      );
+    }
+    if (expenseUnitId) {
+      const { user: u, response: r } = await requirePerm(
+        request,
+        "expenses",
+        "view"
+      );
+      if (!u) return r;
+    } else {
+      const { user: u, response: r } = await requirePerm(
+        request,
+        "cases",
+        "view"
+      );
+      if (!u) return r;
+    }
+  }
 
   if (!caseUnitId && !clientUnitId && !expenseUnitId) {
     return jsonFail(
@@ -26,18 +113,17 @@ export const GET = apiHandler(async (request) => {
     );
   }
 
-  if (expenseUnitId) {
-    const { user, response } = await requirePerm(request, "expenses", "view");
-    if (!user) return response;
-  } else {
-    const { user, response } = await requirePerm(request, "cases", "view");
-    if (!user) return response;
-  }
-
   const where = {
     ...(caseUnitId ? { caseUnitId } : {}),
     ...(clientUnitId ? { clientUnitId } : {}),
     ...(expenseUnitId ? { expenseUnitId } : {}),
+    // Client portal: never list fee receipts / expense bills (metadata leak)
+    ...(isClientOnlyUser(user.roles)
+      ? {
+          docType: { not: "receipt" as const },
+          OR: [{ expenseUnitId: null }, { expenseUnitId: { isSet: false } }],
+        }
+      : {}),
   };
 
   const [rows, total] = await Promise.all([
@@ -82,26 +168,56 @@ export const POST = apiHandler(async (request) => {
   if (!parsed.success) {
     return jsonFail("VALIDATION", parsed.error.issues[0]?.message ?? "Invalid request", 400, parsed.error.issues);
   }
-  const input = parsed.data;
+  const input = { ...parsed.data };
 
-  // Case docs need cases.upload; fee receipts with accounts.*; expense bills with expenses.*.
-  const canCasesUpload =
-    isModuleEnabled("cases") &&
-    (await hasPermission(user.id, "cases", "upload"));
-  const canAccountsReceipt =
-    input.docType === "receipt" &&
-    !input.expenseUnitId &&
-    isModuleEnabled("accounts") &&
-    ((await hasPermission(user.id, "accounts", "edit")) ||
-      (await hasPermission(user.id, "accounts", "upload")));
-  const canExpenseBill =
-    Boolean(input.expenseUnitId) &&
-    isModuleEnabled("expenses") &&
-    ((await hasPermission(user.id, "expenses", "create")) ||
-      (await hasPermission(user.id, "expenses", "edit")) ||
-      (await hasPermission(user.id, "expenses", "upload")));
-  if (!canCasesUpload && !canAccountsReceipt && !canExpenseBill) {
-    return jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403);
+  const clientActor = isClientOnlyUser(user.roles);
+  if (clientActor) {
+    const cid = requireClientUnitId(user);
+    if (!cid) {
+      return jsonFail("FORBIDDEN", "Client portal link is missing.", 403);
+    }
+    if (input.expenseUnitId) {
+      return jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403);
+    }
+    if (!isClientUploadDocType(input.docType)) {
+      return jsonFail(
+        "VALIDATION",
+        `Clients may upload: ${CLIENT_UPLOAD_DOC_TYPES.join(", ")}`,
+        400
+      );
+    }
+    if (!(await hasPermission(user.id, "cases", "upload"))) {
+      return jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403);
+    }
+    input.clientUnitId = cid;
+    if (input.caseUnitId) {
+      const caseItem = await prisma.case.findUnique({
+        where: { unitId: input.caseUnitId },
+        select: { id: true, clientUnitId: true },
+      });
+      if (!caseItem || caseItem.clientUnitId !== cid) {
+        return jsonFail("NOT_FOUND", "Case not found", 404);
+      }
+    }
+  } else {
+    const canCasesUpload =
+      isModuleEnabled("cases") &&
+      (await hasPermission(user.id, "cases", "upload"));
+    const canAccountsReceipt =
+      input.docType === "receipt" &&
+      !input.expenseUnitId &&
+      isModuleEnabled("accounts") &&
+      ((await hasPermission(user.id, "accounts", "edit")) ||
+        (await hasPermission(user.id, "accounts", "upload")));
+    const canExpenseBill =
+      Boolean(input.expenseUnitId) &&
+      isModuleEnabled("expenses") &&
+      ((await hasPermission(user.id, "expenses", "create")) ||
+        (await hasPermission(user.id, "expenses", "edit")) ||
+        (await hasPermission(user.id, "expenses", "upload")));
+    if (!canCasesUpload && !canAccountsReceipt && !canExpenseBill) {
+      return jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403);
+    }
   }
 
   let caseId: string | undefined;
@@ -178,7 +294,7 @@ export const POST = apiHandler(async (request) => {
 
   await writeAudit({
     actorUnitId: user.unitId,
-    action: "document.upload",
+    action: clientActor ? "document.upload.client" : "document.upload",
     entity: "Document",
     entityUnitId: created.unitId,
     meta: {
@@ -223,7 +339,9 @@ export const POST = apiHandler(async (request) => {
             userId: u.id,
             userUnitId: u.unitId,
             type: "document_uploaded",
-            title: `Document uploaded: ${label}`,
+            title: clientActor
+              ? `Client uploaded: ${label}`
+              : `Document uploaded: ${label}`,
             body: created.title,
             href: `/cases/${cse.unitId}`,
             meta: {

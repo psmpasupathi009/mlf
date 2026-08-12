@@ -36,6 +36,7 @@ import {
 } from "@/components/ui/table";
 import { apiFetch, apiDownload, getErrorMessage } from "@/lib/api/client";
 import type { PublicUser } from "@/lib/auth/session";
+import { isClientOnlyUser } from "@/lib/auth/client-portal";
 import type { CaseSummary } from "@/features/cases/server/serialize";
 import { CaseFormDialog } from "@/features/cases/components/case-form-dialog";
 import { CasesBoard } from "@/features/cases/components/cases-board";
@@ -75,6 +76,7 @@ function readStoredView(): CasesView {
 export function CasesPage({ user }: { user: PublicUser }) {
   const can = (action: string) => user.permissions.includes(`cases.${action}`);
   const canExport = user.permissions.includes("reports.view");
+  const clientPortal = isClientOnlyUser(user.roles);
   const searchParams = useSearchParams();
   const router = useRouter();
   const clientUnitId = searchParams.get("clientUnitId") ?? "";
@@ -160,12 +162,17 @@ export function CasesPage({ user }: { user: PublicUser }) {
   }, [clientUnitId, rows]);
 
   useEffect(() => {
+    if (clientPortal) {
+      setView("list");
+      return;
+    }
     queueMicrotask(() => {
       setView(readStoredView());
     });
-  }, []);
+  }, [clientPortal]);
 
   function setCasesView(next: CasesView) {
+    if (clientPortal) return;
     setView(next);
     setPage(1);
     try {
@@ -177,7 +184,7 @@ export function CasesPage({ user }: { user: PublicUser }) {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const isBoard = view === "board";
+    const isBoard = !clientPortal && view === "board";
     const params = new URLSearchParams({
       page: String(isBoard ? 1 : page),
       pageSize: String(isBoard ? BOARD_PAGE_SIZE : pageSize),
@@ -218,6 +225,7 @@ export function CasesPage({ user }: { user: PublicUser }) {
     clientUnitId,
     quick,
     view,
+    clientPortal,
   ]);
 
   useEffect(() => {
@@ -226,50 +234,62 @@ export function CasesPage({ user }: { user: PublicUser }) {
     });
   }, [load]);
 
-  const chips: { id: QuickFilter; label: string }[] = [
-    { id: "all", label: "All cases" },
-    { id: "today", label: "Hearing today" },
-    { id: "week", label: "This week" },
-    { id: "missingCourt", label: "No court number" },
-    { id: "battaDue", label: "Batta due" },
-    { id: "filingDefect", label: "Filing defect" },
-  ];
+  const chips: { id: QuickFilter; label: string }[] = clientPortal
+    ? [
+        { id: "all", label: "All cases" },
+        { id: "today", label: "Hearing today" },
+        { id: "week", label: "This week" },
+      ]
+    : [
+        { id: "all", label: "All cases" },
+        { id: "today", label: "Hearing today" },
+        { id: "week", label: "This week" },
+        { id: "missingCourt", label: "No court number" },
+        { id: "battaDue", label: "Batta due" },
+        { id: "filingDefect", label: "Filing defect" },
+      ];
 
   return (
     <section>
       <PageHeader
         title="Cases"
-        description="Office-shared cause list — search by CSE id, court number, or client."
+        description={
+          clientPortal
+            ? "Your matters — status, court, and hearing dates."
+            : "Office-shared cause list — search by CSE id, court number, or client."
+        }
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex w-auto rounded-lg border border-border/80 bg-muted/40 p-0.5 sm:w-auto!">
-              <button
-                type="button"
-                onClick={() => setCasesView("list")}
-                className={cn(
-                  "inline-flex w-auto! items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                  view === "list"
-                    ? "bg-card text-navy shadow-sm"
-                    : "text-muted-foreground hover:text-navy"
-                )}
-              >
-                <LayoutList className="size-3.5" />
-                List
-              </button>
-              <button
-                type="button"
-                onClick={() => setCasesView("board")}
-                className={cn(
-                  "inline-flex w-auto! items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
-                  view === "board"
-                    ? "bg-card text-navy shadow-sm"
-                    : "text-muted-foreground hover:text-navy"
-                )}
-              >
-                <Columns3 className="size-3.5" />
-                Board
-              </button>
-            </div>
+            {!clientPortal ? (
+              <div className="inline-flex w-auto rounded-lg border border-border/80 bg-muted/40 p-0.5 sm:w-auto!">
+                <button
+                  type="button"
+                  onClick={() => setCasesView("list")}
+                  className={cn(
+                    "inline-flex w-auto! items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                    view === "list"
+                      ? "bg-card text-navy shadow-sm"
+                      : "text-muted-foreground hover:text-navy"
+                  )}
+                >
+                  <LayoutList className="size-3.5" />
+                  List
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCasesView("board")}
+                  className={cn(
+                    "inline-flex w-auto! items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors",
+                    view === "board"
+                      ? "bg-card text-navy shadow-sm"
+                      : "text-muted-foreground hover:text-navy"
+                  )}
+                >
+                  <Columns3 className="size-3.5" />
+                  Board
+                </button>
+              </div>
+            ) : null}
             {can("create") ? (
               <Button type="button" onClick={() => setFormOpen(true)}>
                 Register case
@@ -335,7 +355,7 @@ export function CasesPage({ user }: { user: PublicUser }) {
           </Select>
         }
         actions={
-          canExport || can("upload") || can("edit") ? (
+          !clientPortal && (canExport || can("upload") || can("edit")) ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button type="button" variant="outline" className="gap-2">
@@ -398,9 +418,11 @@ export function CasesPage({ user }: { user: PublicUser }) {
                 : "No cases yet"
           }
           description={
-            can("create")
-              ? "Register a case for a client — court number can wait until allotted."
-              : "Ask admin if you need access to create cases."
+            clientPortal
+              ? "When the office registers a matter for you, it will show here."
+              : can("create")
+                ? "Register a case for a client — court number can wait until allotted."
+                : "Ask admin if you need access to create cases."
           }
           action={
             can("create") && quick === "all" ? (
@@ -441,7 +463,9 @@ export function CasesPage({ user }: { user: PublicUser }) {
               <TableRow>
                 <TableHead className="hidden md:table-cell">ID</TableHead>
                 <TableHead>Court no.</TableHead>
-                <TableHead className="hidden md:table-cell">Client</TableHead>
+                {!clientPortal ? (
+                  <TableHead className="hidden md:table-cell">Client</TableHead>
+                ) : null}
                 <TableHead className="hidden lg:table-cell">Court</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="hidden md:table-cell">Next hearing</TableHead>
@@ -470,17 +494,21 @@ export function CasesPage({ user }: { user: PublicUser }) {
                               Pending
                             </span>
                           )}
-                          <p className="text-xs font-normal text-muted-foreground md:hidden">
-                            {c.clientName ?? c.clientUnitId}
-                          </p>
+                          {!clientPortal ? (
+                            <p className="text-xs font-normal text-muted-foreground md:hidden">
+                              {c.clientName ?? c.clientUnitId}
+                            </p>
+                          ) : null}
                           <div className="md:hidden">
                             <UnitIdBadge value={c.unitId} className="mt-1" />
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell className="hidden md:table-cell">
-                        {c.clientName ?? c.clientUnitId}
-                      </TableCell>
+                      {!clientPortal ? (
+                        <TableCell className="hidden md:table-cell">
+                          {c.clientName ?? c.clientUnitId}
+                        </TableCell>
+                      ) : null}
                       <TableCell className="hidden lg:table-cell">
                         {c.courtName ?? "—"}
                       </TableCell>

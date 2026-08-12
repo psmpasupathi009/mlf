@@ -37,6 +37,7 @@ export const getSessionUser = cache(async (): Promise<PublicUser | null> => {
       email: user.email,
       address: user.address,
       photoKey: user.photoKey,
+      clientUnitId: user.clientUnitId,
       isActive: user.isActive,
     });
   });

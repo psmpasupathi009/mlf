@@ -6,13 +6,18 @@ import { ThemeToggle } from "@/shared/components/theme/theme-toggle";
 import { GlobalSearch } from "@/shared/components/layout/global-search";
 import { NotificationBell } from "@/shared/components/layout/notification-bell";
 import { cn } from "@/lib/utils/cn";
+import type { PublicUser } from "@/lib/auth/session";
+import { isClientOnlyUser } from "@/lib/auth/client-portal";
 
 type SiteHeaderProps = {
   brandName: string;
+  user?: PublicUser | null;
   className?: string;
 };
 
-export function SiteHeader({ brandName, className }: SiteHeaderProps) {
+export function SiteHeader({ brandName, user, className }: SiteHeaderProps) {
+  const showSearch = !user || !isClientOnlyUser(user.roles);
+
   return (
     <header
       className={cn(
@@ -34,8 +39,10 @@ export function SiteHeader({ brandName, className }: SiteHeaderProps) {
         </Link>
 
         <div className="flex shrink-0 items-center justify-end gap-0.5">
-          <GlobalSearch />
-          <NotificationBell />
+          {showSearch ? <GlobalSearch /> : null}
+          {!user || !isClientOnlyUser(user.roles) ? (
+            <NotificationBell />
+          ) : null}
           <div className="hidden min-[400px]:block">
             <ThemeToggle />
           </div>

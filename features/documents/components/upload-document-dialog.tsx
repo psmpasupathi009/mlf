@@ -29,6 +29,7 @@ import {
   DOCUMENT_TYPES,
   type DocumentTypeValue,
 } from "@/lib/validations/documents.schema";
+import { CLIENT_UPLOAD_DOC_TYPES } from "@/lib/auth/client-portal";
 import { cn } from "@/lib/utils/cn";
 
 const ACCEPT = "application/pdf,image/jpeg,image/png,image/webp";
@@ -46,6 +47,7 @@ export function UploadDocumentDialog({
   caseUnitId,
   clientUnitId,
   defaultDocType = "other",
+  clientUploadOnly = false,
   onUploaded,
 }: {
   open: boolean;
@@ -53,6 +55,8 @@ export function UploadDocumentDialog({
   caseUnitId?: string;
   clientUnitId?: string;
   defaultDocType?: DocumentTypeValue;
+  /** Restrict type picker to client-safe document types. */
+  clientUploadOnly?: boolean;
   onUploaded: () => void;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -64,14 +68,25 @@ export function UploadDocumentDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
+  const typeOptions = clientUploadOnly
+    ? DOCUMENT_TYPES.filter((t) =>
+        (CLIENT_UPLOAD_DOC_TYPES as readonly string[]).includes(t)
+      )
+    : DOCUMENT_TYPES;
+
   const reset = useCallback(() => {
     setTitle("");
     setNotes("");
-    setDocType(defaultDocType);
+    setDocType(
+      clientUploadOnly &&
+        !(CLIENT_UPLOAD_DOC_TYPES as readonly string[]).includes(defaultDocType)
+        ? "other"
+        : defaultDocType
+    );
     setFile(null);
     setError("");
     if (fileRef.current) fileRef.current.value = "";
-  }, [defaultDocType]);
+  }, [defaultDocType, clientUploadOnly]);
 
   function pickFile(next: File | null) {
     setError("");
@@ -135,10 +150,13 @@ export function UploadDocumentDialog({
     >
       <DialogContent size="md">
         <DialogHeader>
-          <DialogTitle>Upload case document</DialogTitle>
+          <DialogTitle>
+            {clientUploadOnly ? "Upload document" : "Upload case document"}
+          </DialogTitle>
           <DialogDescription>
-            Judgments, orders, pleadings and other case files. PDF or image, max{" "}
-            {MAX_MB} MB.
+            {clientUploadOnly
+              ? `ID proof, evidence, or other files. PDF or image, max ${MAX_MB} MB.`
+              : `Judgments, orders, pleadings and other case files. PDF or image, max ${MAX_MB} MB.`}
           </DialogDescription>
         </DialogHeader>
 
@@ -153,7 +171,7 @@ export function UploadDocumentDialog({
                 <SelectValue placeholder="Select type" />
               </SelectTrigger>
               <SelectContent className="z-200">
-                {DOCUMENT_TYPES.map((t) => (
+                {typeOptions.map((t) => (
                   <SelectItem key={t} value={t}>
                     {DOCUMENT_TYPE_LABELS[t]}
                   </SelectItem>

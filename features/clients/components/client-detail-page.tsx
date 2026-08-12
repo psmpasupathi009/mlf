@@ -7,6 +7,8 @@ import {
   MapPin,
   MessageSquare,
   Pencil,
+  ShieldCheck,
+  ShieldOff,
   Wallet,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -55,6 +57,13 @@ type DetailResponse = {
   payments: PaymentSummary[];
   documents: DocumentSummary[];
   fee: FeeRollup | null;
+  portal?: {
+    invited: boolean;
+    isActive: boolean;
+    userUnitId: string | null;
+    hasPin: boolean;
+    lastLoginAt: string | null;
+  };
 };
 
 function rupee(n: number) {
@@ -76,6 +85,7 @@ export function ClientDetailPage({
   const [editOpen, setEditOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadType, setUploadType] = useState<DocumentTypeValue>("other");
+  const [portalBusy, setPortalBusy] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -132,6 +142,60 @@ export function ClientDetailPage({
     setUploadOpen(true);
   }
 
+  async function invitePortal() {
+    setPortalBusy(true);
+    const { ok, data } = await apiFetch<{
+      message?: string;
+      portal?: DetailResponse["portal"];
+    }>(`/api/clients/${unitId}/portal-access`, { method: "POST" });
+    setPortalBusy(false);
+    if (!ok) {
+      toast.error(
+        getErrorMessage(
+          data as Record<string, unknown>,
+          "Could not invite to portal"
+        )
+      );
+      return;
+    }
+    toast.success(
+      (data as { message?: string })?.message ?? "Portal access invited"
+    );
+    void load();
+  }
+
+  async function revokePortal() {
+    if (
+      !window.confirm(
+        "Revoke this client’s portal login? They will not be able to sign in."
+      )
+    ) {
+      return;
+    }
+    setPortalBusy(true);
+    const { ok, data } = await apiFetch<{ message?: string }>(
+      `/api/clients/${unitId}/portal-access`,
+      { method: "DELETE" }
+    );
+    setPortalBusy(false);
+    if (!ok) {
+      toast.error(
+        getErrorMessage(
+          data as Record<string, unknown>,
+          "Could not revoke portal access"
+        )
+      );
+      return;
+    }
+    toast.success(
+      (data as { message?: string })?.message ?? "Portal access revoked"
+    );
+    void load();
+  }
+
+  const portal = detail.portal;
+  const portalActive = Boolean(portal?.invited && portal.isActive);
+
   return (
     <section className="space-y-6">
       <div className="flex items-center gap-2">
@@ -154,18 +218,54 @@ export function ClientDetailPage({
                 <MessageSquare className="size-3" />
                 {client.smsConsent ? "SMS on" : "SMS off"}
               </Badge>
+              {portal?.invited ? (
+                <Badge variant={portalActive ? "success" : "muted"}>
+                  {portalActive
+                    ? portal.hasPin
+                      ? "Portal on"
+                      : "Portal · await PIN"
+                    : "Portal off"}
+                </Badge>
+              ) : null}
             </div>
             {can("clients", "edit") ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="w-full sm:w-auto"
-                onClick={() => setEditOpen(true)}
-              >
-                <Pencil className="size-4" />
-                Edit
-              </Button>
+              <>
+                {portalActive ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full sm:w-auto"
+                    disabled={portalBusy}
+                    onClick={() => void revokePortal()}
+                  >
+                    <ShieldOff className="size-4" />
+                    Revoke portal
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full sm:w-auto"
+                    disabled={portalBusy}
+                    onClick={() => void invitePortal()}
+                  >
+                    <ShieldCheck className="size-4" />
+                    {portal?.invited ? "Restore portal" : "Invite to portal"}
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full sm:w-auto"
+                  onClick={() => setEditOpen(true)}
+                >
+                  <Pencil className="size-4" />
+                  Edit
+                </Button>
+              </>
             ) : null}
           </div>
         }

@@ -6,6 +6,7 @@ import { nextUnitId } from "@/lib/ids";
 import { writeAudit, pickAuditFields } from "@/lib/audit";
 import {
   canBookForAnyAdvocate,
+  canViewAnyAdvocateDiary,
   resolveBookingAdvocateMobile,
 } from "@/lib/appointments/booking-rules";
 import { assertSlotBookable } from "@/lib/appointments/availability";
@@ -18,6 +19,8 @@ import {
   scheduleNotify,
 } from "@/lib/notifications/notify";
 import { formatIstTime, istDisplayDate } from "@/lib/utils/ist";
+import { isClientOnlyUser } from "@/lib/auth/client-portal";
+import { requireClientUnitId } from "@/lib/auth/client-scope";
 
 export const GET = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "appointments", "view");
@@ -31,13 +34,38 @@ export const GET = apiHandler(async (request) => {
   const to = searchParams.get("to")?.trim();
   const advocateMobile = searchParams.get("advocateMobile")?.trim();
 
-  // Advocates only see their own diary unless they are admin/sub_admin/staff
-  const scopeOwn = !canBookForAnyAdvocate(user.roles);
-  const scopedMobile = scopeOwn
-    ? user.mobile
-    : advocateMobile || undefined;
-
   const and: Prisma.AppointmentWhereInput[] = [];
+
+  const clientScope = requireClientUnitId(user);
+  if (isClientOnlyUser(user.roles)) {
+    if (!clientScope) {
+      return jsonFail("FORBIDDEN", "Client portal link is missing.", 403);
+    }
+    and.push({ clientUnitId: clientScope });
+  } else {
+    const scopeOwn = !canViewAnyAdvocateDiary(user.roles);
+    const scopedMobile = scopeOwn
+      ? user.mobile
+      : advocateMobile || undefined;
+
+    if (scopedMobile) {
+      and.push({
+        OR: [
+          { advocateMobile: scopedMobile },
+          {
+            advocateMobile: `91${scopedMobile.replace(/\D/g, "").slice(-10)}`,
+          },
+          {
+            advocateMobile: scopedMobile.replace(/\D/g, "").slice(-10),
+          },
+        ],
+      });
+    } else if (searchParams.get("unassigned") === "1") {
+      and.push({
+        OR: [{ advocateMobile: null }, { advocateMobile: "" }],
+      });
+    }
+  }
 
   if (q) {
     and.push({
@@ -50,24 +78,6 @@ export const GET = apiHandler(async (request) => {
         { location: containsInsensitive(q) },
         { advocateMobile: containsInsensitive(q) },
       ],
-    });
-  }
-
-  if (scopedMobile) {
-    and.push({
-      OR: [
-        { advocateMobile: scopedMobile },
-        {
-          advocateMobile: `91${scopedMobile.replace(/\D/g, "").slice(-10)}`,
-        },
-        {
-          advocateMobile: scopedMobile.replace(/\D/g, "").slice(-10),
-        },
-      ],
-    });
-  } else if (searchParams.get("unassigned") === "1") {
-    and.push({
-      OR: [{ advocateMobile: null }, { advocateMobile: "" }],
     });
   }
 
@@ -95,7 +105,12 @@ export const GET = apiHandler(async (request) => {
     prisma.appointment.count({ where }),
   ]);
 
-  return jsonOkList(await enrichAppointments(rows), { page, pageSize, total });
+  return jsonOkList(
+    await enrichAppointments(rows, {
+      stripNotes: isClientOnlyUser(user.roles),
+    }),
+    { page, pageSize, total }
+  );
 });
 
 export const POST = apiHandler(async (request) => {
@@ -114,9 +129,33 @@ export const POST = apiHandler(async (request) => {
   }
   const input = parsed.data;
 
+  const clientActor = isClientOnlyUser(user.roles);
+  const actorClientUnitId = requireClientUnitId(user);
+
+  if (clientActor) {
+    if (!actorClientUnitId) {
+      return jsonFail("FORBIDDEN", "Client portal link is missing.", 403);
+    }
+    if (input.mode === "video") {
+      return jsonFail(
+        "VALIDATION",
+        "Clients can book office visit or phone call only",
+        400
+      );
+    }
+  }
+
   let clientId: string | undefined;
   let clientUnitId: string | undefined;
-  if (input.clientUnitId) {
+  if (clientActor) {
+    const client = await prisma.client.findUnique({
+      where: { unitId: actorClientUnitId! },
+      select: { id: true, unitId: true },
+    });
+    if (!client) return jsonFail("VALIDATION", "Client not found", 400);
+    clientId = client.id;
+    clientUnitId = client.unitId;
+  } else if (input.clientUnitId) {
     const client = await prisma.client.findUnique({
       where: { unitId: input.clientUnitId },
       select: { id: true, unitId: true },
@@ -131,9 +170,12 @@ export const POST = apiHandler(async (request) => {
   if (input.caseUnitId) {
     const caseItem = await prisma.case.findUnique({
       where: { unitId: input.caseUnitId },
-      select: { id: true, unitId: true },
+      select: { id: true, unitId: true, clientUnitId: true },
     });
     if (!caseItem) return jsonFail("VALIDATION", "Case not found", 400);
+    if (clientActor && caseItem.clientUnitId !== actorClientUnitId) {
+      return jsonFail("NOT_FOUND", "Case not found", 404);
+    }
     caseId = caseItem.id;
     caseUnitId = caseItem.unitId;
   }
@@ -147,7 +189,6 @@ export const POST = apiHandler(async (request) => {
     return jsonFail("VALIDATION", resolved.error ?? "Select an advocate", 400);
   }
 
-  // When office books for someone, advocate must exist as active advocate user
   if (canBookForAnyAdvocate(user.roles)) {
     const ten = resolved.mobile.replace(/\D/g, "").slice(-10);
     const advocate = await prisma.user.findFirst({
@@ -173,7 +214,7 @@ export const POST = apiHandler(async (request) => {
 
   const bookable = await assertSlotBookable({
     advocateMobile: resolved.mobile,
-    clientUnitId: input.clientUnitId || null,
+    clientUnitId: clientUnitId || null,
     start: input.scheduledAt,
     durationMin: input.durationMin ?? 30,
   });
@@ -202,7 +243,7 @@ export const POST = apiHandler(async (request) => {
 
   await writeAudit({
     actorUnitId: user.unitId,
-    action: "appointment.create",
+    action: clientActor ? "appointment.create.client" : "appointment.create",
     entity: "Appointment",
     entityUnitId: created.unitId,
     meta: {
@@ -231,7 +272,9 @@ export const POST = apiHandler(async (request) => {
           userId: u.id,
           userUnitId: u.unitId,
           type: "appointment",
-          title: `Appointment: ${created.title}`,
+          title: clientActor
+            ? `Client booked: ${created.title}`
+            : `Appointment: ${created.title}`,
           body: `${istDisplayDate(created.scheduledAt)} · ${formatIstTime(created.scheduledAt)}`,
           href: "/appointments",
           meta: { appointmentUnitId: created.unitId },
@@ -239,5 +282,12 @@ export const POST = apiHandler(async (request) => {
     );
   });
 
-  return jsonOk({ appointment: await enrichAppointment(created) }, 201);
+  return jsonOk(
+    {
+      appointment: await enrichAppointment(created, {
+        stripNotes: clientActor,
+      }),
+    },
+    201
+  );
 });

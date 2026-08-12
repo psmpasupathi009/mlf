@@ -10,6 +10,8 @@ export type AccessTokenPayload = JWTPayload & {
   sub: string;
   mobile: string;
   roles: UserRole[];
+  /** Client.unitId when this session is a client portal user. */
+  cid?: string;
   typ: "access";
 };
 
@@ -33,10 +35,13 @@ export async function signAccessToken(input: {
   unitId: string;
   mobile: string;
   roles: UserRole[];
+  /** Linked Client.unitId for client portal sessions. */
+  clientUnitId?: string | null;
 }): Promise<string> {
   return new SignJWT({
     mobile: input.mobile,
     roles: input.roles,
+    ...(input.clientUnitId ? { cid: input.clientUnitId } : {}),
     typ: "access",
   })
     .setProtectedHeader({ alg: "HS256" })

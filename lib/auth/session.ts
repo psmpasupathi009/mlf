@@ -32,6 +32,7 @@ export type AuthUser = {
   email?: string | null;
   address?: string | null;
   photoKey?: string | null;
+  clientUnitId?: string | null;
   isActive: boolean;
 };
 
@@ -46,6 +47,8 @@ export type PublicUser = {
   address?: string;
   /** Authenticated photo URL when user has uploaded a profile pic */
   photoUrl?: string;
+  /** Linked Client.unitId when this is a client portal login. */
+  clientUnitId?: string;
   permissions: string[];
 };
 
@@ -62,6 +65,7 @@ export async function toPublicUser(user: AuthUser): Promise<PublicUser> {
     email: user.email ?? undefined,
     address: user.address ?? undefined,
     photoUrl: userPhotoUrl(user.unitId, Boolean(user.photoKey)),
+    clientUnitId: user.clientUnitId ?? undefined,
     permissions,
   };
 }
@@ -84,6 +88,7 @@ export async function issueAuthTokens(user: AuthUser): Promise<{
     unitId: user.unitId,
     mobile: user.mobile,
     roles: user.roles,
+    clientUnitId: user.clientUnitId,
   });
 
   const updated = await prisma.user.update({

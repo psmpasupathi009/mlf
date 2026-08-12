@@ -10,7 +10,7 @@ let knownSeeded = false;
 
 /**
  * Persist catalog defaults when RolePermission is empty, and backfill any
- * newly added catalog keys (e.g. dak.*, tasks.*) without overwriting admin edits.
+ * newly added catalog keys or roles (e.g. client) without overwriting admin edits.
  * Returns true when a seed/backfill write ran.
  */
 export async function ensureDefaultPermissions(): Promise<boolean> {
@@ -21,17 +21,30 @@ export async function ensureDefaultPermissions(): Promise<boolean> {
       const catalogKeys = PERMISSION_CATALOG.map(
         (c) => `${c.module}.${c.action}`
       );
-      const adminRows = await prisma.rolePermission.findMany({
-        where: { role: "admin" },
-        select: { module: true, action: true },
-      });
+      const expectedRoles = Array.from(
+        new Set(permissionSeedRows().map((r) => r.role))
+      );
+
+      const [adminRows, roleRows] = await Promise.all([
+        prisma.rolePermission.findMany({
+          where: { role: "admin" },
+          select: { module: true, action: true },
+        }),
+        prisma.rolePermission.findMany({
+          distinct: ["role"],
+          select: { role: true },
+        }),
+      ]);
+
       const adminKeys = new Set(
         adminRows.map((r) => `${r.module}.${r.action}`)
       );
-      const missing = catalogKeys.some((k) => !adminKeys.has(k));
+      const rolesPresent = new Set(roleRows.map((r) => r.role));
+      const missingCatalog = catalogKeys.some((k) => !adminKeys.has(k));
+      const missingRole = expectedRoles.some((r) => !rolesPresent.has(r));
       const empty = adminRows.length === 0;
 
-      if (!empty && !missing) {
+      if (!empty && !missingCatalog && !missingRole) {
         knownSeeded = true;
         return false;
       }

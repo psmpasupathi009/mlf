@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/table";
 import { apiFetch, getErrorMessage } from "@/lib/api/client";
 import type { PublicUser } from "@/lib/auth/session";
+import { isClientOnlyUser } from "@/lib/auth/client-portal";
 import type {
   CaseSummary,
   HearingSummary,
@@ -63,6 +64,7 @@ export function CaseDetailPage({
 }) {
   const can = (module: string, action: string) =>
     user.permissions.includes(`${module}.${action}`);
+  const clientPortal = isClientOnlyUser(user.roles);
 
   const [detail, setDetail] = useState<DetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -147,7 +149,9 @@ export function CaseDetailPage({
   const { case: item, client, hearings, documents } = detail;
   const status = normalizeCaseStatus(item.status);
   const showFilingChecklist =
-    CHECKLIST_STATUSES.has(status) || (status === "active" && item.battaDue);
+    !clientPortal &&
+    (CHECKLIST_STATUSES.has(status) ||
+      (status === "active" && Boolean(item.battaDue)));
 
   function openUpload(docType: DocumentTypeValue = "other") {
     setUploadType(docType);
@@ -205,11 +209,18 @@ export function CaseDetailPage({
         }
       />
 
-      <CaseCourtStatusStrip
-        caseItem={item}
-        canEdit={can("cases", "edit")}
-        onUpdated={applyCaseUpdate}
-      />
+      {!clientPortal ? (
+        <CaseCourtStatusStrip
+          caseItem={item}
+          canEdit={can("cases", "edit")}
+          onUpdated={applyCaseUpdate}
+        />
+      ) : (
+        <p className="text-sm text-muted-foreground">
+          Status:{" "}
+          <span className="font-medium text-navy">{status.replace(/_/g, " ")}</span>
+        </p>
+      )}
 
       {showFilingChecklist ? (
         <CaseFilingChecklist
@@ -266,25 +277,27 @@ export function CaseDetailPage({
             </p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-4 sm:p-5">
-            <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              Agreed fee
-            </p>
-            <p className="mt-2 text-sm font-medium text-navy">
-              {item.agreedFee != null
-                ? `₹${item.agreedFee.toLocaleString("en-IN")}`
-                : "—"}
-            </p>
-          </CardContent>
-        </Card>
+        {!clientPortal ? (
+          <Card>
+            <CardContent className="p-4 sm:p-5">
+              <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+                Agreed fee
+              </p>
+              <p className="mt-2 text-sm font-medium text-navy">
+                {item.agreedFee != null
+                  ? `₹${item.agreedFee.toLocaleString("en-IN")}`
+                  : "—"}
+              </p>
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
 
       {/* Documents first — judgments/orders are primary office need */}
       <CaseDocumentsPanel
         documents={documents}
         canUpload={can("cases", "upload")}
-        canDelete={can("cases", "upload")}
+        canDelete={!clientPortal && can("cases", "upload")}
         onUploadClick={openUpload}
         onDeleted={() => {
           void load();
@@ -296,7 +309,9 @@ export function CaseDetailPage({
           <div>
             <h2 className="text-base font-semibold text-navy">Hearings</h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Diary dates and SMS status
+              {clientPortal
+                ? "Upcoming and past hearing dates"
+                : "Diary dates and SMS status"}
             </p>
           </div>
           {can("cases", "edit") ? (
@@ -320,8 +335,12 @@ export function CaseDetailPage({
                   <TableHead>Date</TableHead>
                   <TableHead>Purpose</TableHead>
                   <TableHead className="hidden md:table-cell">Outcome</TableHead>
-                  <TableHead className="hidden sm:table-cell">SMS</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  {!clientPortal ? (
+                    <TableHead className="hidden sm:table-cell">SMS</TableHead>
+                  ) : null}
+                  {!clientPortal ? (
+                    <TableHead className="text-right">Actions</TableHead>
+                  ) : null}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -334,23 +353,27 @@ export function CaseDetailPage({
                     <TableCell className="hidden md:table-cell">
                       {h.outcome ?? (h.isAdjourned ? "Adjourned" : "—")}
                     </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      <Badge variant={h.smsSentAt ? "success" : "muted"}>
-                        {h.smsSentAt ? "Sent" : "Pending"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right">
-                      {can("cases", "edit") && !h.isAdjourned ? (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setAdjourning(h.unitId)}
-                        >
-                          Adjourn
-                        </Button>
-                      ) : null}
-                    </TableCell>
+                    {!clientPortal ? (
+                      <TableCell className="hidden sm:table-cell">
+                        <Badge variant={h.smsSentAt ? "success" : "muted"}>
+                          {h.smsSentAt ? "Sent" : "Pending"}
+                        </Badge>
+                      </TableCell>
+                    ) : null}
+                    {!clientPortal ? (
+                      <TableCell className="text-right">
+                        {can("cases", "edit") && !h.isAdjourned ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setAdjourning(h.unitId)}
+                          >
+                            Adjourn
+                          </Button>
+                        ) : null}
+                      </TableCell>
+                    ) : null}
                   </TableRow>
                 ))}
               </TableBody>
@@ -441,8 +464,9 @@ export function CaseDetailPage({
         open={uploadOpen}
         onOpenChange={setUploadOpen}
         caseUnitId={item.unitId}
-        clientUnitId={client?.unitId}
+        clientUnitId={clientPortal ? user.clientUnitId : client?.unitId}
         defaultDocType={uploadType}
+        clientUploadOnly={clientPortal}
         onUploaded={load}
       />
     </section>

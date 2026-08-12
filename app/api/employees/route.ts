@@ -33,6 +33,8 @@ export const GET = apiHandler(async (request) => {
   const statusFilter = searchParams.get("status")?.trim();
 
   const where: Prisma.UserWhereInput = {
+    // Portal client logins are not office employees
+    NOT: { roles: { equals: ["client"] } },
     ...(q
       ? {
           OR: [

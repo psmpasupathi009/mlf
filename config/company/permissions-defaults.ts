@@ -83,6 +83,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   staff: "Staff",
   advocate: "Advocate",
   accountant: "Accountant",
+  client: "Client",
 };
 
 export const ROLE_BLURBS: Record<UserRole, string> = {
@@ -91,7 +92,17 @@ export const ROLE_BLURBS: Record<UserRole, string> = {
   staff: "Clerks, PA, paralegals, receptionist, computer operator, messenger, driver, and interns",
   advocate: "Case and client work for any counsel title (Advocate, AOR, Counsel, Senior Associate, Notary, …)",
   accountant: "Cash book and fees — Accounts Manager, Accountant, Accounts Assistant, Cashier",
+  client: "Portal login — own cases, hearings, appointments, and documents only",
 };
+
+/** Roles shown in employee forms and the permissions matrix editor. */
+export const EMPLOYEE_ROLES: UserRole[] = [
+  "admin",
+  "sub_admin",
+  "staff",
+  "advocate",
+  "accountant",
+];
 
 export function moduleLabel(module: string): string {
   return MODULE_LABELS[module] ?? module;
@@ -119,6 +130,7 @@ function buildMatrix(): Matrix {
     staff: empty(),
     advocate: empty(),
     accountant: empty(),
+    client: empty(),
   };
 
   const grant = (role: UserRole, module: string, action: string) => {
@@ -129,13 +141,24 @@ function buildMatrix(): Matrix {
     for (const [module, action] of pairs) grant(role, module, action);
   };
 
-  // Everyone: dashboard + own HRMS
+  // Staff roles: dashboard + own HRMS. Clients get a narrow grant below.
   for (const role of Object.keys(m) as UserRole[]) {
+    if (role === "client") continue;
     grant(role, "dashboard", "view");
     grant(role, "hrms", "view");
     grant(role, "hrms", "own_attendance");
     grant(role, "hrms", "own_leave");
   }
+
+  // client — own matters only (API hard-scopes by clientUnitId)
+  all("client", [
+    ["dashboard", "view"],
+    ["cases", "view"],
+    ["cases", "upload"],
+    ["appointments", "view"],
+    ["appointments", "create"],
+    ["appointments", "cancel"],
+  ]);
 
   // admin — everything in catalog
   for (const { module, action } of PERMISSION_CATALOG) {

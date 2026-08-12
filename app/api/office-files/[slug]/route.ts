@@ -1,7 +1,7 @@
 import { readFile } from "fs/promises";
 import path from "path";
 import { apiHandler, jsonFail } from "@/lib/api/response";
-import { requireUser } from "@/lib/api/guard";
+import { requireStaffUser } from "@/lib/api/guard";
 
 /** Allowlisted office PDFs under private/office-files/ */
 const OFFICE_FILES: Record<
@@ -16,7 +16,7 @@ const OFFICE_FILES: Record<
 };
 
 export const GET = apiHandler(async (request, context) => {
-  const { user, response } = await requireUser(request);
+  const { user, response } = await requireStaffUser(request);
   if (!user) return response;
 
   const { slug } = (await context.params) ?? {};

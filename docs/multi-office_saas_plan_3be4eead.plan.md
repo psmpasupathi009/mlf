@@ -36,7 +36,7 @@ isProject: false
 | Surface | Domain (example) | Who |
 |---------|------------------|-----|
 | Super Admin | `admin.saanru.com` | Platform owners — offices, plans, subscriptions, support |
-| Office Portal | `app.saanru.com` | Each law office — full MLF-like product |
+| Office Portal | `app.saanru.com` | Each law office — full MLF-like product for **staff**; invite-only **client** role with limited access (own cases/hearings, book office/call appointments, upload docs) |
 | Marketing (later) | `saanru.com` | Pricing page, signup CTA (optional v1.1) |
 
 ```mermaid
@@ -266,17 +266,17 @@ lib/validations/<domain>.schema.ts
 
 ## D2 — RBAC / modules / plan gates
 
-**Roles:** `admin`, `sub_admin`, `staff`, `advocate`, `accountant` (MLF blurbs).  
-**Permissions:** seed from MLF `PERMISSION_CATALOG`; edit at `/permissions` (admin).  
-**Nav:** MLF groups — Workspace / Matters / Schedule / Office / Admin; hide if module off or plan denies.  
+**Roles:** `admin`, `sub_admin`, `staff`, `advocate`, `accountant`, **`client`** (portal only — not assignable via employees).  
+**Permissions:** seed from MLF `PERMISSION_CATALOG`; edit at `/permissions` (admin; **employee roles only** — client matrix is seed-locked).  
+**Nav:** MLF groups — Workspace / Matters / Schedule / Office / Admin; hide if module off or plan denies. Client sessions see Home / Cases / Appointments / Documents / Profile only.  
 **UI:** ForbiddenState when perm missing; UpgradePrompt when plan blocks module.
 
 ---
 
 ## D3 — Home dashboard
 
-**Route:** `/` · **API:** `GET /api/dashboard/summary`  
-**UI:** welcome, stats, action queue, timeline, office presence, personal attendance (if HRMS entitled).  
+**Route:** `/` · **API:** `GET /api/dashboard/summary` (staff)  
+**Client home:** same `/` — next hearings, upcoming appointments, quick book + upload (no office stats/HRMS).  
 **Perm:** `dashboard.view`
 
 ---
@@ -284,10 +284,21 @@ lib/validations/<domain>.schema.ts
 ## D4 — Clients
 
 **Routes:** `/clients`, `/clients/[unitId]`  
-**APIs:** GET/POST `/api/clients`, GET/PATCH `/api/clients/[unitId]`, POST import  
-**Flow:** create (normalize mobile, SMS consent) → `CLI-#####` → list/search → detail → link to cases/payments.  
+**APIs:** GET/POST `/api/clients`, GET/PATCH `/api/clients/[unitId]`, POST import, **`POST|DELETE|GET /api/clients/[unitId]/portal-access`** (invite / revoke / status)  
+**Flow:** create (normalize mobile, SMS consent) → `CLI-#####` → list/search → detail → link to cases/payments → **Invite to portal**.  
 **Import:** dry-run → confirm.  
-**Perms:** `clients.view|create|edit`
+**Collision:** invite fails if mobile already belongs to a staff user.
+
+---
+
+## D4b — Client portal (limited self-service)
+
+**Surface:** Same Office Portal login (`app.saanru.com` / MLF `/login`).  
+**Identity:** `User` with `roles: [client]`, `clientUnitId` = `CLI-#####`; first login OTP → set PIN.  
+**Access:** own cases + hearings (read-only, no fees), book/view/cancel own appointments (`office` | `call` only), upload/view own documents (`id_proof` | `evidence` | `affidavit` | `other`).  
+**Denied:** accounts, expenses, employees, HRMS, dak, tasks, availability edit, court roster, other clients, CSV, convert-to-case.  
+**Plan gate (SAANRU):** Starter+; uploads count toward office storage.  
+**APIs:** hard-scope by `clientUnitId` on cases / appointments / documents.  
 
 ---
 
@@ -461,7 +472,7 @@ Parent unitIds must resolve **inside same office**.
 | Group | Items |
 |-------|-------|
 | Workspace | Home |
-| Matters | Clients, Cases, Day board |
+| Matters | Clients, Cases, Day board, **Documents** (client nav) |
 | Schedule | Appointments, Availability |
 | Office | Accounts*, Expenses*, HRMS†, Postal*, Work allotment, Reports, **Billing** |
 | Admin | Employees, Activity, Permissions |
@@ -517,11 +528,12 @@ Billing: clear plan cards, usage bars, UpgradePrompt on locked modules.
 
 # Part H — Out of scope v1
 
-- Client self-service portal  
 - Custom domains per office  
 - Email login / OAuth  
 - Online fee collection from clients (cash ledger only)  
 - WhatsApp Business API (SMS only via 2Factor-like provider)
+
+**In scope (Office Portal client role):** Limited client self-service on the same `app.saanru.com` login — invite-only `UserRole.client` linked via `User.clientUnitId`, own cases/hearings (read-only), book `office`/`call` appointments, upload/view own documents. No fee visibility, no staff modules.
 
 ---
 
@@ -532,7 +544,7 @@ Billing: clear plan cards, usage bars, UpgradePrompt on locked modules.
 | **0 Foundation** | Monorepo, schema (incl. Plan/Subscription/Invoice), shared libs |
 | **1 Super Admin** | Auth, offices wizard, plans CRUD/pricing, subs overview, suspend, audit |
 | **2 Billing** | Razorpay checkout, webhooks, trial/grace, Portal `/billing`, usage meters |
-| **3 Portal core** | Auth+picker, employees, permissions, clients, cases/hearings, diary, docs, home, search, activity, profile, notifications |
+| **3 Portal core** | Auth+picker, employees, permissions, clients (+ portal invite), cases/hearings, diary, docs, **client portal role**, home, search, activity, profile, notifications |
 | **4 Schedule & money** | Appointments, availability, convert-case, accounts, expenses, reports, imports |
 | **5 Ops** | Tasks, dak, HRMS, SMS cron+quota, branding |
 | **6 Hardening** | Isolation + subscription E2E, smoke, seed, docs |
@@ -541,6 +553,12 @@ Billing: clear plan cards, usage bars, UpgradePrompt on locked modules.
 
 # Part J — Test checklist
 
+- Invite client → OTP set PIN → login → only client nav.  
+- Client sees only own cases/hearings; other `CAS-` → 404.  
+- Client books office + call; video rejected; staff sees appointment linked to client.  
+- Client uploads doc; cannot download another client’s file.  
+- Staff mobile collision on invite → clear error.  
+- Revoke portal → login blocked.  
 - Two offices; same mobile → picker; zero data leak (404).  
 - Starter cannot open accounts/HRMS; Professional opens accounts not HRMS; Enterprise all.  
 - Seat limit blocks 6th user on Starter.  

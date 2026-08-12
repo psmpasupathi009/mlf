@@ -52,6 +52,7 @@ import { useDebouncedValue } from "@/shared/hooks/use-debounced-value";
 import { istDateKey, istDayBounds } from "@/lib/utils/ist";
 import { cn } from "@/lib/utils/cn";
 import { canBookForAnyAdvocate } from "@/lib/appointments/booking-rules";
+import { isClientOnlyUser } from "@/lib/auth/client-portal";
 import { displayMobile } from "@/lib/auth/mobile";
 import { PersonChip } from "@/shared/components/user/person-chip";
 import { APPOINTMENT_MODE_OPTIONS } from "@/lib/validations/appointments.schema";
@@ -118,8 +119,12 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
   const canOpenCase =
     (user.permissions.includes("appointments.edit") ||
       user.permissions.includes("cases.create")) &&
-    user.permissions.includes("cases.view");
+    user.permissions.includes("cases.view") &&
+    !isClientOnlyUser(user.roles);
+  const clientPortal = isClientOnlyUser(user.roles);
   const bookAny = canBookForAnyAdvocate(user.roles);
+  /** Staff-style diary filters (advocate / unassigned) — not for clients. */
+  const showOfficeFilters = bookAny && !clientPortal;
 
   const initialQ = searchParams.get("q") ?? "";
   const initialUnassigned = searchParams.get("unassigned") === "1";
@@ -162,9 +167,9 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
     });
     if (debouncedSearch) params.set("q", debouncedSearch);
     if (status !== "all") params.set("status", status);
-    if (bookAny && advocateFilter !== "all") {
+    if (showOfficeFilters && advocateFilter !== "all") {
       params.set("advocateMobile", advocateFilter);
-    } else if (bookAny && unassignedOnly) {
+    } else if (showOfficeFilters && unassignedOnly) {
       params.set("unassigned", "1");
     }
 
@@ -197,6 +202,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
     status,
     range,
     bookAny,
+    showOfficeFilters,
     advocateFilter,
     unassignedOnly,
   ]);
@@ -333,9 +339,11 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
       <PageHeader
         title="Appointments"
         description={
-          bookAny
-            ? "Office diary — book when a client calls, hand off if an advocate is busy."
-            : "Your consultation diary — book call-ins or move a slot if you cannot meet."
+          clientPortal
+            ? "Book an office visit or phone call with an advocate."
+            : bookAny
+              ? "Office diary — book when a client calls, hand off if an advocate is busy."
+              : "Your consultation diary — book call-ins or move a slot if you cannot meet."
         }
         actions={
           <>
@@ -371,7 +379,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                 Export Excel
               </Button>
             ) : null}
-            {can("create") ? (
+            {can("create") && !clientPortal ? (
               <Button
                 type="button"
                 variant="outline"
@@ -436,7 +444,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                 className="h-11 pl-9"
               />
             </div>
-            {bookAny ? (
+            {showOfficeFilters ? (
               <button
                 type="button"
                 onClick={() => {
@@ -461,7 +469,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                 Unassigned
               </button>
             ) : null}
-            {bookAny ? (
+            {showOfficeFilters ? (
               <AdvocatePicker
                 className="h-11 w-full md:w-48"
                 value={advocateFilter === "all" ? null : advocateFilter}
@@ -520,7 +528,11 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
           title={
             range === "today" ? "No appointments today" : "No appointments"
           }
-          description="When a client calls, book a free slot for an advocate."
+          description={
+            clientPortal
+              ? "Book an office visit or phone call when you need to meet the office."
+              : "When a client calls, book a free slot for an advocate."
+          }
           action={
             can("create") ? (
               <Button type="button" className="gap-2" onClick={openCreate}>
@@ -692,6 +704,17 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </>
+                      ) : clientPortal && can("cancel") && scheduled ? (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="h-10 w-full gap-2 sm:flex-1 lg:w-auto lg:flex-none"
+                          disabled={busy}
+                          onClick={() => handleCancel(a.unitId)}
+                        >
+                          <X className="size-3.5" />
+                          Cancel booking
+                        </Button>
                       ) : can("edit") ? (
                         <Button
                           type="button"

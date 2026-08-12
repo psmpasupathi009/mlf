@@ -100,6 +100,34 @@ export const GET = apiHandler(async (request, context) => {
     payments: payments.map((p) => toPaymentSummary(p)),
     documents: uniqueDocuments.map(toDocumentSummary),
     fee,
+    portal: await (async () => {
+      const portalUser = await prisma.user.findUnique({
+        where: { clientUnitId: client.unitId },
+        select: {
+          unitId: true,
+          isActive: true,
+          pinHash: true,
+          lastLoginAt: true,
+          roles: true,
+        },
+      });
+      if (!portalUser || !portalUser.roles.every((r) => r === "client")) {
+        return {
+          invited: false,
+          isActive: false,
+          userUnitId: null as string | null,
+          hasPin: false,
+          lastLoginAt: null as string | null,
+        };
+      }
+      return {
+        invited: true,
+        isActive: portalUser.isActive,
+        userUnitId: portalUser.unitId,
+        hasPin: Boolean(portalUser.pinHash),
+        lastLoginAt: portalUser.lastLoginAt?.toISOString() ?? null,
+      };
+    })(),
   });
 });
 
@@ -119,6 +147,31 @@ export const PATCH = apiHandler(async (request, context) => {
   const input = parsed.data;
 
   const before = pickAuditFields(client as Record<string, unknown>, CLIENT_AUDIT_KEYS);
+
+  const portalUser = await prisma.user.findUnique({
+    where: { clientUnitId: client.unitId },
+  });
+  const nextMobile =
+    input.mobile !== undefined
+      ? normalizeMobile(input.mobile) ?? client.mobile
+      : undefined;
+  if (
+    portalUser &&
+    portalUser.roles.every((r) => r === "client") &&
+    nextMobile &&
+    nextMobile !== portalUser.mobile
+  ) {
+    const clash = await prisma.user.findUnique({
+      where: { mobile: nextMobile },
+    });
+    if (clash && clash.id !== portalUser.id) {
+      return jsonFail(
+        "CONFLICT",
+        "This mobile is already a login for another user. Portal and client mobile must stay the same.",
+        409
+      );
+    }
+  }
 
   const updated = await prisma.client.update({
     where: { id: client.id },
@@ -180,6 +233,19 @@ export const PATCH = apiHandler(async (request, context) => {
     entityUnitId: updated.unitId,
     meta: { before, after, changes: diffAudit(before, after) },
   });
+
+  // Keep linked portal login in sync (name / mobile / contact).
+  if (portalUser && portalUser.roles.every((r) => r === "client")) {
+    await prisma.user.update({
+      where: { id: portalUser.id },
+      data: {
+        name: updated.name,
+        ...(nextMobile ? { mobile: nextMobile } : {}),
+        email: updated.email || undefined,
+        address: updated.address || undefined,
+      },
+    });
+  }
 
   return jsonOk({ client: toClientSummary(updated) });
 });

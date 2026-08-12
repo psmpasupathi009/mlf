@@ -1,8 +1,21 @@
 import type { UserRole } from "@prisma/client";
 import { displayMobile, normalizeMobile } from "@/lib/auth/mobile";
+import { isClientOnlyUser } from "@/lib/auth/client-portal";
 
-/** Admin, sub-admin, and office staff can book for any advocate. */
+/** Admin, sub-admin, and office staff can book for any advocate. Clients also pick an advocate. */
 export function canBookForAnyAdvocate(roles: UserRole[]): boolean {
+  return roles.some(
+    (r) =>
+      r === "admin" ||
+      r === "sub_admin" ||
+      r === "staff" ||
+      r === "client"
+  );
+}
+
+/** Office roles that can browse any advocate’s diary (not clients). */
+export function canViewAnyAdvocateDiary(roles: UserRole[]): boolean {
+  if (isClientOnlyUser(roles)) return false;
   return roles.some(
     (r) => r === "admin" || r === "sub_admin" || r === "staff"
   );

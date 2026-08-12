@@ -13,6 +13,8 @@ enum UserRole {
   staff
   advocate
   accountant
+  /// Portal login for a Client registry row (scoped; not an employee).
+  client
 }
 
 enum OtpPurpose {
@@ -116,6 +118,8 @@ model User {
   email             String?
   address           String?
   photoKey          String?
+  /// When roles include client — links this login to Client.unitId (CLI-#####).
+  clientUnitId      String?        @unique
   /// Ordered preferred courts; [0] = primary default for new cases.
   /// Shape: { state, district, city, courtName }[]
   defaultCourts     Json?

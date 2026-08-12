@@ -6,6 +6,8 @@ import {
 } from "@/lib/appointments/availability";
 import { canBookForAnyAdvocate } from "@/lib/appointments/booking-rules";
 import { displayMobile, normalizeMobile } from "@/lib/auth/mobile";
+import { isClientOnlyUser } from "@/lib/auth/client-portal";
+import { requireClientUnitId } from "@/lib/auth/client-scope";
 
 export const GET = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "appointments", "view");
@@ -14,9 +16,17 @@ export const GET = apiHandler(async (request) => {
   const { searchParams } = new URL(request.url);
   const date = searchParams.get("date")?.trim() ?? "";
   const durationMin = Number(searchParams.get("durationMin") ?? "30") || 30;
-  const clientUnitId = searchParams.get("clientUnitId")?.trim() || undefined;
+  let clientUnitId = searchParams.get("clientUnitId")?.trim() || undefined;
   const excludeAppointmentUnitId =
     searchParams.get("excludeAppointmentUnitId")?.trim() || undefined;
+
+  if (isClientOnlyUser(user.roles)) {
+    const cid = requireClientUnitId(user);
+    if (!cid) {
+      return jsonFail("FORBIDDEN", "Client portal link is missing.", 403);
+    }
+    clientUnitId = cid;
+  }
 
   let advocateMobile = searchParams.get("advocateMobile")?.trim() || "";
   if (!canBookForAnyAdvocate(user.roles)) {

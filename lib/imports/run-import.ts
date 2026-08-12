@@ -7,6 +7,7 @@ import { writeAudit } from "@/lib/audit";
 import { compliance } from "@/config/company/compliance";
 import { assertImportRateLimit } from "@/lib/rate-limit/guards";
 import { findIgnoredImportColumns } from "@/lib/imports/columns";
+import { isClientOnlyUser } from "@/lib/auth/client-portal";
 
 export type ImportRowResult = {
   row: number;
@@ -59,6 +60,11 @@ export function createImportHandler<TRow extends Record<string, string>>(
       options.perm[1]
     );
     if (!user) return response;
+
+    // CSV import is staff-only — clients share upload/create perms for self-service files.
+    if (isClientOnlyUser(user.roles)) {
+      return jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403);
+    }
 
     const limited = await assertImportRateLimit(request, user.unitId);
     if (limited) return limited;
