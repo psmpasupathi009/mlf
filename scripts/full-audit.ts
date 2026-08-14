@@ -201,7 +201,7 @@ async function main() {
     method: "POST",
     path: "/api/auth/send-otp",
     purpose: "Send OTP for setup / forgot-PIN (2Factor SMS)",
-    status: process.env.TWOFACTOR_API_KEY ? "SKIP" : "SKIP",
+    status: process.env.TWO_FACTOR_API_KEY ? "SKIP" : "SKIP",
     detail: "Skipped live SMS to avoid cost/lockout",
     kind: "api",
   });
@@ -631,6 +631,58 @@ async function main() {
   );
 
   await testApi(jar, "Expenses", "GET", "/api/expenses", "List office expenses");
+  let expenseUnitId: string | undefined;
+  {
+    const form = new FormData();
+    const png = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+      "base64"
+    );
+    form.append("file", new Blob([png], { type: "image/png" }), "audit-bill.png");
+    form.append("expenseDate", todayYmd);
+    form.append("category", "stationery");
+    form.append("amount", "125");
+    form.append("paymentMode", "cash");
+    form.append("description", `Audit stationery ${stamp}`);
+    form.append("vendor", "Audit vendor");
+    const up = await req(jar, "POST", "/api/expenses", form);
+    expenseUnitId = pick(up.json, "expense");
+    push({
+      module: "Expenses",
+      method: "POST",
+      path: "/api/expenses",
+      purpose: "Create office expense with bill attachment",
+      status: accept(up.res.status, up.json) ? "PASS" : "FAIL",
+      detail: `HTTP ${up.res.status}${msg(up.json) ? ` — ${msg(up.json)}` : ""}`,
+      kind: "api",
+    });
+    if (expenseUnitId) {
+      await testApi(
+        jar,
+        "Expenses",
+        "GET",
+        `/api/expenses/${expenseUnitId}`,
+        "Expense detail"
+      );
+      await testApi(
+        jar,
+        "Expenses",
+        "PATCH",
+        `/api/expenses/${expenseUnitId}`,
+        "Update expense description",
+        { description: `Audit stationery patched ${stamp}` }
+      );
+      push({
+        module: "Expenses",
+        method: "POST",
+        path: `/api/expenses/${expenseUnitId}/void`,
+        purpose: "Void an expense with reason",
+        status: "SKIP",
+        detail: "Skipped destructive void",
+        kind: "api",
+      });
+    }
+  }
 
   // ── APPOINTMENTS / AVAILABILITY ──
   await testApi(jar, "Appointments", "GET", "/api/appointments", "List appointments");
@@ -907,6 +959,33 @@ async function main() {
     `/api/employees/${user.unitId}`,
     "Employee detail"
   );
+  await testApi(jar, "Court roster", "GET", "/api/court-roster", "Daily court duty board");
+  await testApi(
+    jar,
+    "Court roster",
+    "GET",
+    `/api/court-roster/available-advocates?date=${todayYmd}&state=Tamil%20Nadu&district=Erode&city=Gobichettipalayam&courtName=${encodeURIComponent("District Munsif Court, Gobichettipalayam")}`,
+    "Advocates available for cover"
+  );
+  await testApi(jar, "Activity", "GET", "/api/activity", "Office activity log");
+  if (clientUnitId) {
+    await testApi(
+      jar,
+      "Clients",
+      "GET",
+      `/api/clients/${clientUnitId}/portal-access`,
+      "Client portal invite status"
+    );
+    push({
+      module: "Clients",
+      method: "POST",
+      path: `/api/clients/${clientUnitId}/portal-access`,
+      purpose: "Invite client portal login",
+      status: "SKIP",
+      detail: "Would SMS / create a live portal user",
+      kind: "api",
+    });
+  }
   push({
     module: "Employees",
     method: "POST",
@@ -1000,6 +1079,30 @@ async function main() {
     "/api/notifications/unread-count",
     "Unread badge count"
   );
+  const inbox = await req(jar, "GET", "/api/notifications?pageSize=1");
+  const firstNote = (
+    inbox.json as { data?: { unitId?: string }[] }
+  )?.data?.[0]?.unitId;
+  if (firstNote) {
+    await testApi(
+      jar,
+      "Notifications",
+      "PATCH",
+      `/api/notifications/${firstNote}/read`,
+      "Mark one notification read",
+      {}
+    );
+  } else {
+    push({
+      module: "Notifications",
+      method: "PATCH",
+      path: "/api/notifications/[unitId]/read",
+      purpose: "Mark one notification read",
+      status: "SKIP",
+      detail: "Inbox empty",
+      kind: "api",
+    });
+  }
   await testApi(
     jar,
     "Notifications",
@@ -1035,6 +1138,25 @@ async function main() {
     undefined,
     (s) => s >= 200 && s < 400
   );
+  for (const [type, purpose] of [
+    ["employees", "Excel export employees"],
+    ["appointments", "Excel export appointments"],
+    ["tasks", "Excel export tasks"],
+    ["dak", "Excel export dak"],
+    ["accounts", "Excel export accounts"],
+    ["expenses", "Excel export expenses"],
+    ["fees-outstanding", "Excel export fees outstanding"],
+  ] as const) {
+    await testApi(
+      jar,
+      "Exports",
+      "GET",
+      `/api/exports?type=${type}`,
+      purpose,
+      undefined,
+      (s) => s >= 200 && s < 400
+    );
+  }
   await testApi(
     jar,
     "Office",
@@ -1058,13 +1180,14 @@ async function main() {
   });
 
   // ── PORTAL PAGES ──
-  const pages = [
+  const pages: Array<[string, string]> = [
     ["/", "Home / day board"],
     ["/clients", "Clients list UI"],
     ["/cases", "Cases list UI"],
     ["/diary", "Diary day board UI"],
     ["/appointments", "Appointments UI"],
     ["/availability", "Advocate availability UI"],
+    ["/court-roster", "Court roster UI"],
     ["/accounts", "Accounts cash register UI"],
     ["/expenses", "Office expenses UI"],
     ["/hrms", "HRMS attendance/leave UI"],
@@ -1072,10 +1195,17 @@ async function main() {
     ["/tasks", "Work allotment UI"],
     ["/reports", "Reports / exports UI"],
     ["/employees", "Employees UI"],
+    ["/activity", "Activity log UI"],
     ["/permissions", "Permissions matrix UI"],
     ["/notifications", "Notifications UI"],
     ["/profile", "Profile UI"],
-  ] as const;
+    ["/documents", "Client documents (staff redirect)"],
+    ["/legal/terms", "Public terms"],
+    ["/legal/privacy", "Public privacy"],
+    ["/legal/consultation-policy", "Public consultation policy"],
+  ];
+  if (clientUnitId) pages.push([`/clients/${clientUnitId}`, "Client detail UI"]);
+  if (caseUnitId) pages.push([`/cases/${caseUnitId}`, "Case detail UI"]);
   for (const [path, purpose] of pages) {
     const { res } = await req(jar, "GET", path);
     push({
@@ -1108,6 +1238,9 @@ async function main() {
     ["features/notifications/*", "Inbox + SSE hook"],
     ["features/profile/*", "Own profile + photo crop"],
     ["features/reports/*", "Export triggers"],
+    ["features/court-roster/*", "Daily court duty + cover"],
+    ["features/expenses/*", "Office expenses + void"],
+    ["features/activity/*", "Audit log viewer"],
     ["lib/auth/*", "JWT, cookies, PIN, OTP, session"],
     ["lib/rbac/*", "Permission resolution + guards"],
     ["lib/rate-limit/*", "Mongo rate limits"],
@@ -1143,7 +1276,7 @@ async function main() {
       warn: rows.filter((r) => r.status === "WARN").length,
       skip: rows.filter((r) => r.status === "SKIP").length,
     },
-    smokeIds: { clientUnitId, caseUnitId, paymentUnitId, docUnitId, apptUnitId, dakUnitId, taskUnitId },
+    smokeIds: { clientUnitId, caseUnitId, paymentUnitId, docUnitId, apptUnitId, dakUnitId, taskUnitId, expenseUnitId },
     rows,
   };
 

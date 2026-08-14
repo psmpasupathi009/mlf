@@ -41,6 +41,10 @@ const nextConfig: NextConfig = {
             value: "camera=(), microphone=(), geolocation=(self)",
           },
           {
+            key: "X-Robots-Tag",
+            value: "noindex, nofollow, noarchive",
+          },
+          {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",

@@ -31,6 +31,7 @@ export const POST = apiHandler(async (request, context) => {
       pinHash: null,
       failedPinAttempts: 0,
       pinLockedUntil: null,
+      sessionVersion: { increment: 1 },
     },
   });
 

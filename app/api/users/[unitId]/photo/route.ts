@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
 import { apiHandler, jsonFail } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/guard";
+import { isClientOnlyUser } from "@/lib/auth/client-portal";
 import { prisma } from "@/lib/db/prisma";
 import { storage } from "@/lib/storage";
 
-/** Serve profile photo — auth required. */
+/** Serve profile photo — auth required. Clients: own photo or bookable advocates. */
 export const GET = apiHandler(async (request, context) => {
   const { user, response } = await requireUser(request);
   if (!user) return response;
@@ -14,9 +15,18 @@ export const GET = apiHandler(async (request, context) => {
 
   const target = await prisma.user.findUnique({
     where: { unitId },
-    select: { photoKey: true, isActive: true },
+    select: { photoKey: true, isActive: true, roles: true, unitId: true },
   });
   if (!target?.isActive) return jsonFail("NOT_FOUND", "User not found", 404);
+
+  if (isClientOnlyUser(user.roles)) {
+    const own = target.unitId === user.unitId;
+    const advocate = target.roles.includes("advocate");
+    if (!own && !advocate) {
+      return jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403);
+    }
+  }
+
   if (!target.photoKey) return jsonFail("NOT_FOUND", "No photo", 404);
 
   const file = await storage.get(target.photoKey);

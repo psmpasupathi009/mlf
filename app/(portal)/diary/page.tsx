@@ -3,6 +3,7 @@ import { getSessionUser } from "@/lib/auth/session-user";
 import { ForbiddenState } from "@/shared/components/feedback/forbidden-state";
 import { DiaryPage } from "@/features/diary/components/diary-page";
 import { isModuleEnabled } from "@/config/company/modules";
+import { isClientOnlyUser } from "@/lib/auth/client-portal";
 
 function canAccessDiary(permissions: string[] | undefined): boolean {
   const perms = permissions ?? [];
@@ -16,7 +17,11 @@ function canAccessDiary(permissions: string[] | undefined): boolean {
 
 export default async function DiaryRoutePage() {
   const user = await getSessionUser();
-  if (!user || !canAccessDiary(user.permissions)) {
+  if (
+    !user ||
+    isClientOnlyUser(user.roles) ||
+    !canAccessDiary(user.permissions)
+  ) {
     return <ForbiddenState />;
   }
   return (

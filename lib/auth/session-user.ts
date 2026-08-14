@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { cookies } from "next/headers";
 import { withDbRetry } from "@/lib/db/unreachable";
-import { verifyAccessToken } from "@/lib/auth/jwt";
+import { accessSessionMatches, verifyAccessToken } from "@/lib/auth/jwt";
 import {
   ACCESS_COOKIE,
   findUserByAccessSub,
@@ -25,6 +25,7 @@ export const getSessionUser = cache(async (): Promise<PublicUser | null> => {
   return withDbRetry(async () => {
     const user = await findUserByAccessSub(payload.sub);
     if (!user || !user.isActive) return null;
+    if (!accessSessionMatches(payload, user.sessionVersion)) return null;
 
     // Permissions also hit Mongo — keep inside the retry boundary.
     return toPublicUser({

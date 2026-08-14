@@ -96,7 +96,10 @@ export async function POST(request: Request) {
 
     const updated = await prisma.user.update({
       where: { id: user.id },
-      data: { pinHash: await hashPin(parsed.data.pin) },
+      data: {
+        pinHash: await hashPin(parsed.data.pin),
+        sessionVersion: { increment: 1 },
+      },
     });
 
     const tokens = await issueAuthTokens(updated);

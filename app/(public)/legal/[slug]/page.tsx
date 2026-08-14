@@ -85,7 +85,7 @@ export default async function LegalPageRoute({ params }: Props) {
         </div>
 
         <p className="mt-12 text-xs text-muted-foreground">
-          Draft office policy for portal use. Signed engagement letters and
+          Office policy for portal use. Signed engagement letters and
           vakalatnama control the advocate–client relationship for each matter.
         </p>
       </main>

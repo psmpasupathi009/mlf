@@ -52,19 +52,13 @@ export async function canViewDocument(
   return hasPermission(user.id, "cases", "view");
 }
 
-/** Delete/upload-style mutate — clients may not delete; staff use upload perms. */
+/** Delete — clients may not delete; staff need the matching module upload/edit perm. */
 export async function canMutateDocument(
   user: User,
   doc: Pick<Document, "docType" | "expenseUnitId">
 ): Promise<boolean> {
   if (isClientOnlyUser(user.roles)) return false;
 
-  if (
-    isModuleEnabled("cases") &&
-    (await hasPermission(user.id, "cases", "upload"))
-  ) {
-    return true;
-  }
   if (doc.expenseUnitId) {
     if (!isModuleEnabled("expenses")) return false;
     return (
@@ -72,11 +66,15 @@ export async function canMutateDocument(
       (await hasPermission(user.id, "expenses", "upload"))
     );
   }
-  if (doc.docType !== "receipt" || !isModuleEnabled("accounts")) return false;
-  return (
-    (await hasPermission(user.id, "accounts", "edit")) ||
-    (await hasPermission(user.id, "accounts", "upload"))
-  );
+  if (doc.docType === "receipt") {
+    if (!isModuleEnabled("accounts")) return false;
+    return (
+      (await hasPermission(user.id, "accounts", "edit")) ||
+      (await hasPermission(user.id, "accounts", "upload"))
+    );
+  }
+  if (!isModuleEnabled("cases")) return false;
+  return hasPermission(user.id, "cases", "upload");
 }
 
 /** Safe Content-Disposition for downloads (ASCII fallback + RFC 5987). */

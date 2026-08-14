@@ -49,6 +49,12 @@ export function assertEnv(): void {
         "Invalid environment: CRON_SECRET must be a long random string in production"
       );
     }
+    const sms = process.env.TWO_FACTOR_API_KEY?.trim() ?? "";
+    if (!sms) {
+      throw new Error(
+        "Invalid environment: TWO_FACTOR_API_KEY is required in production for OTP and hearing SMS"
+      );
+    }
   }
 
   validated = true;

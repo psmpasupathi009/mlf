@@ -12,8 +12,19 @@ export type AccessTokenPayload = JWTPayload & {
   roles: UserRole[];
   /** Client.unitId when this session is a client portal user. */
   cid?: string;
+  /** Must match User.sessionVersion (missing claim treated as 0). */
+  sv?: number;
   typ: "access";
 };
+
+/** True when the JWT session version matches the user row (PIN reset invalidates old tokens). */
+export function accessSessionMatches(
+  payload: Pick<AccessTokenPayload, "sv">,
+  sessionVersion: number | null | undefined
+): boolean {
+  const tokenSv = typeof payload.sv === "number" ? payload.sv : 0;
+  return tokenSv === (sessionVersion ?? 0);
+}
 
 export type OtpProofPayload = JWTPayload & {
   jti: string;
@@ -37,10 +48,12 @@ export async function signAccessToken(input: {
   roles: UserRole[];
   /** Linked Client.unitId for client portal sessions. */
   clientUnitId?: string | null;
+  sessionVersion?: number | null;
 }): Promise<string> {
   return new SignJWT({
     mobile: input.mobile,
     roles: input.roles,
+    sv: input.sessionVersion ?? 0,
     ...(input.clientUnitId ? { cid: input.clientUnitId } : {}),
     typ: "access",
   })

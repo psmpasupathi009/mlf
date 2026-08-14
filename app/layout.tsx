@@ -20,6 +20,7 @@ export const metadata: Metadata = {
     template: "%s | Manitham Law Foundation",
   },
   description: "Secure portal for Manitham Law Foundation",
+  robots: { index: false, follow: false, nocache: true },
 };
 
 export const viewport: Viewport = {

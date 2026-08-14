@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import type { User, UserRole } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import {
+  accessSessionMatches,
   signAccessToken,
   verifyAccessToken,
   type AccessTokenPayload,
@@ -34,6 +35,7 @@ export type AuthUser = {
   photoKey?: string | null;
   clientUnitId?: string | null;
   isActive: boolean;
+  sessionVersion?: number | null;
 };
 
 /** Public contract — never expose Mongo ObjectId. */
@@ -89,6 +91,7 @@ export async function issueAuthTokens(user: AuthUser): Promise<{
     mobile: user.mobile,
     roles: user.roles,
     clientUnitId: user.clientUnitId,
+    sessionVersion: user.sessionVersion,
   });
 
   const updated = await prisma.user.update({
@@ -172,6 +175,7 @@ export async function getCurrentUser(request: Request): Promise<User | null> {
 
   const user = await findUserByAccessSub(payload.sub);
   if (!user || !user.isActive) return null;
+  if (!accessSessionMatches(payload, user.sessionVersion)) return null;
   return user;
 }
 

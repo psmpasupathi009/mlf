@@ -127,6 +127,8 @@ model User {
   failedPinAttempts Int            @default(0)
   pinLockedUntil    DateTime?
   lastLoginAt       DateTime?
+  /// Bumped on PIN reset / force-reset so existing JWTs die immediately.
+  sessionVersion    Int            @default(0)
   createdAt         DateTime       @default(now())
   updatedAt         DateTime       @updatedAt
 

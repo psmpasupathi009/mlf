@@ -92,6 +92,7 @@ export async function POST(request: Request) {
         pinHash: await hashPin(parsed.data.pin),
         failedPinAttempts: 0,
         pinLockedUntil: null,
+        sessionVersion: { increment: 1 },
       },
     });
 

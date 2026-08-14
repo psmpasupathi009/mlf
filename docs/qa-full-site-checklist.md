@@ -12,6 +12,7 @@ Login as admin (or sub_admin where noted). PIN default: `SEED_PIN` / `123456`.
 | Login with mobile + PIN | Auto | [ ] |
 | Session `/api/auth/me` | Auto | [ ] |
 | OTP send / verify / setup PIN | Auto (SKIP live SMS) | [ ] |
+| Forgot PIN reset invalidates old sessions | Auto (code) / Manual | [ ] |
 | Logout / session-expired | Auto / Manual | [ ] |
 
 ## Courts cascade
@@ -37,7 +38,10 @@ Login as admin (or sub_admin where noted). PIN default: `SEED_PIN` / `123456`.
 | Check | Type | Done |
 |-------|------|------|
 | Create / list / patch client | Auto | [ ] |
+| Client detail page | Auto | [ ] |
+| Portal-access status (invite skipped) | Auto | [ ] |
 | Create / list / patch case with court | Auto | [ ] |
+| Case detail page | Auto | [ ] |
 | Add hearing | Auto | [ ] |
 | Diary day board | Auto | [ ] |
 | Hearing SMS notify (if configured) | Auto / SKIP | [ ] |
@@ -48,23 +52,25 @@ Login as admin (or sub_admin where noted). PIN default: `SEED_PIN` / `123456`.
 | Check | Type | Done |
 |-------|------|------|
 | List / create appointment | Auto | [ ] |
-| Convert appointment → case | Auto | [ ] |
+| Convert appointment → case | Auto / SKIP | [ ] |
 | Weekly hours / time blocks | Auto | [ ] |
+| Court roster board + available advocates | Auto | [ ] |
 
-## Accounts & documents
+## Accounts, expenses & documents
 
 | Check | Type | Done |
 |-------|------|------|
-| Create payment / void | Auto | [ ] |
-| Upload / delete document | Auto | [ ] |
+| Create payment / void | Auto (void SKIP) | [ ] |
+| Create expense + bill / patch | Auto (void SKIP) | [ ] |
+| Upload / delete document | Auto (delete SKIP) | [ ] |
 
 ## HRMS
 
 | Check | Type | Done |
 |-------|------|------|
 | Check-in / presence | Auto | [ ] |
-| Leave request / decide / cancel | Auto | [ ] |
-| Office holidays | Auto | [ ] |
+| Leave request / decide / cancel | Auto (decide/cancel SKIP) | [ ] |
+| Office holidays | Auto (GET) | [ ] |
 
 ## Office modules
 
@@ -72,16 +78,16 @@ Login as admin (or sub_admin where noted). PIN default: `SEED_PIN` / `123456`.
 |-------|------|------|
 | Dak list / create | Auto | [ ] |
 | Tasks list / create | Auto | [ ] |
-| Expenses page + API | Auto | [ ] |
-| Reports / exports | Auto | [ ] |
+| Reports / exports (all types) | Auto | [ ] |
+| Activity log | Auto | [ ] |
 
 ## Admin
 
 | Check | Type | Done |
 |-------|------|------|
-| Employees CRUD / deactivate | Auto | [ ] |
+| Employees CRUD / deactivate | Auto (mutate SKIP) | [ ] |
 | Permissions matrix | Auto | [ ] |
-| Notifications inbox + SSE | Auto | [ ] |
+| Notifications inbox + mark-one-read | Auto | [ ] |
 | Profile | Auto | [ ] |
 
 ## Portal pages (HTTP load)
@@ -89,11 +95,12 @@ Login as admin (or sub_admin where noted). PIN default: `SEED_PIN` / `123456`.
 | Path | Type | Done |
 |------|------|------|
 | `/` Home | Auto | [ ] |
-| `/clients` `/cases` `/diary` | Auto | [ ] |
-| `/appointments` `/availability` | Auto | [ ] |
+| `/clients` `/clients/[id]` `/cases` `/cases/[id]` `/diary` | Auto | [ ] |
+| `/appointments` `/availability` `/court-roster` | Auto | [ ] |
 | `/accounts` `/expenses` `/hrms` | Auto | [ ] |
-| `/dak` `/tasks` `/reports` | Auto | [ ] |
+| `/dak` `/tasks` `/reports` `/activity` | Auto | [ ] |
 | `/employees` `/permissions` `/notifications` `/profile` | Auto | [ ] |
+| `/documents` (staff redirect) `/legal/*` | Auto | [ ] |
 
 ## How to run Auto suite
 
