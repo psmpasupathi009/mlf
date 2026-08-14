@@ -1112,7 +1112,7 @@ async function main() {
     ["lib/rbac/*", "Permission resolution + guards"],
     ["lib/rate-limit/*", "Mongo rate limits"],
     ["lib/api/guard.ts", "requireUser / requirePerm"],
-    ["lib/storage/*", "Local upload storage"],
+    ["lib/storage/*", "Cloudinary + legacy local storage"],
     ["lib/notifications/*", "In-app notify + SMS jobs"],
     ["prisma/schema.prisma", "Mongo data model"],
     ["config/company/*", "Office identity, nav, perms defaults"],

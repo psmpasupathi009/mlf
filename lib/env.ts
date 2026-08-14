@@ -5,11 +5,23 @@ const PLACEHOLDER_SECRETS = new Set([
   "change-me-cron-secret-long-random",
 ]);
 
+const isTest = process.env.NODE_ENV === "test";
+
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1, "DATABASE_URL is required"),
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
   CRON_SECRET: z.string().optional(),
   NODE_ENV: z.enum(["development", "test", "production"]).optional(),
+  CLOUDINARY_CLOUD_NAME: isTest
+    ? z.string().optional()
+    : z.string().min(1, "CLOUDINARY_CLOUD_NAME is required"),
+  CLOUDINARY_API_KEY: isTest
+    ? z.string().optional()
+    : z.string().min(1, "CLOUDINARY_API_KEY is required"),
+  CLOUDINARY_API_SECRET: isTest
+    ? z.string().optional()
+    : z.string().min(1, "CLOUDINARY_API_SECRET is required"),
+  CLOUDINARY_FOLDER: z.string().min(1).optional(),
 });
 
 let validated = false;

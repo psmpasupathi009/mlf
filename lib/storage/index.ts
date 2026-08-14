@@ -1,52 +1,14 @@
-import { compliance } from "@/config/company/compliance";
 import { mkdir, writeFile, readFile, unlink } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 import { detectAllowedMime } from "@/lib/storage/detect-mime";
+import { assertAllowedMime, assertSize, safeFolder } from "@/lib/storage/guards";
+import { cloudinaryDriver, parseStorageKey } from "@/lib/storage/cloudinary-driver";
+import type { StorageDriver, StoredFile } from "@/lib/storage/types";
 
-export type StoredFile = {
-  key: string;
-  mimeType: string;
-  size: number;
-  originalName: string;
-};
-
-export type StorageDriver = {
-  put(input: {
-    buffer: Buffer;
-    mimeType: string;
-    originalName: string;
-    folder?: string;
-  }): Promise<StoredFile>;
-  get(key: string): Promise<{ buffer: Buffer; mimeType?: string } | null>;
-  delete(key: string): Promise<void>;
-};
+export type { StoredFile, StorageDriver } from "@/lib/storage/types";
 
 const UPLOAD_ROOT = path.join(process.cwd(), "uploads");
-
-function assertAllowedMime(mimeType: string): void {
-  const allowed = compliance.uploads.allowedMimeTypes as readonly string[];
-  if (!allowed.includes(mimeType)) {
-    throw new Error(`File type not allowed: ${mimeType}`);
-  }
-}
-
-function assertSize(size: number): void {
-  if (size > compliance.uploads.maxBytes) {
-    throw new Error(
-      `File too large (max ${Math.round(compliance.uploads.maxBytes / (1024 * 1024))} MB)`
-    );
-  }
-}
-
-function safeFolder(folder: string): string {
-  return (
-    folder
-      .replace(/[^a-zA-Z0-9_\-./]/g, "_")
-      .replace(/\.\./g, "_")
-      .slice(0, 80) || "misc"
-  );
-}
 
 const localDriver: StorageDriver = {
   async put({ buffer, originalName, folder = "misc" }) {
@@ -97,5 +59,25 @@ const localDriver: StorageDriver = {
   },
 };
 
-/** Features call this interface — never `fs` directly. Swap driver in Scale. */
-export const storage: StorageDriver = localDriver;
+/**
+ * New uploads go to Cloudinary (private/authenticated).
+ * get/delete: Cloudinary keys (`image:` / `raw:`) vs legacy local paths.
+ */
+export const storage: StorageDriver = {
+  put(input) {
+    return cloudinaryDriver.put(input);
+  },
+  async get(key) {
+    const parsed = parseStorageKey(key);
+    if (parsed.kind === "cloudinary") return cloudinaryDriver.get(key);
+    return localDriver.get(key);
+  },
+  async delete(key) {
+    const parsed = parseStorageKey(key);
+    if (parsed.kind === "cloudinary") {
+      await cloudinaryDriver.delete(key);
+      return;
+    }
+    await localDriver.delete(key);
+  },
+};

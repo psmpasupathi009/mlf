@@ -15,6 +15,12 @@ const nextConfig: NextConfig = {
   images: {
     formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 60 * 60 * 24 * 30,
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "res.cloudinary.com",
+      },
+    ],
   },
   experimental: {
     optimizePackageImports: ["sonner", "radix-ui", "lucide-react", "date-fns"],
@@ -40,7 +46,7 @@ const nextConfig: NextConfig = {
               "default-src 'self'",
               "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
               "style-src 'self' 'unsafe-inline'",
-              "img-src 'self' data: blob:",
+              "img-src 'self' data: blob: https://res.cloudinary.com",
               "font-src 'self' data:",
               "connect-src 'self'",
               "frame-ancestors 'none'",
