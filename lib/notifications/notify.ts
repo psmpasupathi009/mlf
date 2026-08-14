@@ -12,9 +12,9 @@ import { istAddCalendarDays, istDateKey } from "@/lib/utils/ist";
 export type NotifyUserRef = { id: string; unitId: string };
 
 /** Prisma MongoDB: unset optional DateTime ≠ `null` filter. Match both. */
-export const unreadNotificationWhere = {
+export const unreadNotificationWhere: Prisma.NotificationWhereInput = {
   OR: [{ readAt: null }, { readAt: { isSet: false } }],
-} as const;
+};
 
 export type NotifyInput = {
   userId: string;

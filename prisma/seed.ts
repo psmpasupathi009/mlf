@@ -26,6 +26,9 @@ const DATA = join(process.cwd(), "prisma", "data");
 const RESET_STAFF = process.argv.includes("--reset-staff");
 /** Delete all business data + non-admin users; keep env ADMIN_MOBILE + RolePermission. */
 const WIPE_KEEP_ADMIN = process.argv.includes("--wipe-keep-admin");
+/** Delete operational/test data; keep OFFICE_ROSTER staff + RolePermission + defaultCourts. */
+const WIPE_KEEP_STAFF = process.argv.includes("--wipe-keep-staff");
+const SKIP_SAMPLE_DATA = WIPE_KEEP_ADMIN || WIPE_KEEP_STAFF;
 
 /** Dev/test PIN for seeded users (override with SEED_PIN). */
 const SEED_PIN = process.env.SEED_PIN ?? "123456";
@@ -164,18 +167,8 @@ async function migrateLegacyUsers() {
   console.log(`User migrate: updated ${migrated} document(s), employee seq=${seq}`);
 }
 
-/**
- * Wipe operational data. Keeps RolePermission and the env bootstrap admin user.
- * Resets IdCounter so unit IDs start fresh after reseed.
- */
-async function wipeKeepAdmin() {
-  const adminMobile = normalizeMobile(
-    process.env.ADMIN_MOBILE ?? process.env.ADMIN_MOBILE_1 ?? ""
-  );
-  if (!adminMobile) {
-    throw new Error("--wipe-keep-admin requires ADMIN_MOBILE (or ADMIN_MOBILE_1)");
-  }
-
+/** Operational collections (not User / RolePermission / IdCounter). */
+async function wipeOperationalCollections() {
   const counts = await Promise.all([
     prisma.hearing.deleteMany({}),
     prisma.case.deleteMany({}),
@@ -190,6 +183,7 @@ async function wipeKeepAdmin() {
     prisma.advocateWeeklyHours.deleteMany({}),
     prisma.advocateTimeBlock.deleteMany({}),
     prisma.officeHoliday.deleteMany({}),
+    prisma.courtDutyOverride.deleteMany({}),
     prisma.notification.deleteMany({}),
     prisma.client.deleteMany({}),
     prisma.auditLog.deleteMany({}),
@@ -197,28 +191,82 @@ async function wipeKeepAdmin() {
     prisma.consumedOtpProof.deleteMany({}),
     prisma.rateLimit.deleteMany({}),
   ]);
+  return counts.reduce((a, c) => a + c.count, 0);
+}
 
+async function resetIdCountersKeepingEmployeeSeq() {
+  const remaining = await prisma.user.findMany({
+    select: { unitId: true },
+  });
+  let maxEmp = 0;
+  for (const u of remaining) {
+    const n = Number(u.unitId?.match(/(\d+)$/)?.[1] ?? "0");
+    if (n > maxEmp) maxEmp = n;
+  }
+  await prisma.idCounter.deleteMany({});
+  if (maxEmp > 0) {
+    await prisma.idCounter.create({
+      data: { entity: "employee", seq: maxEmp },
+    });
+  }
+}
+
+/**
+ * Wipe operational data. Keeps RolePermission and the env bootstrap admin user.
+ * Resets IdCounter so unit IDs start fresh after reseed.
+ */
+async function wipeKeepAdmin() {
+  const adminMobile = normalizeMobile(
+    process.env.ADMIN_MOBILE ?? process.env.ADMIN_MOBILE_1 ?? ""
+  );
+  if (!adminMobile) {
+    throw new Error("--wipe-keep-admin requires ADMIN_MOBILE (or ADMIN_MOBILE_1)");
+  }
+
+  const cleared = await wipeOperationalCollections();
   const deletedUsers = await prisma.user.deleteMany({
     where: { mobile: { not: adminMobile } },
   });
-
-  await prisma.idCounter.deleteMany({});
-
-  // Keep employee seq above the remaining admin so new EMP-* IDs do not collide.
-  const admin = await prisma.user.findUnique({
-    where: { mobile: adminMobile },
-    select: { unitId: true },
-  });
-  const adminSeq = Number(admin?.unitId?.match(/(\d+)$/)?.[1] ?? "0");
-  if (adminSeq > 0) {
-    await prisma.idCounter.create({
-      data: { entity: "employee", seq: adminSeq },
-    });
-  }
+  await resetIdCountersKeepingEmployeeSeq();
 
   console.log(
-    `--wipe-keep-admin: cleared business collections (${counts.reduce((a, c) => a + c.count, 0)} docs), deleted ${deletedUsers.count} user(s); kept admin ${adminMobile}`
+    `--wipe-keep-admin: cleared business collections (${cleared} docs), deleted ${deletedUsers.count} user(s); kept admin ${adminMobile}`
   );
+}
+
+/**
+ * Wipe test/operational data. Keeps OFFICE_ROSTER staff (and env admin if set)
+ * plus RolePermission. Permanent court follow lists are re-applied from roster.
+ */
+async function wipeKeepStaff() {
+  const keep = new Set<string>();
+  for (const row of OFFICE_ROSTER) {
+    const m = normalizeMobile(row.mobile);
+    if (m) keep.add(m);
+  }
+
+  if (keep.size === 0) {
+    throw new Error("--wipe-keep-staff: OFFICE_ROSTER has no valid mobiles");
+  }
+
+  const cleared = await wipeOperationalCollections();
+  const extras = await prisma.user.findMany({
+    where: { mobile: { notIn: [...keep] } },
+    select: { unitId: true, mobile: true, name: true },
+  });
+  const deletedUsers = await prisma.user.deleteMany({
+    where: { mobile: { notIn: [...keep] } },
+  });
+  await resetIdCountersKeepingEmployeeSeq();
+
+  console.log(
+    `--wipe-keep-staff: cleared business collections (${cleared} docs), deleted ${deletedUsers.count} extra user(s); keeping ${keep.size} roster mobile(s)`
+  );
+  if (extras.length) {
+    for (const u of extras) {
+      console.log(`  removed ${u.unitId} ${u.name ?? ""} ${u.mobile}`);
+    }
+  }
 }
 
 async function seedAdmin() {
@@ -709,7 +757,7 @@ async function seedOfficeHoliday() {
 }
 
 async function printSummary() {
-  const [users, clients, cases, hearings, appointments, payments, perms] =
+  const [users, clients, cases, hearings, appointments, payments, perms, overrides] =
     await Promise.all([
       prisma.user.count(),
       prisma.client.count(),
@@ -718,29 +766,62 @@ async function printSummary() {
       prisma.appointment.count(),
       prisma.cashPayment.count(),
       prisma.rolePermission.count(),
+      prisma.courtDutyOverride.count(),
     ]);
+  const staff = await prisma.user.findMany({
+    where: { isActive: true },
+    select: { unitId: true, name: true, roles: true, defaultCourts: true },
+    orderBy: { unitId: "asc" },
+  });
+  const advocatesWithCourts = staff.filter((u) => {
+    const courts = u.defaultCourts;
+    return Array.isArray(courts) && courts.length > 0;
+  }).length;
   console.log("\n--- Seed summary ---");
   console.log(
     JSON.stringify(
-      { users, clients, cases, hearings, appointments, payments, perms },
+      {
+        users,
+        clients,
+        cases,
+        hearings,
+        appointments,
+        payments,
+        courtDutyOverrides: overrides,
+        advocatesWithDefaultCourts: advocatesWithCourts,
+        perms,
+      },
       null,
       2
     )
   );
+  if (WIPE_KEEP_STAFF) {
+    console.log("\nRemaining staff:");
+    for (const u of staff) {
+      const n = Array.isArray(u.defaultCourts) ? u.defaultCourts.length : 0;
+      console.log(
+        `  ${u.unitId} ${u.name ?? "?"} [${u.roles.join(",")}] courts=${n}`
+      );
+    }
+  }
   console.log(`Test login: ADMIN_MOBILE with PIN ${SEED_PIN}`);
 }
 
 async function main() {
-  if (WIPE_KEEP_ADMIN) {
+  if (WIPE_KEEP_STAFF) {
+    await wipeKeepStaff();
+  } else if (WIPE_KEEP_ADMIN) {
     await wipeKeepAdmin();
   }
   await seedPermissions();
   await migrateLegacyUsers();
   const pinHash = await hashPin(SEED_PIN);
-  await seedAdmin();
+  if (!WIPE_KEEP_STAFF) {
+    await seedAdmin();
+  }
   await seedEmployees(pinHash);
   // After a wipe, only restore office staff — skip demo clients/cases/etc.
-  if (!WIPE_KEEP_ADMIN) {
+  if (!SKIP_SAMPLE_DATA) {
     const clients = await seedClients();
     const cases = await seedCases(clients);
     await seedHearings(cases);
@@ -748,7 +829,9 @@ async function main() {
     await seedPayments(clients, cases);
     await seedOfficeHoliday();
   } else {
-    console.log("Sample CSV data skipped (--wipe-keep-admin)");
+    console.log(
+      `Sample CSV data skipped (${WIPE_KEEP_STAFF ? "--wipe-keep-staff" : "--wipe-keep-admin"})`
+    );
   }
   await printSummary();
 }

@@ -1,4 +1,5 @@
-export function normalizeMobile(input: string): string | null {
+export function normalizeMobile(input: string | null | undefined): string | null {
+  if (!input) return null;
   const digits = input.replace(/\D/g, "");
 
   if (digits.length === 10 && /^[6-9]/.test(digits)) {
