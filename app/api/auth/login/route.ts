@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { isDbUnreachableError } from "@/lib/db/unreachable";
 import { normalizeMobile } from "@/lib/auth/mobile";
+import { findUserByLoginMobile } from "@/lib/auth/bootstrap-admin";
 import {
   isPinLocked,
   pinLockRetryAfterSec,
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const user = await prisma.user.findUnique({ where: { mobile } });
+    const user = await findUserByLoginMobile(mobile);
 
     if (!user || !user.isActive || !user.pinHash) {
       return applyCorsHeaders(
@@ -141,6 +142,7 @@ export async function POST(request: Request) {
     const response = jsonOk({
       message: "Login successful",
       user: tokens.user,
+      accessToken: tokens.accessToken,
     });
 
     return applyCorsHeaders(request, attachAuthCookies(response, tokens));

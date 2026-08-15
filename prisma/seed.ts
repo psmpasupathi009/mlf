@@ -16,7 +16,7 @@ import {
 } from "../config/company/designations";
 import { normalizeCaseStatus } from "../config/company/case-pipeline";
 import { OFFICE_ROSTER } from "../config/company/office-roster";
-import { normalizeMobile } from "../lib/auth/mobile";
+import { getEnvAdminMobile, normalizeMobile } from "../lib/auth/mobile";
 import { hashPin } from "../lib/auth/pin";
 import { parseCsv } from "../lib/utils/csv";
 import { nextUnitId } from "../lib/ids";
@@ -24,7 +24,7 @@ import { nextUnitId } from "../lib/ids";
 const prisma = new PrismaClient();
 const DATA = join(process.cwd(), "prisma", "data");
 const RESET_STAFF = process.argv.includes("--reset-staff");
-/** Delete all business data + non-admin users; keep env ADMIN_MOBILE + RolePermission. */
+/** Delete all business data + non-admin users; keep env SUPER_ADMIN_MOBILE + RolePermission. */
 const WIPE_KEEP_ADMIN = process.argv.includes("--wipe-keep-admin");
 /** Delete operational/test data; keep OFFICE_ROSTER staff + RolePermission + defaultCourts. */
 const WIPE_KEEP_STAFF = process.argv.includes("--wipe-keep-staff");
@@ -216,11 +216,11 @@ async function resetIdCountersKeepingEmployeeSeq() {
  * Resets IdCounter so unit IDs start fresh after reseed.
  */
 async function wipeKeepAdmin() {
-  const adminMobile = normalizeMobile(
-    process.env.ADMIN_MOBILE ?? process.env.ADMIN_MOBILE_1 ?? ""
-  );
+  const adminMobile = getEnvAdminMobile();
   if (!adminMobile) {
-    throw new Error("--wipe-keep-admin requires ADMIN_MOBILE (or ADMIN_MOBILE_1)");
+    throw new Error(
+      "--wipe-keep-admin requires SUPER_ADMIN_MOBILE (or ADMIN_MOBILE)"
+    );
   }
 
   const cleared = await wipeOperationalCollections();
@@ -270,11 +270,9 @@ async function wipeKeepStaff() {
 }
 
 async function seedAdmin() {
-  const adminMobile = normalizeMobile(
-    process.env.ADMIN_MOBILE ?? process.env.ADMIN_MOBILE_1 ?? ""
-  );
+  const adminMobile = getEnvAdminMobile();
   if (!adminMobile) {
-    console.log("Admin: skipped (set ADMIN_MOBILE)");
+    console.log("Admin: skipped (set SUPER_ADMIN_MOBILE or ADMIN_MOBILE)");
     return null;
   }
 
@@ -293,19 +291,25 @@ async function seedAdmin() {
   );
 
   if (existing) {
+    const keepPin = Boolean(existing.pinHash);
     const updated = await prisma.user.update({
       where: { id: existing.id },
       data: {
         roles: mergedRoles,
         designation: existing.designation ?? "Managing Partner",
-        name: existing.name ?? "Bootstrap Admin",
-        pinHash,
+        name: existing.name ?? "Super Admin",
+        // Keep PIN after Forgot PIN / setup; only fill default 123456 when unset.
+        ...(keepPin ? {} : { pinHash }),
         isActive: true,
         failedPinAttempts: 0,
         pinLockedUntil: null,
       },
     });
-    console.log(`Admin: updated ${updated.unitId} (${adminMobile}) PIN=${SEED_PIN}`);
+    console.log(
+      keepPin
+        ? `Admin: updated ${updated.unitId} (${adminMobile}) PIN kept`
+        : `Admin: updated ${updated.unitId} (${adminMobile}) PIN=${SEED_PIN}`
+    );
     return updated;
   }
 
@@ -316,7 +320,7 @@ async function seedAdmin() {
       mobile: adminMobile,
       roles: designationDefaultRoles["Managing Partner"],
       designation: "Managing Partner",
-      name: "Bootstrap Admin",
+      name: "Super Admin",
       pinHash,
       isActive: true,
     },
@@ -326,9 +330,7 @@ async function seedAdmin() {
 }
 
 async function seedEmployees(pinHash: string) {
-  const adminMobile = normalizeMobile(
-    process.env.ADMIN_MOBILE ?? process.env.ADMIN_MOBILE_1 ?? ""
-  );
+  const adminMobile = getEnvAdminMobile();
   let created = 0;
   let updated = 0;
   const rosterMobiles = new Set<string>();
@@ -804,7 +806,9 @@ async function printSummary() {
       );
     }
   }
-  console.log(`Test login: ADMIN_MOBILE with PIN ${SEED_PIN}`);
+  console.log(
+    `Test login: SUPER_ADMIN_MOBILE (or ADMIN_MOBILE) — new users PIN ${SEED_PIN}; existing PIN is kept`
+  );
 }
 
 async function main() {

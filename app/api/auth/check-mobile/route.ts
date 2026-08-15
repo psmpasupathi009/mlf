@@ -8,6 +8,7 @@ import {
   isEnvAdminMobile,
   normalizeMobile,
 } from "@/lib/auth/mobile";
+import { ensureEnvAdminUser } from "@/lib/auth/bootstrap-admin";
 import {
   applyCorsHeaders,
   corsPreflight,
@@ -60,6 +61,8 @@ export async function POST(request: Request) {
         )
       );
     }
+
+    await ensureEnvAdminUser(mobile);
 
     const user = await withDbRetry(() =>
       prisma.user.findUnique({

@@ -263,6 +263,11 @@ export function defaultAllowed(
   return MATRIX[role]?.has(key(module, action)) ?? false;
 }
 
+/** Every catalog key — admin always holds this set (web + mobile). */
+export function catalogPermissionKeys(): string[] {
+  return PERMISSION_CATALOG.map((c) => key(c.module, c.action));
+}
+
 /** Flat rows for prisma seed / reset-to-defaults. */
 export function permissionSeedRows(): {
   role: UserRole;

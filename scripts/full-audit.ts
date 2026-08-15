@@ -7,7 +7,7 @@ import "dotenv/config";
 import { writeFileSync } from "node:fs";
 import { PrismaClient } from "@prisma/client";
 import { ACCESS_COOKIE } from "../lib/auth/cookie-names";
-import { normalizeMobile } from "../lib/auth/mobile";
+import { getEnvAdminMobile } from "../lib/auth/mobile";
 
 const BASE = process.env.SMOKE_BASE_URL ?? "http://127.0.0.1:3000";
 /** Prefer SMOKE_PIN; fall back to SEED_PIN (same default as prisma/seed.ts). */
@@ -137,9 +137,7 @@ async function main() {
     throw new Error("Set SMOKE_PIN to the 6-digit login PIN (env only)");
   }
 
-  const adminMobile = normalizeMobile(
-    process.env.ADMIN_MOBILE ?? process.env.ADMIN_MOBILE_1 ?? ""
-  );
+  const adminMobile = getEnvAdminMobile();
   const user =
     (adminMobile
       ? await prisma.user.findUnique({ where: { mobile: adminMobile } })

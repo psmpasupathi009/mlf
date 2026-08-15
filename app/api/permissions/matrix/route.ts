@@ -54,18 +54,13 @@ export const PUT = apiHandler(async (request) => {
     return jsonFail("VALIDATION", parsed.error.issues[0]?.message ?? "Invalid request", 400, parsed.error.issues);
   }
 
-  // Admin must always retain full access — the matrix can't lock the office out.
-  const adminRows = parsed.data.rows.filter((r) => r.role === "admin");
-  const adminHasAllAccess = PERMISSION_CATALOG.every(({ module, action }) =>
-    adminRows.some((r) => r.module === module && r.action === action && r.allowed)
+  const rows = parsed.data.rows.map((row) =>
+    row.role === "admin" ? { ...row, allowed: true } : row
   );
-  if (adminRows.length > 0 && !adminHasAllAccess) {
-    return jsonFail("VALIDATION", "The admin role must keep full access to every module", 400);
-  }
 
   const existing = await prisma.rolePermission.findMany({
     where: {
-      OR: parsed.data.rows.map((row) => ({
+      OR: rows.map((row) => ({
         role: row.role,
         module: row.module,
         action: row.action,
@@ -76,7 +71,7 @@ export const PUT = apiHandler(async (request) => {
     existing.map((r) => [`${r.role}.${r.module}.${r.action}`, r.allowed])
   );
   const cellChanges: AuditChangeMap = {};
-  for (const row of parsed.data.rows) {
+  for (const row of rows) {
     const key = `${row.role}.${row.module}.${row.action}`;
     const prev = existingMap.get(key);
     const from = prev === undefined ? null : prev;
@@ -85,7 +80,7 @@ export const PUT = apiHandler(async (request) => {
     }
   }
 
-  for (const row of parsed.data.rows) {
+  for (const row of rows) {
     await prisma.rolePermission.upsert({
       where: {
         role_module_action: { role: row.role, module: row.module, action: row.action },
@@ -100,7 +95,7 @@ export const PUT = apiHandler(async (request) => {
     action: "permissions.matrix_update",
     entity: "RolePermission",
     meta: {
-      rowsChanged: parsed.data.rows.length,
+      rowsChanged: rows.length,
       changes: cellChanges,
     },
   });

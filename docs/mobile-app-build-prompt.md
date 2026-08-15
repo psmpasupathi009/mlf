@@ -134,7 +134,7 @@ Content-Type: application/json
 
 Full map: [application-flows.md](./application-flows.md).
 
-**Defer to later / desktop-first:** CSV import, permissions matrix editor, bulk exports, employees admin (unless needed), postal dak (optional).
+**On mobile:** all website nav modules are in the staff app (tabs + More). **Still website-first:** CSV import, Excel download, permissions *editor*, court cascade pickers.
 
 ---
 

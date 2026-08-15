@@ -1,6 +1,7 @@
 import { cache } from "react";
 import type { User, UserRole } from "@prisma/client";
 import { isModuleEnabled, type AppModule } from "@/config/company/modules";
+import { catalogPermissionKeys } from "@/config/company/permissions-defaults";
 import { prisma } from "@/lib/db/prisma";
 import { jsonFail } from "@/lib/api/response";
 import { ensureDefaultPermissions } from "@/lib/rbac/ensure-permissions";
@@ -12,9 +13,14 @@ function permKey(module: string, action: string): string {
   return `${module}.${action}`;
 }
 
+function fullAdminPermissions(): Set<string> {
+  return new Set(catalogPermissionKeys());
+}
+
 /**
  * Effective permissions = union of RolePermission rows for user.roles.
- * Always from DB — never trust JWT or client body.
+ * Admin always receives the full catalog (cannot be locked out).
+ * Always from DB for non-admin — never trust JWT or client body.
  * Request-scoped via React cache() when called from RSC / same request tree.
  */
 export const getEffectivePermissions = cache(
@@ -29,6 +35,10 @@ export const getEffectivePermissions = cache(
     }
 
     await ensureDefaultPermissions();
+
+    if (user.roles.includes("admin")) {
+      return fullAdminPermissions();
+    }
 
     const rows = await prisma.rolePermission.findMany({
       where: {
@@ -58,6 +68,9 @@ export async function getEffectivePermissionsForRoles(
 ): Promise<string[]> {
   if (roles.length === 0) return [];
   await ensureDefaultPermissions();
+  if (roles.includes("admin")) {
+    return catalogPermissionKeys().sort();
+  }
   const rows = await prisma.rolePermission.findMany({
     where: { role: { in: roles }, allowed: true },
     select: { module: true, action: true },

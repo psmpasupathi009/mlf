@@ -179,6 +179,9 @@ export async function getCurrentUser(request: Request): Promise<User | null> {
   return user;
 }
 
+const CORS_ALLOW_HEADERS = "Content-Type, Authorization";
+const CORS_ALLOW_METHODS = "GET,POST,PUT,PATCH,DELETE,OPTIONS";
+
 export function applyCorsHeaders(
   request: Request,
   response: NextResponse
@@ -189,14 +192,22 @@ export function applyCorsHeaders(
     .map((v) => v.trim())
     .filter(Boolean);
 
+  const requestHeaders = (
+    request.headers.get("access-control-request-headers") ?? ""
+  ).toLowerCase();
+  const bearerClient =
+    Boolean(getBearerToken(request)) || requestHeaders.includes("authorization");
+
   if (origin && allowed.includes(origin)) {
     response.headers.set("Access-Control-Allow-Origin", origin);
     response.headers.set("Access-Control-Allow-Credentials", "true");
-    response.headers.set(
-      "Access-Control-Allow-Headers",
-      "Content-Type, Authorization"
-    );
-    response.headers.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+    response.headers.set("Access-Control-Allow-Headers", CORS_ALLOW_HEADERS);
+    response.headers.set("Access-Control-Allow-Methods", CORS_ALLOW_METHODS);
+  } else if (origin && bearerClient) {
+    // Native / mobile clients send Bearer; they are not limited to web origins.
+    response.headers.set("Access-Control-Allow-Origin", origin);
+    response.headers.set("Access-Control-Allow-Headers", CORS_ALLOW_HEADERS);
+    response.headers.set("Access-Control-Allow-Methods", CORS_ALLOW_METHODS);
   }
 
   return response;

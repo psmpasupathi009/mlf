@@ -8,7 +8,7 @@
 import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { issueAuthTokens, type AuthUser } from "../lib/auth/session";
-import { normalizeMobile } from "../lib/auth/mobile";
+import { getEnvAdminMobile } from "../lib/auth/mobile";
 
 const BASE = process.env.SMOKE_BASE_URL ?? "http://127.0.0.1:3000";
 const prisma = new PrismaClient();
@@ -88,9 +88,7 @@ async function waitForServer(timeoutMs = 60_000) {
 async function main() {
   const results: StepResult[] = [];
 
-  const adminMobileEnv = normalizeMobile(
-    process.env.ADMIN_MOBILE ?? process.env.ADMIN_MOBILE_1 ?? ""
-  );
+  const adminMobileEnv = getEnvAdminMobile();
   const user =
     (adminMobileEnv
       ? await prisma.user.findUnique({ where: { mobile: adminMobileEnv } })

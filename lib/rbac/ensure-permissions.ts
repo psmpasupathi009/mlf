@@ -61,8 +61,8 @@ export async function ensureDefaultPermissions(): Promise<boolean> {
               },
             },
             create: row,
-            // Don't clobber an admin matrix save.
-            update: {},
+            // Keep admin fully open; don't clobber other roles' matrix saves.
+            update: row.role === "admin" ? { allowed: true } : {},
           })
         )
       );

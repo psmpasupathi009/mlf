@@ -100,6 +100,7 @@ export async function POST(request: Request) {
     const response = jsonOk({
       message: "PIN reset successfully",
       user: tokens.user,
+      accessToken: tokens.accessToken,
     });
 
     return applyCorsHeaders(request, attachAuthCookies(response, tokens));

@@ -9,14 +9,10 @@ import {
   applyCorsHeaders,
   corsPreflight,
 } from "@/lib/auth/session";
+import { ensureEnvAdminUser, findUserByLoginMobile } from "@/lib/auth/bootstrap-admin";
 import { jsonFail, jsonOk } from "@/lib/api/response";
 import { rateLimit } from "@/lib/rate-limit";
 import { clientRateKey } from "@/lib/rate-limit/client-key";
-import {
-  createUserWithUniqueMobile,
-  findUserByMobile,
-  MobileConflictError,
-} from "@/lib/auth/users.service";
 import { verifyOtpSms } from "@/lib/services/two-factor.service";
 import { verifyOtpSchema } from "@/lib/validations/auth.schema";
 
@@ -97,26 +93,9 @@ export async function POST(request: Request) {
     });
 
     if (purpose === "setup") {
-      let user = await findUserByMobile(mobile);
+      let user = await findUserByLoginMobile(mobile);
       if (!user && isEnvAdminMobile(mobile)) {
-        try {
-          user = await createUserWithUniqueMobile({
-            mobile,
-            roles: ["admin"],
-          });
-        } catch (error) {
-          if (error instanceof MobileConflictError) {
-            return applyCorsHeaders(
-              request,
-              jsonFail(
-                "CONFLICT",
-                "This mobile number is already registered",
-                409
-              )
-            );
-          }
-          throw error;
-        }
+        user = await ensureEnvAdminUser(mobile);
       }
 
       if (!user || !user.isActive) {
@@ -130,7 +109,7 @@ export async function POST(request: Request) {
         );
       }
     } else {
-      const user = await findUserByMobile(mobile);
+      const user = await findUserByLoginMobile(mobile);
       if (!user || !user.isActive || !user.pinHash) {
         return applyCorsHeaders(
           request,

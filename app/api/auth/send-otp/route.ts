@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db/prisma";
 import { isEnvAdminMobile, normalizeMobile } from "@/lib/auth/mobile";
+import { findUserByLoginMobile } from "@/lib/auth/bootstrap-admin";
 import { rateLimit } from "@/lib/rate-limit";
 import { clientRateKey } from "@/lib/rate-limit/client-key";
 import {
@@ -72,7 +73,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const user = await prisma.user.findUnique({ where: { mobile } });
+    const user = await findUserByLoginMobile(mobile);
 
     if (purpose === "setup") {
       const allowed =
