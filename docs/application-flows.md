@@ -1,5 +1,7 @@
 # MLF Application Flows
 
+**Canonical how-the-site-works doc:** [site-architecture.md](./site-architecture.md) (every flow, mermaid diagrams, schema, APIs). This file is deeper file-level notes and maintainability.
+
 How each major flow works: **UI → API → validation → Prisma → response**, and which files each flow uses.
 
 **Stack:** Next.js (App Router) · React · Prisma 6 · MongoDB Atlas · JWT cookie session · 2Factor OTP/SMS
@@ -185,6 +187,39 @@ These touch many domains. Read them once; domain sections assume this pattern.
 **First-time setup:** `check-mobile` → `send-otp` → `verify-otp` → `setup-pin` → cookies.
 
 Auth endpoints are rate-limited (`lib/rate-limit`).
+
+**Shared step machine (web + mobile):** [`lib/auth/login-flow.ts`](../lib/auth/login-flow.ts) — `LoginStep`, `AUTH_API`, `nextStepAfterCheckMobile`. Mobile apps mirror [`features/auth/components/login-form.tsx`](../features/auth/components/login-form.tsx).
+
+#### Login playbook (who can sign in and how)
+
+| User type | How account is created | Can log in? | First sign-in | Return sign-in |
+|-----------|------------------------|-------------|---------------|----------------|
+| Super admin | `SUPER_ADMIN_MOBILE` in env; `ensureEnvAdminUser` on check-mobile | Yes | **Dev:** PIN from `SEED_PIN` if unset. **Production:** OTP → create strong PIN | Mobile + PIN |
+| Staff / sub-admin | Admin **Employees → Create** (`POST /api/employees`) | Yes, immediately | Mobile → OTP setup → create PIN | Mobile + PIN |
+| Client | Admin **Clients → Invite to portal** (`POST /api/clients/[unitId]/portal-access`) | Only after invite | Same OTP setup as staff | Mobile + PIN |
+| Unknown mobile | — | No (`not_found`) | — | — |
+
+**Staff vs client:** Creating a client record does **not** create login. Portal invite is a separate step on the client detail page.
+
+**OTP setup vs Forgot PIN:**
+- **OTP setup** (`purpose: setup`) — first PIN, or after admin force-reset PIN (`pinHash` empty).
+- **Forgot PIN** (`purpose: forgot_pin`) — change an existing PIN; requires `pinHash` already set.
+
+**Web vs mobile session:** Web uses httpOnly cookie `mlf_access`. Mobile stores `accessToken` from login/setup-pin/forgot-pin/reset JSON and sends `Authorization: Bearer`. Same APIs — see [`docs/mobile-app-build-prompt.md`](./mobile-app-build-prompt.md).
+
+```mermaid
+flowchart TB
+  phone["Enter mobile"] --> cm["check-mobile"]
+  cm --> pin["status pin → login"]
+  cm --> otp["status otp_required → send-otp setup"]
+  cm --> deny["status not_found"]
+  otp --> verify["verify-otp"]
+  verify --> setup["setup-pin → session"]
+  pin --> session["cookie or Bearer token"]
+  setup --> session
+  session --> staff["Staff: full portal by permissions"]
+  session --> client["Client: limited portal paths"]
+```
 
 ```mermaid
 sequenceDiagram

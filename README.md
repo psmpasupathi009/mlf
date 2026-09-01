@@ -20,6 +20,7 @@ APIs and URLs use public **`unitId`** (`CLI-…`, `CSE-…`, `EMP-…`), never M
 
 | Doc | What it covers |
 |-----|----------------|
+| [docs/site-architecture.md](docs/site-architecture.md) | Full explanation of how the site works — every flow, diagram, schema, APIs |
 | [docs/website-guide.md](docs/website-guide.md) | How the site works — pages, flows, which IDs each feature uses |
 | [docs/schema-api-reference.md](docs/schema-api-reference.md) | ID glossary, models, dual-FK rules, full API catalog |
 | [docs/application-flows.md](docs/application-flows.md) | Deeper flow notes / maintainability |

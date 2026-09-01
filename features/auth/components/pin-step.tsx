@@ -173,7 +173,7 @@ export function PinStep({
             onClick={onForgot}
             disabled={loading}
           >
-            {loading ? "Sending OTP…" : "Forgot PIN?"}
+            {loading ? "Sending OTP…" : "Forgot PIN? (already have a PIN)"}
           </button>
         ) : null}
       </div>

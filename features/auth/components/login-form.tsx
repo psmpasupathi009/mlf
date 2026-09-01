@@ -15,21 +15,14 @@ import {
   getRetryAfterSec,
 } from "@/lib/api/client";
 import { isWeakPin } from "@/lib/auth/pin-rules";
-
-type Step =
-  | "phone"
-  | "pin"
-  | "otp_setup"
-  | "setup_pin"
-  | "otp_forgot"
-  | "reset_pin";
+import type { LoginStep, OtpPurpose } from "@/lib/auth/login-flow";
 
 export function LoginForm() {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const countdown = useResendCountdown(60);
 
-  const [step, setStep] = useState<Step>("phone");
+  const [step, setStep] = useState<LoginStep>("phone");
   const [mobile, setMobile] = useState("");
   const [otp, setOtp] = useState("");
   const [pin, setPin] = useState("");
@@ -148,7 +141,7 @@ export function LoginForm() {
     setError("Could not verify this number. Please try again.");
   }
 
-  async function sendOtp(purpose: "setup" | "forgot_pin") {
+  async function sendOtp(purpose: OtpPurpose) {
     if (busy) return;
     setLoading(true);
     setError("");
@@ -169,7 +162,7 @@ export function LoginForm() {
     setStep(purpose === "setup" ? "otp_setup" : "otp_forgot");
   }
 
-  async function handleVerifyOtp(purpose: "setup" | "forgot_pin") {
+  async function handleVerifyOtp(purpose: OtpPurpose) {
     if (busy) return;
     setLoading(true);
     setError("");
@@ -292,19 +285,35 @@ export function LoginForm() {
 
   const heading =
     step === "phone"
-      ? { title: "Sign in", subtitle: null as string | null }
+      ? {
+          title: "Sign in",
+          subtitle:
+            "Use the mobile number registered by your office. No public signup.",
+        }
       : step === "pin"
         ? {
             title: pinLocked ? "PIN locked" : "Enter PIN",
             subtitle: `+91 ${mobile}`,
           }
         : step === "otp_setup"
-          ? { title: "Verify OTP", subtitle: `Sent to +91 ${mobile}` }
+          ? {
+              title: "Verify OTP",
+              subtitle: `First-time sign-in — OTP sent to +91 ${mobile}`,
+            }
           : step === "otp_forgot"
-            ? { title: "Reset PIN", subtitle: `OTP sent to +91 ${mobile}` }
-            : step === "setup_pin"
-              ? { title: "Create PIN", subtitle: "Choose a 6-digit PIN" }
-              : { title: "New PIN", subtitle: "Choose a new 6-digit PIN" };
+            ? {
+                title: "Reset PIN",
+                subtitle: `OTP sent to +91 ${mobile}`,
+              }
+          : step === "setup_pin"
+            ? {
+                title: "Create PIN",
+                subtitle: "Choose a strong 6-digit PIN for future sign-ins",
+              }
+            : {
+                title: "New PIN",
+                subtitle: "Choose a new 6-digit PIN",
+              };
 
   return (
     <div className="w-full text-foreground">
@@ -317,11 +326,9 @@ export function LoginForm() {
         <h2 className="text-xl font-semibold tracking-tight text-navy sm:text-[1.5rem]">
           {heading.title}
         </h2>
-        {heading.subtitle ? (
-          <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-            {heading.subtitle}
-          </p>
-        ) : null}
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          {heading.subtitle}
+        </p>
       </header>
 
       {step === "phone" ? (

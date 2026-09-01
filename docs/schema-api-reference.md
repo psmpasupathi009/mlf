@@ -1,6 +1,6 @@
 # Schema & API Reference (ID-first)
 
-Lookup guide for **IDs**, **models**, and **APIs**. For how pages and flows use these, see [website-guide.md](./website-guide.md).
+Lookup guide for **IDs**, **models**, and **APIs**. Full flow diagrams: [site-architecture.md](./site-architecture.md). Shorter ID-aware page map: [website-guide.md](./website-guide.md).
 
 **Stack:** Next.js · Prisma 6 · MongoDB Atlas · JWT · 2Factor SMS  
 **Schema source:** [`prisma/schema.prisma`](../prisma/schema.prisma) · **Prefixes:** [`config/company/ids.ts`](../config/company/ids.ts)

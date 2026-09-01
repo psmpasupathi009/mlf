@@ -2,11 +2,16 @@ import "dotenv/config";
 import { PrismaClient } from "@prisma/client";
 import { getEnvAdminMobiles, normalizeMobile } from "../lib/auth/mobile";
 import { hashPin } from "../lib/auth/pin";
+import {
+  bootstrapPinFromEnv,
+  shouldAutoSetBootstrapPin,
+} from "../lib/auth/bootstrap-pin";
 import { designationDefaultRoles } from "../config/company/designations";
 import { formatUnitId, idConfig } from "../config/company/ids";
 
 const prisma = new PrismaClient();
-const PIN = process.env.SEED_PIN ?? "123456";
+const PIN = bootstrapPinFromEnv();
+const autoPin = shouldAutoSetBootstrapPin();
 
 async function nextEmployeeUnitId() {
   const prefix = idConfig.prefixes.employee;
@@ -34,7 +39,7 @@ async function main() {
     throw new Error("Set SUPER_ADMIN_MOBILE or ADMIN_MOBILE in .env");
   }
 
-  const pinHash = await hashPin(PIN);
+  const pinHash = autoPin ? await hashPin(PIN) : null;
   for (const mobile of mobiles) {
     const ten = mobile.slice(2);
     const existing = await prisma.user.findFirst({
@@ -48,11 +53,11 @@ async function main() {
           isActive: true,
           roles: Array.from(new Set([...existing.roles, "admin"])),
           name: existing.name ?? "Super Admin",
-          ...(existing.pinHash ? {} : { pinHash }),
+          ...(existing.pinHash ? {} : pinHash ? { pinHash } : {}),
         },
       });
       console.log(
-        `updated ${updated.unitId} ${updated.mobile} pin=${existing.pinHash ? "kept" : PIN}`
+        `updated ${updated.unitId} ${updated.mobile} pin=${existing.pinHash ? "kept" : autoPin ? PIN : "otp_setup"}`
       );
       continue;
     }
@@ -66,11 +71,13 @@ async function main() {
         name: mobile === normalizeMobile(process.env.SUPER_ADMIN_MOBILE ?? "")
           ? "Super Admin"
           : "Bootstrap Admin",
-        pinHash,
+        ...(pinHash ? { pinHash } : {}),
         isActive: true,
       },
     });
-    console.log(`created ${created.unitId} ${created.mobile} PIN=${PIN}`);
+    console.log(
+      `created ${created.unitId} ${created.mobile} PIN=${autoPin ? PIN : "otp_setup on first login"}`
+    );
   }
 }
 

@@ -4,12 +4,13 @@ import { hashPin } from "@/lib/auth/pin";
 import { nextUnitId } from "@/lib/ids";
 import { designationDefaultRoles } from "@/config/company/designations";
 import {
+  bootstrapPinFromEnv,
+  shouldAutoSetBootstrapPin,
+} from "@/lib/auth/bootstrap-pin";
+import {
   getEnvAdminMobiles,
   isEnvAdminMobile,
-  normalizeMobile,
 } from "@/lib/auth/mobile";
-
-const BOOTSTRAP_PIN = process.env.SEED_PIN ?? "123456";
 
 function loginAliases(mobile91: string): string[] {
   const ten = mobile91.startsWith("91") ? mobile91.slice(2) : mobile91;
@@ -29,7 +30,8 @@ export async function findUserByLoginMobile(
 
 /**
  * Create or revive the env super-admin so they can log in without a prior seed.
- * Keeps an existing PIN (Forgot PIN / setup). Sets default PIN only when unset.
+ * Keeps an existing PIN (Forgot PIN / setup).
+ * Dev only: sets default SEED_PIN when pinHash is empty. Production: OTP setup on first login.
  */
 export async function ensureEnvAdminUser(mobile91: string): Promise<User | null> {
   if (!isEnvAdminMobile(mobile91)) return null;
@@ -43,6 +45,11 @@ export async function ensureEnvAdminUser(mobile91: string): Promise<User | null>
     ])
   );
 
+  const defaultPinHash =
+    shouldAutoSetBootstrapPin() && !existing?.pinHash
+      ? await hashPin(bootstrapPinFromEnv())
+      : undefined;
+
   if (existing) {
     return prisma.user.update({
       where: { id: existing.id },
@@ -54,7 +61,7 @@ export async function ensureEnvAdminUser(mobile91: string): Promise<User | null>
         pinLockedUntil: null,
         name: existing.name ?? "Super Admin",
         designation: existing.designation ?? "Managing Partner",
-        ...(existing.pinHash ? {} : { pinHash: await hashPin(BOOTSTRAP_PIN) }),
+        ...(defaultPinHash ? { pinHash: defaultPinHash } : {}),
       },
     });
   }
@@ -67,7 +74,7 @@ export async function ensureEnvAdminUser(mobile91: string): Promise<User | null>
       roles,
       designation: "Managing Partner",
       name: "Super Admin",
-      pinHash: await hashPin(BOOTSTRAP_PIN),
+      ...(defaultPinHash ? { pinHash: defaultPinHash } : {}),
       isActive: true,
     },
   });

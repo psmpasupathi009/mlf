@@ -35,6 +35,19 @@ These changes live in the web repo so native clients can authenticate without sc
 
 **You do not need a separate mobile database or mobile-only API tree.**
 
+**Canonical step machine:** Copy from web [`lib/auth/login-flow.ts`](../lib/auth/login-flow.ts) and [`features/auth/components/login-form.tsx`](../features/auth/components/login-form.tsx). Types: `LoginStep`, `CheckMobileStatus`, `AUTH_API`, `AUTH_TOKEN_ENDPOINTS`.
+
+| `LoginStep` (UI state) | Trigger | API call(s) | Persist token? |
+|------------------------|---------|-------------|----------------|
+| `phone` | User submits mobile | `POST check-mobile` | — |
+| `pin` | `status: pin` | `POST login` | Yes — save `accessToken` |
+| `otp_setup` | `status: otp_required` | `POST send-otp` `{ purpose: "setup" }` | — |
+| `setup_pin` | OTP verified | `POST verify-otp` → `POST setup-pin` | Yes |
+| `otp_forgot` | User taps Forgot PIN | `POST send-otp` `{ purpose: "forgot_pin" }` | — |
+| `reset_pin` | OTP verified | `POST verify-otp` → `POST forgot-pin/reset` | Yes |
+
+Only `login`, `setup-pin`, and `forgot-pin/reset` return `accessToken`. Store it in SecureStore after any of those succeed.
+
 ### Deploy checklist (website)
 
 Before the phone can talk to production:

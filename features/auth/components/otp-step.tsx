@@ -46,7 +46,12 @@ export function OtpStep({
         <p className="border-l-2 border-gold pl-3 text-sm leading-relaxed text-muted-foreground">
           Enter the {OTP_LENGTH}-digit OTP sent by SMS to reset your PIN.
         </p>
-      ) : null}
+      ) : (
+        <p className="border-l-2 border-gold pl-3 text-sm leading-relaxed text-muted-foreground">
+          First time signing in? Enter the {OTP_LENGTH}-digit OTP sent by SMS,
+          then create your PIN.
+        </p>
+      )}
 
       <div className="space-y-2.5">
         <Label className="text-[0.8125rem] font-medium tracking-wide text-foreground">

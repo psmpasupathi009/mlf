@@ -1,5 +1,7 @@
 # Website Guide (ID-aware)
 
+**Canonical how-the-site-works doc:** [site-architecture.md](./site-architecture.md) (every flow, mermaid diagrams, schema, APIs). This file is the shorter ID-aware map.
+
 How the MLF portal works: **pages → APIs → models**, and **which IDs** each feature uses.
 
 **ID lookup / full API list:** [schema-api-reference.md](./schema-api-reference.md)  

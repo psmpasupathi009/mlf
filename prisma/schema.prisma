@@ -289,19 +289,21 @@ model Case {
 }
 
 model Hearing {
-  id             String    @id @default(auto()) @map("_id") @db.ObjectId
-  unitId         String    @unique
-  caseId         String    @db.ObjectId
-  caseUnitId     String
-  hearingDate    DateTime
-  purpose        String?
-  notes          String?
-  outcome        String?
-  isAdjourned    Boolean   @default(false)
-  smsSentAt      DateTime?
-  createdById    String?   @db.ObjectId
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  id                       String    @id @default(auto()) @map("_id") @db.ObjectId
+  unitId                   String    @unique
+  caseId                   String    @db.ObjectId
+  caseUnitId               String
+  hearingDate              DateTime
+  purpose                  String?
+  notes                    String?
+  outcome                  String?
+  isAdjourned              Boolean   @default(false)
+  /// Overlay: who appears this date. Null = case primaryAdvocateMobile.
+  appearingAdvocateMobile  String?
+  smsSentAt                DateTime?
+  createdById              String?   @db.ObjectId
+  createdAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
 
   @@index([caseId])
   @@index([caseUnitId])
@@ -584,7 +586,7 @@ model CourtDutyOverride {
   fromDate       String
   toDate         String
   reason         String?
-  createdById    String?  @db.ObjectId
+  createdById    String?  @db.ObjectI
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
@@ -599,7 +601,7 @@ model Notification {
   unitId     String    @unique
   userId     String    @db.ObjectId
   userUnitId String
-  /// leave_request | leave_decided | task_assigned | task_done | appointment | case_status | filing_defect | batta_due | hearing_tomorrow | office_holiday | system
+  /// leave_request | leave_decided | task_assigned | task_done | appointment | case_status | filing_defect | batta_due | hearing_tomorrow | hearing_adjourned | hearing_advocate_assigned | office_holiday | system
   type       String
   title      String
   body       String?
