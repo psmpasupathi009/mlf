@@ -9,6 +9,12 @@ import { toClientSummary } from "@/features/clients/server/serialize";
 import { toPaymentSummary } from "@/features/accounts/server/serialize";
 import { feeRollupForClient } from "@/features/accounts/server/fee-rollup";
 import { toDocumentSummary } from "@/features/documents/server/serialize";
+import {
+  getClientPortalLoginStatus,
+  syncClientPortalLoginFromClient,
+  assertClientPortalMobileAvailable,
+  getClientPortalLoginUser,
+} from "@/features/clients/server/portal-login";
 
 const CLIENT_AUDIT_KEYS = [
   "name",
@@ -100,34 +106,7 @@ export const GET = apiHandler(async (request, context) => {
     payments: payments.map((p) => toPaymentSummary(p)),
     documents: uniqueDocuments.map(toDocumentSummary),
     fee,
-    portal: await (async () => {
-      const portalUser = await prisma.user.findUnique({
-        where: { clientUnitId: client.unitId },
-        select: {
-          unitId: true,
-          isActive: true,
-          pinHash: true,
-          lastLoginAt: true,
-          roles: true,
-        },
-      });
-      if (!portalUser || !portalUser.roles.every((r) => r === "client")) {
-        return {
-          invited: false,
-          isActive: false,
-          userUnitId: null as string | null,
-          hasPin: false,
-          lastLoginAt: null as string | null,
-        };
-      }
-      return {
-        invited: true,
-        isActive: portalUser.isActive,
-        userUnitId: portalUser.unitId,
-        hasPin: Boolean(portalUser.pinHash),
-        lastLoginAt: portalUser.lastLoginAt?.toISOString() ?? null,
-      };
-    })(),
+    portal: await getClientPortalLoginStatus(client.unitId),
   });
 });
 
@@ -148,28 +127,18 @@ export const PATCH = apiHandler(async (request, context) => {
 
   const before = pickAuditFields(client as Record<string, unknown>, CLIENT_AUDIT_KEYS);
 
-  const portalUser = await prisma.user.findUnique({
-    where: { clientUnitId: client.unitId },
-  });
+  const portalUser = await getClientPortalLoginUser(client.unitId);
   const nextMobile =
     input.mobile !== undefined
       ? normalizeMobile(input.mobile) ?? client.mobile
       : undefined;
-  if (
-    portalUser &&
-    portalUser.roles.every((r) => r === "client") &&
-    nextMobile &&
-    nextMobile !== portalUser.mobile
-  ) {
-    const clash = await prisma.user.findUnique({
-      where: { mobile: nextMobile },
+  if (portalUser && nextMobile && nextMobile !== portalUser.mobile) {
+    const mobileMsg = await assertClientPortalMobileAvailable(nextMobile, {
+      excludeUserId: portalUser.id,
+      clientUnitId: client.unitId,
     });
-    if (clash && clash.id !== portalUser.id) {
-      return jsonFail(
-        "CONFLICT",
-        "This mobile is already a login for another user. Portal and client mobile must stay the same.",
-        409
-      );
+    if (mobileMsg) {
+      return jsonFail("CONFLICT", mobileMsg, 409);
     }
   }
 
@@ -234,18 +203,7 @@ export const PATCH = apiHandler(async (request, context) => {
     meta: { before, after, changes: diffAudit(before, after) },
   });
 
-  // Keep linked portal login in sync (name / mobile / contact).
-  if (portalUser && portalUser.roles.every((r) => r === "client")) {
-    await prisma.user.update({
-      where: { id: portalUser.id },
-      data: {
-        name: updated.name,
-        ...(nextMobile ? { mobile: nextMobile } : {}),
-        email: updated.email || undefined,
-        address: updated.address || undefined,
-      },
-    });
-  }
+  await syncClientPortalLoginFromClient(updated);
 
   return jsonOk({ client: toClientSummary(updated) });
 });

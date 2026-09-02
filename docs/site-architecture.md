@@ -35,7 +35,7 @@ MLF is a **single-office** law-firm portal. There is no multi-tenant Org model a
 | Who | How they exist | What they see |
 |-----|----------------|---------------|
 | **Staff** | Admin creates a `User` (`EMP-#####`) with roles `admin` / `sub_admin` / `staff` / `advocate` / `accountant` | Full office nav (filtered by permissions) |
-| **Client portal** | Staff invites via `POST /api/clients/[unitId]/portal-access` — a `User` with `roles: ["client"]` and `clientUnitId = CLI-#####` | Home, cases, appointments, documents, profile, notifications, legal |
+| **Client portal** | Staff enables via `POST /api/clients/[unitId]/portal` — a `User` with `roles: ["client"]`, `unitId = CLI-#####`, and `clientUnitId = CLI-#####` | Home, cases, appointments, documents, profile, notifications, legal |
 
 **Not in this product:** OAuth/social login, email/password signup, Stripe/Razorpay, email provider, S3, AI, tRPC, Next.js `"use server"` actions, NextAuth/Clerk.
 
@@ -427,7 +427,7 @@ Admin-only extra rules (`lib/rbac/employee-guards.ts`): only admin can assign/ma
 
 ### 3.8 After super admin is in
 
-The super admin uses **Employees** to create staff (`POST /api/employees`) — those users are **not** env-bootstrap; they get OTP setup (`otp_required`) until they set a PIN. Clients are invited separately (`portal-access`). Env mobiles remain special: every `check-mobile` will revive them if deactivated.
+The super admin uses **Employees** to create staff (`POST /api/employees`) — those users are **not** env-bootstrap; they get OTP setup (`otp_required`) until they set a PIN. Clients enable portal separately (`POST .../portal`). Env mobiles remain special: every `check-mobile` will revive them if deactivated.
 
 ---
 
@@ -796,7 +796,7 @@ flowchart TD
 
 ```text
 Staff /clients/CLI-xxxxx
-  --> POST /api/clients/CLI-xxxxx/portal-access   clients.edit
+  --> POST /api/clients/CLI-xxxxx/portal   clients.edit
   --> User { roles:[client], clientUnitId:CLI-xxxxx, mobile: client.mobile 91… }
   --> Client logs in same LoginForm
   --> proxy allowlist + APIs scoped to that CLI
@@ -808,7 +808,7 @@ sequenceDiagram
   participant PA as portal_access
   participant DB as Mongo
   participant C as Client
-  S->>PA: POST clients unitId portal-access
+  S->>PA: POST clients unitId portal
   PA->>PA: requirePerm clients.edit
   PA->>DB: Client by unitId
   PA->>DB: User roles client clientUnitId
@@ -821,7 +821,7 @@ sequenceDiagram
 3. `ensureDefaultPermissions()` so `client` role keys exist.
 4. If `User` already unique-on `clientUnitId`: reactivate if needed (`isActive: true`).
 5. Else create User (`nextUnitId("employee")` still used for portal users — public id is `EMP-#####` even for clients), `roles: ["client"]`, `clientUnitId`, **no PIN** → first login is OTP setup.
-6. GET portal-access returns invite status (`hasPin`, `lastLoginAt`). DELETE revokes (`isActive` false).
+6. GET portal returns login status (`hasPin`, `lastLoginAt`). DELETE disables portal (`isActive` false).
 7. Client JWT includes `cid`. `requireClientScope` / `assertOwnsClientUnit` filter cases, appointments, documents. Edge `proxy.ts` blocks `/employees`, `/accounts`, etc.
 
 ### 5.7 RBAC — line by line
@@ -903,7 +903,7 @@ flowchart LR
 |--------|------|-------|
 | GET, POST | `/api/clients` | `clients.view` / `create` |
 | GET, PATCH | `/api/clients/[unitId]` | `view` / `edit` |
-| GET, POST, DELETE | `/api/clients/[unitId]/portal-access` | `view` / `edit` |
+| GET, POST, DELETE | `/api/clients/[unitId]/portal` | `view` / `edit` |
 | POST | `/api/clients/import` | `clients.create` (+ `edit` for upsert) |
 
 ```mermaid
@@ -925,7 +925,7 @@ sequenceDiagram
   Zod clients.schema  -->  normalizeMobile  -->  nextUnitId("client")
   -->  Prisma Client CLI  -->  writeAudit  -->  list GET /api/clients?page=&q=
 
-/clients/CLI-xxxxx  -->  POST .../portal-access  -->  User roles=client
+/clients/CLI-xxxxx  -->  POST .../portal  -->  User roles=client
   -->  client LoginForm  (same §5)
 ```
 
@@ -1501,7 +1501,7 @@ Typical guard in parentheses. Auth routes: rate-limited, CORS, no `requirePerm`.
 |--------|------|-------|
 | GET, POST | `/api/clients` | `clients.view` / `create` |
 | GET, PATCH | `/api/clients/[unitId]` | `view` / `edit` |
-| GET, POST, DELETE | `/api/clients/[unitId]/portal-access` | `view` / `edit` |
+| GET, POST, DELETE | `/api/clients/[unitId]/portal` | `view` / `edit` |
 | POST | `/api/clients/import` | `create` |
 | GET, POST | `/api/cases` | `cases.view` / `create` |
 | GET, PATCH | `/api/cases/[unitId]` | `view` / `edit` |

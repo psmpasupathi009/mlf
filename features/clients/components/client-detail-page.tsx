@@ -58,8 +58,8 @@ type DetailResponse = {
   documents: DocumentSummary[];
   fee: FeeRollup | null;
   portal?: {
-    invited: boolean;
-    isActive: boolean;
+    hasLoginAccount: boolean;
+    portalEnabled: boolean;
     userUnitId: string | null;
     hasPin: boolean;
     lastLoginAt: string | null;
@@ -142,39 +142,39 @@ export function ClientDetailPage({
     setUploadOpen(true);
   }
 
-  async function invitePortal() {
+  async function enablePortal() {
     setPortalBusy(true);
     const { ok, data } = await apiFetch<{
       message?: string;
       portal?: DetailResponse["portal"];
-    }>(`/api/clients/${unitId}/portal-access`, { method: "POST" });
+    }>(`/api/clients/${unitId}/portal`, { method: "POST" });
     setPortalBusy(false);
     if (!ok) {
       toast.error(
         getErrorMessage(
           data as Record<string, unknown>,
-          "Could not invite to portal"
+          "Could not enable portal"
         )
       );
       return;
     }
     toast.success(
-      (data as { message?: string })?.message ?? "Portal access invited"
+      (data as { message?: string })?.message ?? "Portal enabled"
     );
     void load();
   }
 
-  async function revokePortal() {
+  async function disablePortal() {
     if (
       !window.confirm(
-        "Revoke this client’s portal login? They will not be able to sign in."
+        "Disable portal login for this client? They will not be able to sign in."
       )
     ) {
       return;
     }
     setPortalBusy(true);
     const { ok, data } = await apiFetch<{ message?: string }>(
-      `/api/clients/${unitId}/portal-access`,
+      `/api/clients/${unitId}/portal`,
       { method: "DELETE" }
     );
     setPortalBusy(false);
@@ -182,19 +182,19 @@ export function ClientDetailPage({
       toast.error(
         getErrorMessage(
           data as Record<string, unknown>,
-          "Could not revoke portal access"
+          "Could not disable portal"
         )
       );
       return;
     }
     toast.success(
-      (data as { message?: string })?.message ?? "Portal access revoked"
+      (data as { message?: string })?.message ?? "Portal disabled"
     );
     void load();
   }
 
   const portal = detail.portal;
-  const portalActive = Boolean(portal?.invited && portal.isActive);
+  const portalActive = Boolean(portal?.portalEnabled);
 
   return (
     <section className="space-y-6">
@@ -218,7 +218,7 @@ export function ClientDetailPage({
                 <MessageSquare className="size-3" />
                 {client.smsConsent ? "SMS on" : "SMS off"}
               </Badge>
-              {portal?.invited ? (
+              {portal?.hasLoginAccount ? (
                 <Badge variant={portalActive ? "success" : "muted"}>
                   {portalActive
                     ? portal.hasPin
@@ -237,10 +237,10 @@ export function ClientDetailPage({
                     size="sm"
                     className="w-full sm:w-auto"
                     disabled={portalBusy}
-                    onClick={() => void revokePortal()}
+                    onClick={() => void disablePortal()}
                   >
                     <ShieldOff className="size-4" />
-                    Revoke portal
+                    Disable portal
                   </Button>
                 ) : (
                   <Button
@@ -249,10 +249,10 @@ export function ClientDetailPage({
                     size="sm"
                     className="w-full sm:w-auto"
                     disabled={portalBusy}
-                    onClick={() => void invitePortal()}
+                    onClick={() => void enablePortal()}
                   >
                     <ShieldCheck className="size-4" />
-                    {portal?.invited ? "Restore portal" : "Invite to portal"}
+                    Enable portal
                   </Button>
                 )}
                 <Button

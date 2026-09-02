@@ -225,7 +225,7 @@ Pattern per module: **purpose → IDs → path → steps → APIs → perms → 
 - `GET/POST /api/clients`
 - `GET/PATCH /api/clients/[unitId]`
 - `POST /api/clients/import`
-- `POST|DELETE|GET /api/clients/[unitId]/portal-access`
+- `POST|DELETE|GET /api/clients/[unitId]/portal`
 
 **IDs:** `CLI-#####`
 

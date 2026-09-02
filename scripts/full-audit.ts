@@ -971,14 +971,14 @@ async function main() {
       jar,
       "Clients",
       "GET",
-      `/api/clients/${clientUnitId}/portal-access`,
-      "Client portal invite status"
+      `/api/clients/${clientUnitId}/portal`,
+      "Client portal status"
     );
     push({
       module: "Clients",
       method: "POST",
-      path: `/api/clients/${clientUnitId}/portal-access`,
-      purpose: "Invite client portal login",
+      path: `/api/clients/${clientUnitId}/portal`,
+      purpose: "Enable client portal login",
       status: "SKIP",
       detail: "Would SMS / create a live portal user",
       kind: "api",
