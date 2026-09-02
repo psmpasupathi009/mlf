@@ -8,6 +8,7 @@ Local / CI helpers. Run from repo root with `npx tsx scripts/<name>.ts` (or the 
 | `full-audit.ts` | Broader consistency checks |
 | `smoke-confidence.ts` | HTTP smoke against a running app |
 | `backfill-appointment-client-ids.ts` | Set `Appointment.clientId` where only `clientUnitId` was stored |
+| `backfill-client-portal-login-ids.ts` | Align legacy client portal `User.unitId` from `EMP-…` to `CLI-…` |
 
 ## Smoke env
 

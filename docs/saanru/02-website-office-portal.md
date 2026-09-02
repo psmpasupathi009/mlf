@@ -215,9 +215,9 @@ Pattern per module: **purpose → IDs → path → steps → APIs → perms → 
 
 ---
 
-### 4. Clients + portal invite
+### 4. Clients + portal enable
 
-**Purpose:** Client registry; invite/revoke client portal access.
+**Purpose:** Client registry; enable/disable client portal login.
 
 **Paths:** `/clients`, `/clients/[unitId]`
 
@@ -229,11 +229,11 @@ Pattern per module: **purpose → IDs → path → steps → APIs → perms → 
 
 **IDs:** `CLI-#####`
 
-**Flow:** create (normalize mobile, **`smsConsent`**) → list/search → detail → link cases/payments → **Invite to portal** → OTP → client PIN.
+**Flow:** create (normalize mobile, **`smsConsent`**) → list/search → detail → link cases/payments → **Enable portal** (`POST .../portal`) → client OTP → PIN.
 
-**Client detail page (staff):** cases list, payments, **fee rollup**, documents panel, portal invite/revoke status card
+**Client detail page (staff):** cases list, payments, **fee rollup**, documents panel, portal enable/disable status
 
-**Collision:** invite fails if mobile already staff user.
+**Collision:** enable portal fails if mobile already staff user.
 
 **Compliance:** Aadhaar last-4 only when collected — never full Aadhaar ([`compliance.ts`](../../config/company/compliance.ts))
 
@@ -673,12 +673,12 @@ Parent unitIds must resolve **inside same office**.
 
 ## Client portal (first-class)
 
-Same app, same `/login`. Invite-only — not self-registration.
+Same app, same `/login`. Portal login enabled by staff — not self-registration.
 
 | Area | Behavior |
 |------|----------|
-| Identity | Staff **Invite to portal** → `User` `roles:[client]`, `clientUnitId=CLI-…`; OTP → PIN; revoke = `isActive=false` |
-| Collision | Invite/update fails if mobile is already staff login |
+| Identity | Staff **Enable portal** (`POST .../portal`) → `User` `unitId=CLI-…`, `roles:[client]`, `clientUnitId=CLI-…`; OTP → PIN; disable = `isActive=false` |
+| Collision | Enable/update fails if mobile is already staff login |
 | Nav | Home, Cases, Appointments, Documents (`clientOnly`); Profile via menu |
 | Path allowlist | `/`, `/cases`, `/appointments`, `/documents`, `/profile`, `/notifications`, `/legal` |
 | Perms (seed) | `dashboard.view`, `cases.view`, `cases.upload`, `appointments.view`, `appointments.create`, `appointments.cancel` |
@@ -831,7 +831,7 @@ NEXT_PUBLIC_ENABLE_SSE=0
 |-------|-------------|
 | 0 | Monorepo + schema with `officeId` on all domain models |
 | 1 | Auth + office picker + employees + permissions |
-| 2 | Clients (+ portal invite), cases/hearings, diary, home, notifications |
+| 2 | Clients (+ portal enable), cases/hearings, diary, home, notifications |
 | 3 | Appointments, availability, court roster, client portal |
 | 4 | Accounts, expenses, documents, dak, tasks, reports, imports |
 | 5 | HRMS, cron SMS, billing `/billing`, branding |
@@ -844,12 +844,12 @@ NEXT_PUBLIC_ENABLE_SSE=0
 - Two offices; same mobile → picker; zero data leak (404 cross-office)
 - Starter: no accounts/HRMS; Professional: accounts yes, HRMS no; Enterprise: all
 - Seat limit blocks 6th user on Starter
-- Invite client → OTP → PIN → client nav only
+- Enable client portal → OTP → PIN → client nav only
 - Client sees own cases only; other CSE → 404
 - Client books office + call; video rejected
 - Client uploads doc; cannot access another client's file
-- Staff mobile collision on invite → clear error
-- Revoke portal → login blocked
+- Staff mobile collision on enable portal → clear error
+- Disable portal → login blocked
 - Court roster permanent + override CRUD
 - Expenses void + bill DOC
 - Trial → checkout → active; past_due → suspended → pay → active

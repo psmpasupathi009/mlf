@@ -209,6 +209,8 @@ Auth endpoints are rate-limited (`lib/rate-limit`).
 
 Helper: [`features/clients/server/portal-login.ts`](../features/clients/server/portal-login.ts) — `enableClientPortalLogin`, `disableClientPortalLogin`, `getClientPortalLoginStatus`.
 
+**Legacy portal users:** older enables used `EMP-…` as client `User.unitId`. New enables use **`CLI-…`**. Run `npx tsx scripts/backfill-client-portal-login-ids.ts` once to align existing rows (clients must sign in again after id change).
+
 **Staff vs client:** Creating a client record does **not** enable login. Admin clicks **Enable portal** on the client detail page (disable turns off sign-in without deleting the User row).
 
 **OTP setup vs Forgot PIN:**

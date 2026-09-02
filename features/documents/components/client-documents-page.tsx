@@ -56,7 +56,7 @@ export function ClientDocumentsPage({ user }: { user: PublicUser }) {
     return (
       <EmptyState
         title="Portal link missing"
-        description="Ask the office to re-invite you to the client portal."
+        description="Ask the office to enable portal access for your client file."
       />
     );
   }

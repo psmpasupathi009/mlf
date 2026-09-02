@@ -15,12 +15,12 @@ export const GET = apiHandler(async (request, context) => {
 
   const target = await prisma.user.findUnique({
     where: { unitId },
-    select: { photoKey: true, isActive: true, roles: true, unitId: true },
+    select: { id: true, photoKey: true, isActive: true, roles: true, unitId: true },
   });
   if (!target?.isActive) return jsonFail("NOT_FOUND", "User not found", 404);
 
   if (isClientOnlyUser(user.roles)) {
-    const own = target.unitId === user.unitId;
+    const own = target.id === user.id || target.unitId === user.unitId;
     const advocate = target.roles.includes("advocate");
     if (!own && !advocate) {
       return jsonFail("FORBIDDEN", "You don’t have access. Ask admin.", 403);

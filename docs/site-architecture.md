@@ -574,7 +574,7 @@ Pipeline rules live in `config/company/case-pipeline.ts` (`canTransitionStatus`)
 
 **Purpose:** Login is **Indian mobile + 6-digit PIN**. OTP (2Factor, 4 digits) is only for **first PIN** and **forgot PIN**. Session is a **stateless 7-day HS256 JWT** in httpOnly cookie `mlf_access`. Invalidation is `User.sessionVersion` vs JWT claim `sv`.
 
-**There is no public signup.** Super-admin bootstrap: [section 3](#3-super-admin-setup). Staff are created by admin; clients are invited.
+**There is no public signup.** Super-admin bootstrap: [section 3](#3-super-admin-setup). Staff are created by admin; client portal login is enabled by staff on the client file.
 
 **LoginForm steps** (`features/auth/components/login-form.tsx`): `phone` → `pin` | `otp_setup` → `setup_pin` | `otp_forgot` → `reset_pin`.
 
@@ -695,7 +695,7 @@ sequenceDiagram
 
 ### 5.2 First-time PIN (OTP setup) — line by line
 
-Used when: new employee (admin created User with no PIN), client invite with no PIN, env admin with empty `pinHash`, after force-reset.
+Used when: new employee (admin created User with no PIN), client portal enabled with no PIN, env admin with empty `pinHash`, after force-reset.
 
 ```mermaid
 sequenceDiagram
@@ -727,7 +727,7 @@ sequenceDiagram
 6. Delete prior `OtpSession` for that mobile+purpose; insert new (`expiresAt` +10 min, `verified: false`).
 7. UI `step=otp_setup`, 60s resend countdown. User enters 4-digit OTP.
 8. **`POST /api/auth/verify-otp`**: rate-limit; load latest unverified unexpired `OtpSession`; `verifyOtpSms(sessionId, otp)`; mark `verified`.
-9. If `purpose=setup` and no user: `ensureEnvAdminUser` for env mobiles only. Ordinary numbers must already exist (employee create / portal invite).
+9. If `purpose=setup` and no user: `ensureEnvAdminUser` for env mobiles only. Ordinary numbers must already exist (employee create / portal enable).
 10. `signOtpProofToken` → UI stores `otpProofToken`, `step=setup_pin`.
 11. UI rejects mismatch / weak PIN client-side (`isWeakPin`).
 12. **`POST /api/auth/setup-pin`**: rate-limit; Zod; reject weak PIN **before** consume; `consumeOtpProof(token, "setup")` inserts `ConsumedOtpProof.jti` (unique — replay returns null).
@@ -792,12 +792,12 @@ flowchart TD
 5. `writeAudit` `employee.force_reset_pin`.
 6. Target’s current JWT dies immediately. Next `/login` → `check-mobile` → `otp_required` → §5.2.
 
-### 5.6 Client portal invite — line by line
+### 5.6 Client portal enable — line by line
 
 ```text
 Staff /clients/CLI-xxxxx
   --> POST /api/clients/CLI-xxxxx/portal   clients.edit
-  --> User { roles:[client], clientUnitId:CLI-xxxxx, mobile: client.mobile 91… }
+  --> User { unitId: CLI-xxxxx, roles:[client], clientUnitId:CLI-xxxxx, mobile: client.mobile 91… }
   --> Client logs in same LoginForm
   --> proxy allowlist + APIs scoped to that CLI
 ```
@@ -805,24 +805,25 @@ Staff /clients/CLI-xxxxx
 ```mermaid
 sequenceDiagram
   participant S as Staff
-  participant PA as portal_access
+  participant PA as portal API
   participant DB as Mongo
   participant C as Client
   S->>PA: POST clients unitId portal
   PA->>PA: requirePerm clients.edit
   PA->>DB: Client by unitId
-  PA->>DB: User roles client clientUnitId
+  PA->>DB: User roles client unitId=CLI clientUnitId
   C->>C: check-mobile then PIN or OTP
   C->>C: cookie cid=CLI
 ```
 
 1. `requirePerm(clients, edit)`. Resolve `Client` by `unitId`.
-2. `normalizeMobile(client.mobile)` — invalid mobile blocks invite.
+2. `normalizeMobile(client.mobile)` — invalid mobile blocks enable.
 3. `ensureDefaultPermissions()` so `client` role keys exist.
-4. If `User` already unique-on `clientUnitId`: reactivate if needed (`isActive: true`).
-5. Else create User (`nextUnitId("employee")` still used for portal users — public id is `EMP-#####` even for clients), `roles: ["client"]`, `clientUnitId`, **no PIN** → first login is OTP setup.
-6. GET portal returns login status (`hasPin`, `lastLoginAt`). DELETE disables portal (`isActive` false).
-7. Client JWT includes `cid`. `requireClientScope` / `assertOwnsClientUnit` filter cases, appointments, documents. Edge `proxy.ts` blocks `/employees`, `/accounts`, etc.
+4. `enableClientPortalLogin()` — create or reactivate `User` with **`unitId = client.unitId` (CLI)**, `roles: ["client"]`, `clientUnitId`, **no PIN** → first login is OTP setup.
+5. GET portal returns login status (`hasLoginAccount`, `portalEnabled`, `hasPin`, `lastLoginAt`). DELETE disables portal (`isActive: false`).
+6. Client JWT includes `cid`. `requireClientScope` / `assertOwnsClientUnit` filter cases, appointments, documents. Edge `proxy.ts` blocks `/employees`, `/accounts`, etc.
+
+**Legacy:** older enables used `EMP-…` as `User.unitId`; run `scripts/backfill-client-portal-login-ids.ts` to align to CLI.
 
 ### 5.7 RBAC — line by line
 
@@ -891,11 +892,11 @@ flowchart LR
 
 ---
 
-### 6.2 Clients + portal invite
+### 6.2 Clients + portal enable
 
 **Who:** Staff. **Pages:** `/clients`, `/clients/[unitId]`
 
-**Schema:** `Client` (`CLI`). Portal: `User.clientUnitId` → this `unitId`.
+**Schema:** `Client` (`CLI`). Portal: `User.unitId` and `User.clientUnitId` → this `unitId`.
 
 **Code:** `features/clients/` · `lib/validations/clients.schema.ts` · `features/clients/server/serialize.ts`
 
@@ -918,14 +919,14 @@ sequenceDiagram
   API-->>UI: unitId
 ```
 
-**End-to-end (create + invite)**
+**End-to-end (create + enable portal)**
 
 ```text
 /clients  -->  features/clients  -->  POST /api/clients
   Zod clients.schema  -->  normalizeMobile  -->  nextUnitId("client")
   -->  Prisma Client CLI  -->  writeAudit  -->  list GET /api/clients?page=&q=
 
-/clients/CLI-xxxxx  -->  POST .../portal  -->  User roles=client
+/clients/CLI-xxxxx  -->  POST .../portal  -->  User unitId=CLI roles=client
   -->  client LoginForm  (same §5)
 ```
 
@@ -933,10 +934,10 @@ sequenceDiagram
 2. Form `apiFetch POST /api/clients` JSON.
 3. `requirePerm(clients, create)` → Zod → unique mobile → `nextUnitId("client")` → insert → audit.
 4. Detail `GET /api/clients/[unitId]`; PATCH for edits.
-5. Invite: [§5.6](#56-client-portal-invite--line-by-line).
+5. Enable portal: [§5.6](#56-client-portal-enable--line-by-line).
 6. Import: [§6.19](#619-csv-import-cross-cutting).
 
-**Connects to:** Cases (`clientUnitId` required), payments, documents on client detail, appointments, DAK soft link, portal invite → client login.
+**Connects to:** Cases (`clientUnitId` required), payments, documents on client detail, appointments, DAK soft link, portal enable → client login.
 
 ---
 
@@ -1401,7 +1402,7 @@ flowchart LR
   cases --> hearings["Hearings"]
   hearings --> diary["Diary"]
   diary --> sms["Hearing SMS"]
-  clients --> portal["Portal invite"]
+  clients --> portal["Enable portal"]
   portal --> clientUI["Client cases appts docs"]
   appts["Appointments"] --> convert["convert-case"]
   convert --> cases
@@ -1428,7 +1429,7 @@ SUPER ADMIN (.env / seed / check-mobile)
         |
      HOME  ----------------------+
         |                        |
-   CLIENTS --portal invite--> CLIENT LOGIN (same §5, cid=CLI)
+   CLIENTS --enable portal--> CLIENT LOGIN (same §5, cid=CLI)
         |
       CASES --hearings--> DIARY --SMS--> 2Factor
         |  |     |
@@ -1450,7 +1451,7 @@ SUPER ADMIN (.env / seed / check-mobile)
 
 **People spine:** **Employees** (advocates) feed roster, hearings, appointments, HRMS, and task assignees. **Force-reset PIN** dumps them back to OTP setup (auth flow).
 
-**Client spine:** invite → same **login** APIs → allowlisted pages → APIs filter by `clientUnitId`.
+**Client spine:** enable portal → same **login** APIs → allowlisted pages → APIs filter by `clientUnitId`.
 
 **Always on:** RBAC on every mutating API; `writeAudit` → Activity; `notifyUser` → bell; CSV import/export as bulk I/O for the same models.
 

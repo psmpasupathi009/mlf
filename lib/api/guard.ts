@@ -96,7 +96,7 @@ export async function requireClientScope(
       clientUnitId: null,
       response: jsonFail(
         "FORBIDDEN",
-        "Client portal link is missing. Ask the office to re-invite you.",
+        "Client portal link is missing. Ask the office to enable portal access for your client file.",
         403
       ),
     };

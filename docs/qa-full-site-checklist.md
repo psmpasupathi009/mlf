@@ -39,7 +39,7 @@ Login as admin (or sub_admin where noted). PIN default: `SEED_PIN` / `123456`.
 |-------|------|------|
 | Create / list / patch client | Auto | [ ] |
 | Client detail page | Auto | [ ] |
-| Portal-access status (invite skipped) | Auto | [ ] |
+| Portal enable status (optional) | Auto | [ ] |
 | Create / list / patch case with court | Auto | [ ] |
 | Case detail page | Auto | [ ] |
 | Add hearing | Auto | [ ] |
