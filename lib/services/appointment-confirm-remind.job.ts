@@ -1,15 +1,19 @@
 import type { Appointment } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
 import {
+  appointmentWhenBody,
   canShowConfirmButton,
   getConfirmWindowHours,
 } from "@/lib/appointments/confirm-window";
+import {
+  findPortalClientUser,
+  unsetOrNullDateWhere,
+} from "@/lib/appointments/portal-client";
 import {
   findUsersByMobiles,
   notifyUsers,
   type NotifyInput,
 } from "@/lib/notifications/notify";
-import { formatIstTime, istDisplayDate } from "@/lib/utils/ist";
 
 const BATCH_SIZE = 80;
 /** Look back so a missed cron tick still catches open windows. */
@@ -23,29 +27,69 @@ export type ConfirmRemindJobResult = {
   hasMore: boolean;
 };
 
-function whenLabel(scheduledAt: Date): string {
-  return `${istDisplayDate(scheduledAt)} ${formatIstTime(scheduledAt)}`;
-}
+type ReminderOpts = { excludeUserId?: string };
 
-async function findPortalClientUser(clientUnitId: string) {
-  return prisma.user.findFirst({
-    where: {
-      isActive: true,
-      roles: { has: "client" },
-      OR: [{ clientUnitId }, { unitId: clientUnitId }],
-    },
-    select: { id: true, unitId: true },
-  });
+async function buildConfirmWindowRecipients(
+  appointment: Appointment,
+  opts?: ReminderOpts
+): Promise<NotifyInput[]> {
+  const body = appointmentWhenBody(appointment.title, appointment.scheduledAt);
+  const meta = {
+    appointmentUnitId: appointment.unitId,
+    kind: "confirm_window",
+  };
+  const exclude = opts?.excludeUserId;
+
+  const [portal, advocates] = await Promise.all([
+    appointment.clientUnitId
+      ? findPortalClientUser(appointment.clientUnitId)
+      : Promise.resolve(null),
+    appointment.advocateMobile
+      ? findUsersByMobiles([appointment.advocateMobile])
+      : Promise.resolve([]),
+  ]);
+
+  const recipients: NotifyInput[] = [];
+
+  if (portal && portal.id !== exclude) {
+    recipients.push({
+      userId: portal.id,
+      userUnitId: portal.unitId,
+      type: "appointment",
+      title: "Confirm your appointment",
+      body,
+      href: "/appointments",
+      meta,
+    });
+  }
+
+  for (const a of advocates) {
+    if (a.id === exclude) continue;
+    recipients.push({
+      userId: a.id,
+      userUnitId: a.unitId,
+      type: "appointment",
+      title: "Confirm client coming",
+      body,
+      href: "/appointments",
+      meta,
+    });
+  }
+
+  return recipients;
 }
 
 /**
- * Notify client portal user + advocate that Confirm coming is available.
+ * Notify client portal + advocate that Confirm coming is available.
  * Marks confirmRemindedAt so each appointment is nudged once.
  */
 export async function sendConfirmWindowReminders(
   appointment: Appointment,
-  opts?: { excludeUserId?: string }
+  opts?: ReminderOpts
 ): Promise<{ notified: number; marked: boolean }> {
+  if (appointment.confirmRemindedAt) {
+    return { notified: 0, marked: false };
+  }
   if (
     !canShowConfirmButton({
       status: appointment.status,
@@ -56,54 +100,9 @@ export async function sendConfirmWindowReminders(
   ) {
     return { notified: 0, marked: false };
   }
-  if (appointment.confirmRemindedAt) {
-    return { notified: 0, marked: false };
-  }
 
-  const when = whenLabel(appointment.scheduledAt);
-  const body = `${appointment.title} · ${when}`;
-  const recipients: NotifyInput[] = [];
-
-  if (appointment.clientUnitId) {
-    const portal = await findPortalClientUser(appointment.clientUnitId);
-    if (portal && portal.id !== opts?.excludeUserId) {
-      recipients.push({
-        userId: portal.id,
-        userUnitId: portal.unitId,
-        type: "appointment",
-        title: "Confirm your appointment",
-        body,
-        href: "/appointments",
-        meta: {
-          appointmentUnitId: appointment.unitId,
-          kind: "confirm_window",
-        },
-      });
-    }
-  }
-
-  if (appointment.advocateMobile) {
-    const advocates = await findUsersByMobiles([appointment.advocateMobile]);
-    for (const a of advocates) {
-      if (a.id === opts?.excludeUserId) continue;
-      recipients.push({
-        userId: a.id,
-        userUnitId: a.unitId,
-        type: "appointment",
-        title: "Confirm client coming",
-        body,
-        href: "/appointments",
-        meta: {
-          appointmentUnitId: appointment.unitId,
-          kind: "confirm_window",
-        },
-      });
-    }
-  }
-
-  if (recipients.length) {
-    await notifyUsers(recipients);
-  }
+  const recipients = await buildConfirmWindowRecipients(appointment, opts);
+  if (recipients.length) await notifyUsers(recipients);
 
   await prisma.appointment.update({
     where: { id: appointment.id },
@@ -115,23 +114,15 @@ export async function sendConfirmWindowReminders(
 
 export async function runAppointmentConfirmRemindJob(): Promise<ConfirmRemindJobResult> {
   const now = new Date();
-  const windowHours = getConfirmWindowHours();
-  const windowMs = windowHours * 60 * 60 * 1000;
+  const windowMs = getConfirmWindowHours() * 60 * 60 * 1000;
   const lookbackMs = LOOKBACK_HOURS * 60 * 60 * 1000;
 
-  // Window open: scheduledAt <= now + windowHours
-  // Slot not long past: scheduledAt >= now - lookback
   const due = await prisma.appointment.findMany({
     where: {
       status: "scheduled",
       AND: [
-        { OR: [{ confirmedAt: null }, { confirmedAt: { isSet: false } }] },
-        {
-          OR: [
-            { confirmRemindedAt: null },
-            { confirmRemindedAt: { isSet: false } },
-          ],
-        },
+        unsetOrNullDateWhere("confirmedAt"),
+        unsetOrNullDateWhere("confirmRemindedAt"),
         {
           scheduledAt: {
             lte: new Date(now.getTime() + windowMs),
@@ -152,20 +143,6 @@ export async function runAppointmentConfirmRemindJob(): Promise<ConfirmRemindJob
   let notifiedRecipients = 0;
 
   for (const apt of batch) {
-    // Skip if slot already ended (window closed)
-    if (
-      !canShowConfirmButton({
-        status: apt.status,
-        confirmedAt: apt.confirmedAt,
-        scheduledAt: apt.scheduledAt,
-        durationMin: apt.durationMin,
-        now,
-      })
-    ) {
-      skipped += 1;
-      continue;
-    }
-
     const result = await sendConfirmWindowReminders(apt);
     if (result.marked) {
       reminded += 1;

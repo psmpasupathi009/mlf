@@ -3,6 +3,8 @@
  * until slot end. Default 1 hour.
  */
 
+import { formatIstTime, istDisplayDate } from "@/lib/utils/ist";
+
 export function getConfirmWindowHours(): number {
   const raw = process.env.APPOINTMENT_CONFIRM_WINDOW_HOURS?.trim();
   const n = raw ? Number(raw) : 1;
@@ -36,4 +38,9 @@ export function canShowConfirmButton(input: {
       ? input.scheduledAt
       : new Date(input.scheduledAt);
   return isInConfirmWindow(scheduledAt, input.durationMin, input.now);
+}
+
+/** Shared copy for appointment notification bodies. */
+export function appointmentWhenBody(title: string, scheduledAt: Date): string {
+  return `${title} · ${istDisplayDate(scheduledAt)} ${formatIstTime(scheduledAt)}`;
 }

@@ -3,15 +3,19 @@ import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
 import { writeAudit, pickAuditFields } from "@/lib/audit";
 import { canAccessAppointment } from "@/lib/appointments/access";
-import { canShowConfirmButton } from "@/lib/appointments/confirm-window";
+import {
+  appointmentWhenBody,
+  canShowConfirmButton,
+} from "@/lib/appointments/confirm-window";
+import { findPortalClientUser } from "@/lib/appointments/portal-client";
 import { enrichAppointment } from "@/features/appointments/server/enrich";
 import { isClientOnlyUser } from "@/lib/auth/client-portal";
 import {
   findUsersByMobiles,
   notifyUsers,
   scheduleNotify,
+  type NotifyInput,
 } from "@/lib/notifications/notify";
-import { formatIstTime, istDisplayDate } from "@/lib/utils/ist";
 
 const CONFIRM_AUDIT_KEYS = [
   "confirmedAt",
@@ -19,6 +23,17 @@ const CONFIRM_AUDIT_KEYS = [
   "confirmedByRole",
   "status",
 ] as const;
+
+function confirmDeniedMessage(item: {
+  status: string;
+  confirmedAt: Date | null;
+}): string {
+  if (item.confirmedAt) return "This appointment is already confirmed";
+  if (item.status !== "scheduled") {
+    return "Only scheduled appointments can be confirmed";
+  }
+  return "Confirm coming is only available in the confirmation window before the appointment";
+}
 
 export const POST = apiHandler(async (request, context) => {
   const { user, response } = await requirePerm(request, "appointments", "view");
@@ -28,9 +43,7 @@ export const POST = apiHandler(async (request, context) => {
   const item = unitId
     ? await prisma.appointment.findUnique({ where: { unitId } })
     : null;
-  if (!item) return jsonFail("NOT_FOUND", "Appointment not found", 404);
-
-  if (!canAccessAppointment(user, item)) {
+  if (!item || !canAccessAppointment(user, item)) {
     return jsonFail("NOT_FOUND", "Appointment not found", 404);
   }
 
@@ -42,37 +55,16 @@ export const POST = apiHandler(async (request, context) => {
       durationMin: item.durationMin,
     })
   ) {
-    if (item.confirmedAt) {
-      return jsonFail(
-        "VALIDATION",
-        "This appointment is already confirmed",
-        400
-      );
-    }
-    if (item.status !== "scheduled") {
-      return jsonFail(
-        "VALIDATION",
-        "Only scheduled appointments can be confirmed",
-        400
-      );
-    }
-    return jsonFail(
-      "VALIDATION",
-      "Confirm coming is only available in the confirmation window before the appointment",
-      400
-    );
+    return jsonFail("VALIDATION", confirmDeniedMessage(item), 400);
   }
 
   const clientActor = isClientOnlyUser(user.roles);
-  const confirmedByRole = clientActor ? "client" : "staff";
-  const now = new Date();
-
   const updated = await prisma.appointment.update({
     where: { id: item.id },
     data: {
-      confirmedAt: now,
+      confirmedAt: new Date(),
       confirmedByUnitId: user.unitId,
-      confirmedByRole,
+      confirmedByRole: clientActor ? "client" : "staff",
     },
   });
 
@@ -90,17 +82,9 @@ export const POST = apiHandler(async (request, context) => {
   });
 
   scheduleNotify(async () => {
-    const when = `${istDisplayDate(updated.scheduledAt)} ${formatIstTime(updated.scheduledAt)}`;
-    const body = `${updated.title} · ${when}`;
-    const recipients: Array<{
-      userId: string;
-      userUnitId: string;
-      type: string;
-      title: string;
-      body: string;
-      href: string;
-      meta: Record<string, string>;
-    }> = [];
+    const body = appointmentWhenBody(updated.title, updated.scheduledAt);
+    const meta = { appointmentUnitId: updated.unitId };
+    const recipients: NotifyInput[] = [];
 
     if (clientActor && updated.advocateMobile) {
       const advocates = await findUsersByMobiles([updated.advocateMobile]);
@@ -113,32 +97,20 @@ export const POST = apiHandler(async (request, context) => {
           title: "Client confirmed appointment",
           body,
           href: "/appointments",
-          meta: { appointmentUnitId: updated.unitId },
+          meta,
         });
       }
-    }
-
-    if (!clientActor && updated.clientUnitId) {
-      const portalUser = await prisma.user.findFirst({
-        where: {
-          isActive: true,
-          roles: { has: "client" },
-          OR: [
-            { clientUnitId: updated.clientUnitId },
-            { unitId: updated.clientUnitId },
-          ],
-        },
-        select: { id: true, unitId: true },
-      });
-      if (portalUser && portalUser.id !== user.id) {
+    } else if (!clientActor && updated.clientUnitId) {
+      const portal = await findPortalClientUser(updated.clientUnitId);
+      if (portal && portal.id !== user.id) {
         recipients.push({
-          userId: portalUser.id,
-          userUnitId: portalUser.unitId,
+          userId: portal.id,
+          userUnitId: portal.unitId,
           type: "appointment",
           title: "Office confirmed your appointment",
           body,
           href: "/appointments",
-          meta: { appointmentUnitId: updated.unitId },
+          meta,
         });
       }
     }
