@@ -142,6 +142,7 @@ export function CasesBoard({
       caseItem,
       nextStatus: toStatus,
       canEdit,
+      skipConfirm: true,
     });
     setBusy(false);
 
