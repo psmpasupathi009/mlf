@@ -92,7 +92,7 @@ export const ROLE_BLURBS: Record<UserRole, string> = {
   staff: "Clerks, PA, paralegals, receptionist, computer operator, messenger, driver, and interns",
   advocate: "Case and client work for any counsel title (Advocate, AOR, Counsel, Senior Associate, Notary, …)",
   accountant: "Cash book and fees — Accounts Manager, Accountant, Accounts Assistant, Cashier",
-  client: "Portal login — own cases, hearings, appointments, and documents only",
+  client: "Portal login — own cases, hearings, view appointments, and documents only (office books appointments)",
 };
 
 /** Roles shown in employee forms and the permissions matrix editor. */
@@ -150,13 +150,13 @@ function buildMatrix(): Matrix {
     grant(role, "hrms", "own_leave");
   }
 
-  // client — own matters only (API hard-scopes by clientUnitId)
+  // client — own matters only (API hard-scopes by clientUnitId).
+  // Appointments are office-booked only — no appointments.create.
   all("client", [
     ["dashboard", "view"],
     ["cases", "view"],
     ["cases", "upload"],
     ["appointments", "view"],
-    ["appointments", "create"],
     ["appointments", "cancel"],
   ]);
 

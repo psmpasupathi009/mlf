@@ -117,6 +117,15 @@ export const POST = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "appointments", "create");
   if (!user) return response;
 
+  // Clients call the office — only staff book appointments.
+  if (isClientOnlyUser(user.roles)) {
+    return jsonFail(
+      "FORBIDDEN",
+      "Please contact the office to book an appointment.",
+      403
+    );
+  }
+
   const raw = await request.json();
   const parsed = createAppointmentSchema.safeParse(raw);
   if (!parsed.success) {
@@ -129,33 +138,9 @@ export const POST = apiHandler(async (request) => {
   }
   const input = parsed.data;
 
-  const clientActor = isClientOnlyUser(user.roles);
-  const actorClientUnitId = requireClientUnitId(user);
-
-  if (clientActor) {
-    if (!actorClientUnitId) {
-      return jsonFail("FORBIDDEN", "Client portal link is missing.", 403);
-    }
-    if (input.mode === "video") {
-      return jsonFail(
-        "VALIDATION",
-        "Clients can book office visit or phone call only",
-        400
-      );
-    }
-  }
-
   let clientId: string | undefined;
   let clientUnitId: string | undefined;
-  if (clientActor) {
-    const client = await prisma.client.findUnique({
-      where: { unitId: actorClientUnitId! },
-      select: { id: true, unitId: true },
-    });
-    if (!client) return jsonFail("VALIDATION", "Client not found", 400);
-    clientId = client.id;
-    clientUnitId = client.unitId;
-  } else if (input.clientUnitId) {
+  if (input.clientUnitId) {
     const client = await prisma.client.findUnique({
       where: { unitId: input.clientUnitId },
       select: { id: true, unitId: true },
@@ -173,9 +158,6 @@ export const POST = apiHandler(async (request) => {
       select: { id: true, unitId: true, clientUnitId: true },
     });
     if (!caseItem) return jsonFail("VALIDATION", "Case not found", 400);
-    if (clientActor && caseItem.clientUnitId !== actorClientUnitId) {
-      return jsonFail("NOT_FOUND", "Case not found", 404);
-    }
     caseId = caseItem.id;
     caseUnitId = caseItem.unitId;
   }
@@ -243,7 +225,7 @@ export const POST = apiHandler(async (request) => {
 
   await writeAudit({
     actorUnitId: user.unitId,
-    action: clientActor ? "appointment.create.client" : "appointment.create",
+    action: "appointment.create",
     entity: "Appointment",
     entityUnitId: created.unitId,
     meta: {
@@ -263,30 +245,33 @@ export const POST = apiHandler(async (request) => {
   });
 
   scheduleNotify(async () => {
-    if (!created.advocateMobile) return;
-    const advocates = await findUsersByMobiles([created.advocateMobile]);
-    await notifyUsers(
-      advocates
-        .filter((u) => u.id !== user.id)
-        .map((u) => ({
-          userId: u.id,
-          userUnitId: u.unitId,
-          type: "appointment",
-          title: clientActor
-            ? `Client booked: ${created.title}`
-            : `Appointment: ${created.title}`,
-          body: `${istDisplayDate(created.scheduledAt)} · ${formatIstTime(created.scheduledAt)}`,
-          href: "/appointments",
-          meta: { appointmentUnitId: created.unitId },
-        }))
+    if (created.advocateMobile) {
+      const advocates = await findUsersByMobiles([created.advocateMobile]);
+      await notifyUsers(
+        advocates
+          .filter((u) => u.id !== user.id)
+          .map((u) => ({
+            userId: u.id,
+            userUnitId: u.unitId,
+            type: "appointment",
+            title: `Appointment: ${created.title}`,
+            body: `${istDisplayDate(created.scheduledAt)} · ${formatIstTime(created.scheduledAt)}`,
+            href: "/appointments",
+            meta: { appointmentUnitId: created.unitId },
+          }))
+      );
+    }
+
+    // Already inside confirm window at book time — nudge client + office now.
+    const { sendConfirmWindowReminders } = await import(
+      "@/lib/services/appointment-confirm-remind.job"
     );
+    await sendConfirmWindowReminders(created, { excludeUserId: user.id });
   });
 
   return jsonOk(
     {
-      appointment: await enrichAppointment(created, {
-        stripNotes: clientActor,
-      }),
+      appointment: await enrichAppointment(created),
     },
     201
   );

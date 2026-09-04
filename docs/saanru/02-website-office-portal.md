@@ -681,7 +681,7 @@ Same app, same `/login`. Portal login enabled by staff — not self-registration
 | Collision | Enable/update fails if mobile is already staff login |
 | Nav | Home, Cases, Appointments, Documents (`clientOnly`); Profile via menu |
 | Path allowlist | `/`, `/cases`, `/appointments`, `/documents`, `/profile`, `/notifications`, `/legal` |
-| Perms (seed) | `dashboard.view`, `cases.view`, `cases.upload`, `appointments.view`, `appointments.create`, `appointments.cancel` |
+| Perms (seed) | `dashboard.view`, `cases.view`, `cases.upload`, `appointments.view`, `appointments.cancel` |
 | Cases | Own only, read-only; stripped fields: `agreedFee`, `notes`, `filingChecklist`, `battaDue`, `awaitingService` ([`client-scope.ts`](../../lib/auth/client-scope.ts)) |
 | Appointments | Book **office \| call** only (no video); cancel scheduled only; no convert-case |
 | Documents | `/documents` page; types `id_proof`, `evidence`, `affidavit`, `other`; no receipts/expense bills |

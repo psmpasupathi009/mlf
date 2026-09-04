@@ -1046,7 +1046,7 @@ Client /documents  -->  same API, types limited, parent = own CLI
 
 ### 6.5 Appointments → convert-case
 
-**Who:** Staff book any (with rules); clients book scoped appointments. **Page:** `/appointments`
+**Who:** Staff book when a client calls (with rules); clients **view/cancel only** (no self-book). **Page:** `/appointments`
 
 **Schema:** `Appointment` (`APT`) optional dual Client/Case; `advocateMobile`; `mode` office/call/video.
 

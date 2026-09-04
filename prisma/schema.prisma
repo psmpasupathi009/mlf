@@ -411,6 +411,13 @@ model Appointment {
   location       String?
   notes          String?
   status         AppointmentStatus @default(scheduled)
+  /// RSVP: when client or staff confirmed coming (status stays scheduled)
+  confirmedAt       DateTime?
+  confirmedByUnitId String?
+  /// client | staff
+  confirmedByRole   String?
+  /// When window-open confirm reminder was sent (dedupe)
+  confirmRemindedAt DateTime?
   createdById    String?           @db.ObjectId
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
@@ -419,6 +426,7 @@ model Appointment {
   @@index([status])
   @@index([advocateMobile])
   @@index([caseUnitId])
+  @@index([confirmRemindedAt, scheduledAt])
 }
 
 /// Office dak / postal register (in / out)
@@ -586,7 +594,7 @@ model CourtDutyOverride {
   fromDate       String
   toDate         String
   reason         String?
-  createdById    String?  @db.ObjectI
+  createdById    String?  @db.ObjectId
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

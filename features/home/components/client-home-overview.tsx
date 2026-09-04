@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import {
   CalendarDays,
+  CheckCircle2,
   FileUp,
   Scale,
 } from "lucide-react";
@@ -13,9 +14,9 @@ import { apiFetch, getErrorMessage } from "@/lib/api/client";
 import { PageHeader } from "@/shared/components/data/page-header";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { personFirstName } from "@/shared/lib/person";
 import type { AppointmentSummary } from "@/features/appointments/server/serialize";
-import { AppointmentFormDialog } from "@/features/appointments/components/appointment-form-dialog";
 import { UploadDocumentDialog } from "@/features/documents/components/upload-document-dialog";
 import {
   CASE_STATUS_LABEL,
@@ -45,8 +46,8 @@ export function ClientHomeOverview({ user }: { user: PublicUser }) {
   const [cases, setCases] = useState<CaseRow[]>([]);
   const [appointments, setAppointments] = useState<AppointmentSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [bookOpen, setBookOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [confirmBusy, setConfirmBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -91,6 +92,25 @@ export function ClientHomeOverview({ user }: { user: PublicUser }) {
     });
   }, [load]);
 
+  async function handleConfirmComing(unitId: string) {
+    setConfirmBusy(unitId);
+    const { ok, data } = await apiFetch(`/api/appointments/${unitId}/confirm`, {
+      method: "POST",
+    });
+    setConfirmBusy(null);
+    if (!ok) {
+      toast.error(
+        getErrorMessage(
+          data as Record<string, unknown>,
+          "Could not confirm appointment"
+        )
+      );
+      return;
+    }
+    toast.success("Thanks — you’re confirmed for this appointment");
+    void load();
+  }
+
   const first = personFirstName({
     name: user.name,
     fallback: "there",
@@ -109,18 +129,9 @@ export function ClientHomeOverview({ user }: { user: PublicUser }) {
     <section className="space-y-6">
       <PageHeader
         title={`Welcome, ${first}`}
-        description="View your cases and hearings, book an office visit or phone call, and upload documents."
+        description="View your cases, hearings, and appointments. Call the office to book a visit or phone call, and upload documents here."
         actions={
-          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-            <Button
-              type="button"
-              size="sm"
-              className="w-full sm:w-auto"
-              onClick={() => setBookOpen(true)}
-            >
-              <CalendarDays className="size-4" />
-              Book appointment
-            </Button>
+          user.clientUnitId ? (
             <Button
               type="button"
               variant="outline"
@@ -131,7 +142,7 @@ export function ClientHomeOverview({ user }: { user: PublicUser }) {
               <FileUp className="size-4" />
               Upload document
             </Button>
-          </div>
+          ) : undefined
         }
       />
 
@@ -191,21 +202,45 @@ export function ClientHomeOverview({ user }: { user: PublicUser }) {
               <p className="text-sm text-muted-foreground">Loading…</p>
             ) : appointments.length === 0 ? (
               <p className="text-sm text-muted-foreground">
-                No scheduled appointments. Book an office visit or phone call.
+                No scheduled appointments. Call the office to book a visit or
+                phone call.
               </p>
             ) : (
               <ul className="space-y-2">
                 {appointments.map((a) => (
                   <li
                     key={a.unitId}
-                    className="rounded-lg border border-border/60 px-3 py-2"
+                    className="space-y-2 rounded-lg border border-border/60 px-3 py-2"
                   >
-                    <p className="text-sm font-medium text-navy">{a.title}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatWhen(a.scheduledAt)}
-                      {a.mode ? ` · ${a.mode}` : ""}
-                      {a.advocateName ? ` · ${a.advocateName}` : ""}
-                    </p>
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-medium text-navy">{a.title}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatWhen(a.scheduledAt)}
+                          {a.mode ? ` · ${a.mode}` : ""}
+                          {a.advocateName ? ` · ${a.advocateName}` : ""}
+                        </p>
+                      </div>
+                      {a.confirmedAt ? (
+                        <Badge variant="success">Confirmed</Badge>
+                      ) : a.canConfirm ? (
+                        <Badge variant="warning">Confirm now</Badge>
+                      ) : null}
+                    </div>
+                    {a.canConfirm ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        className="w-full gap-2"
+                        disabled={confirmBusy === a.unitId}
+                        onClick={() => void handleConfirmComing(a.unitId)}
+                      >
+                        <CheckCircle2 className="size-3.5" />
+                        {confirmBusy === a.unitId
+                          ? "Confirming…"
+                          : "Confirm you’re coming"}
+                      </Button>
+                    ) : null}
                   </li>
                 ))}
               </ul>
@@ -249,18 +284,6 @@ export function ClientHomeOverview({ user }: { user: PublicUser }) {
           )}
         </CardContent>
       </Card>
-
-      <AppointmentFormDialog
-        open={bookOpen}
-        onOpenChange={setBookOpen}
-        appointment={null}
-        formMode="create"
-        user={user}
-        onSaved={() => {
-          setBookOpen(false);
-          void load();
-        }}
-      />
 
       {user.clientUnitId ? (
         <UploadDocumentDialog

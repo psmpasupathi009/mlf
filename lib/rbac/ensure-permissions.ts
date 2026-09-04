@@ -7,6 +7,25 @@ import {
 let seeding: Promise<boolean> | null = null;
 /** Process-local: skip DB probes after catalog is known complete. */
 let knownSeeded = false;
+/** Process-local: client self-booking revoke applied once. */
+let clientApptCreateRevoked = false;
+
+/**
+ * Office-only booking: clients must not keep appointments.create from older seeds.
+ */
+async function revokeClientAppointmentCreate(): Promise<void> {
+  if (clientApptCreateRevoked) return;
+  await prisma.rolePermission.updateMany({
+    where: {
+      role: "client",
+      module: "appointments",
+      action: "create",
+      allowed: true,
+    },
+    data: { allowed: false },
+  });
+  clientApptCreateRevoked = true;
+}
 
 /**
  * Persist catalog defaults when RolePermission is empty, and backfill any
@@ -14,6 +33,8 @@ let knownSeeded = false;
  * Returns true when a seed/backfill write ran.
  */
 export async function ensureDefaultPermissions(): Promise<boolean> {
+  await revokeClientAppointmentCreate();
+
   if (knownSeeded) return false;
 
   if (!seeding) {

@@ -8,6 +8,7 @@ import {
   Briefcase,
   CalendarPlus,
   Check,
+  CheckCircle2,
   Download,
   MoreHorizontal,
   Pencil,
@@ -213,7 +214,8 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
     });
   }, [load]);
 
-  const canCreate = user.permissions.includes("appointments.create");
+  const canCreate =
+    !clientPortal && user.permissions.includes("appointments.create");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -283,6 +285,29 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
     void load();
   }
 
+  async function handleConfirmComing(unitId: string) {
+    setActionBusy(unitId);
+    const { ok, data } = await apiFetch(`/api/appointments/${unitId}/confirm`, {
+      method: "POST",
+    });
+    setActionBusy(null);
+    if (!ok) {
+      toast.error(
+        getErrorMessage(
+          data as Record<string, unknown>,
+          "Could not confirm appointment"
+        )
+      );
+      return;
+    }
+    toast.success(
+      clientPortal
+        ? "Thanks — you’re confirmed for this appointment"
+        : "Client marked as coming"
+    );
+    void load();
+  }
+
   async function handleComplete(unitId: string) {
     setActionBusy(unitId);
     const { ok, data } = await apiFetch(`/api/appointments/${unitId}`, {
@@ -340,7 +365,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
         title="Appointments"
         description={
           clientPortal
-            ? "Book an office visit or phone call with an advocate."
+            ? "View appointments the office booked for you. Call the office to schedule a new visit or phone call."
             : bookAny
               ? "Office diary — book when a client calls, hand off if an advocate is busy."
               : "Your consultation diary — book call-ins or move a slot if you cannot meet."
@@ -389,7 +414,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                 Import CSV
               </Button>
             ) : null}
-            {can("create") ? (
+            {can("create") && !clientPortal ? (
               <Button type="button" className="h-11 gap-2 px-4" onClick={openCreate}>
                 <CalendarPlus className="size-4" />
                 Book appointment
@@ -530,11 +555,11 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
           }
           description={
             clientPortal
-              ? "Book an office visit or phone call when you need to meet the office."
+              ? "Call the office to book a visit or phone call. Appointments the office schedules will show here."
               : "When a client calls, book a free slot for an advocate."
           }
           action={
-            can("create") ? (
+            can("create") && !clientPortal ? (
               <Button type="button" className="gap-2" onClick={openCreate}>
                 <CalendarPlus className="size-4" />
                 Book appointment
@@ -581,6 +606,23 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                           <Badge variant={STATUS_VARIANT[a.status] ?? "outline"}>
                             {a.status}
                           </Badge>
+                          {scheduled && a.confirmedAt ? (
+                            <Badge variant="success">
+                              {a.confirmedByRole === "client"
+                                ? "Confirmed by client"
+                                : a.confirmedByRole === "staff"
+                                  ? "Confirmed by office"
+                                  : "Confirmed"}
+                            </Badge>
+                          ) : null}
+                          {scheduled && a.canConfirm ? (
+                            <Badge variant="warning">Confirm now</Badge>
+                          ) : null}
+                          {scheduled &&
+                          !a.confirmedAt &&
+                          !a.canConfirm ? (
+                            <Badge variant="muted">Awaiting confirmation</Badge>
+                          ) : null}
                           <span className="inline-flex items-center gap-1 rounded-full border border-border/80 bg-muted/40 px-2 py-0.5 text-xs text-muted-foreground">
                             <ModeIcon className="size-3" />
                             {modeLabel(a.mode)}
@@ -638,6 +680,19 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                     </div>
 
                     <div className="flex w-full shrink-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:w-auto lg:flex-col lg:items-stretch xl:flex-row xl:items-center">
+                      {a.canConfirm ? (
+                        <Button
+                          type="button"
+                          className="h-10 w-full gap-2 sm:flex-1 lg:w-auto lg:flex-none"
+                          disabled={busy}
+                          onClick={() => void handleConfirmComing(a.unitId)}
+                        >
+                          <CheckCircle2 className="size-3.5" />
+                          {clientPortal
+                            ? "Confirm you’re coming"
+                            : "Confirm client coming"}
+                        </Button>
+                      ) : null}
                       {canOpenCase && a.clientUnitId && !a.caseUnitId ? (
                         <Button
                           type="button"
@@ -654,6 +709,7 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                         <>
                           <Button
                             type="button"
+                            variant="outline"
                             className="h-10 w-full gap-2 sm:flex-1 lg:w-auto lg:flex-none"
                             disabled={busy}
                             onClick={() => openReschedule(a)}
@@ -704,7 +760,10 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </>
-                      ) : clientPortal && can("cancel") && scheduled ? (
+                      ) : null}
+                      {scheduled &&
+                      can("cancel") &&
+                      (clientPortal || !can("edit")) ? (
                         <Button
                           type="button"
                           variant="outline"
@@ -715,7 +774,8 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
                           <X className="size-3.5" />
                           Cancel booking
                         </Button>
-                      ) : can("edit") ? (
+                      ) : null}
+                      {!scheduled && can("edit") ? (
                         <Button
                           type="button"
                           variant="outline"

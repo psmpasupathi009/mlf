@@ -4,15 +4,13 @@ import { prisma } from "@/lib/db/prisma";
 import { writeAudit, pickAuditFields, diffAudit } from "@/lib/audit";
 import {
   canBookForAnyAdvocate,
-  canViewAnyAdvocateDiary,
   resolveBookingAdvocateMobile,
 } from "@/lib/appointments/booking-rules";
 import { assertSlotBookable } from "@/lib/appointments/availability";
+import { canAccessAppointment } from "@/lib/appointments/access";
 import { updateAppointmentSchema } from "@/lib/validations/appointments.schema";
 import { enrichAppointment } from "@/features/appointments/server/enrich";
 import { isClientOnlyUser } from "@/lib/auth/client-portal";
-import { requireClientUnitId } from "@/lib/auth/client-scope";
-import type { UserRole } from "@prisma/client";
 
 const APPOINTMENT_AUDIT_KEYS = [
   "title",
@@ -25,25 +23,10 @@ const APPOINTMENT_AUDIT_KEYS = [
   "location",
   "notes",
   "status",
+  "confirmedAt",
+  "confirmedByUnitId",
+  "confirmedByRole",
 ] as const;
-
-function canAccessAppointment(
-  user: {
-    roles: UserRole[];
-    mobile: string;
-    clientUnitId?: string | null;
-  },
-  item: { advocateMobile: string | null; clientUnitId: string | null }
-): boolean {
-  if (isClientOnlyUser(user.roles)) {
-    const cid = requireClientUnitId(user);
-    return Boolean(cid && item.clientUnitId === cid);
-  }
-  if (canViewAnyAdvocateDiary(user.roles)) return true;
-  const ten = user.mobile.replace(/\D/g, "").slice(-10);
-  const aptTen = (item.advocateMobile ?? "").replace(/\D/g, "").slice(-10);
-  return !aptTen || aptTen === ten;
-}
 
 export const GET = apiHandler(async (request, context) => {
   const { user, response } = await requirePerm(request, "appointments", "view");
