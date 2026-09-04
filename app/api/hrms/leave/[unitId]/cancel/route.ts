@@ -68,6 +68,44 @@ export const POST = apiHandler(async (request, context) => {
     data,
   });
 
+  // If we auto-checked them out when leave was approved, reopen punch so they can
+  // check out normally after returning mid-day.
+  let clearedAutoCheckOut = false;
+  if (leave.status === "approved") {
+    const coversToday = leave.fromDate <= today && leave.toDate >= today;
+    if (coversToday) {
+      const att = await prisma.attendance.findFirst({
+        where: {
+          userId: leave.userId,
+          date: today,
+          checkInAt: { not: null },
+          checkOutAt: { not: null },
+          notes: {
+            contains: "auto check-out (leave approved)",
+            mode: "insensitive",
+          },
+        },
+      });
+      if (att) {
+        const cleaned = (att.notes ?? "")
+          .replace(/\s*·\s*auto check-out \(leave approved\)/i, "")
+          .replace(/^Auto check-out \(leave approved\)$/i, "")
+          .trim();
+        await prisma.attendance.update({
+          where: { id: att.id },
+          data: {
+            checkOutAt: null,
+            checkOutLat: null,
+            checkOutLng: null,
+            checkOutAccuracy: null,
+            notes: cleaned || null,
+          },
+        });
+        clearedAutoCheckOut = true;
+      }
+    }
+  }
+
   const after = pickAuditFields(updated as Record<string, unknown>, ["status"] as const);
   await writeAudit({
     actorUnitId: user.unitId,
@@ -79,12 +117,12 @@ export const POST = apiHandler(async (request, context) => {
       after,
       changes: diffAudit(before, after),
       wasApproved: leave.status === "approved",
+      ...(clearedAutoCheckOut ? { clearedAutoCheckOut: true } : {}),
     },
   });
 
-  const { scheduleNotify, notifyUsers, findUsersWithPermission } = await import(
-    "@/lib/notifications/notify"
-  );
+  const { scheduleNotify, notifyUsers, notifyUser, findUsersWithPermission } =
+    await import("@/lib/notifications/notify");
 
   if (leave.status === "approved") {
     scheduleNotify(async () => {
@@ -102,6 +140,18 @@ export const POST = apiHandler(async (request, context) => {
             meta: { leaveUnitId: leave.unitId },
           }))
       );
+      // Notify the leave owner when an approver cancels on their behalf.
+      if (!isOwner) {
+        await notifyUser({
+          userId: leave.userId,
+          userUnitId: leave.userUnitId,
+          type: "leave_cancelled",
+          title: "Your approved leave was cancelled",
+          body: `${leave.fromDate} → ${leave.toDate}`,
+          href: "/hrms?section=leave",
+          meta: { leaveUnitId: leave.unitId },
+        });
+      }
     });
   } else {
     scheduleNotify(async () => {

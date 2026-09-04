@@ -18,6 +18,7 @@ import { LEAVE_REASON_OPTIONS } from "@/config/company/form-options";
 import { SelectOrOther } from "@/shared/components/forms/select-or-other";
 import { DatePicker } from "@/shared/components/forms/date-picker";
 import { FormError } from "@/shared/components/feedback/form-error";
+import { istDateKey } from "@/lib/utils/ist";
 
 type LeaveApplyDialogProps = {
   open: boolean;
@@ -37,6 +38,8 @@ export function LeaveApplyDialog({
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const today = istDateKey();
+  const minDate = new Date(`${today}T00:00:00`);
 
   function handleOpenChange(next: boolean) {
     if (!next) setError("");
@@ -52,6 +55,10 @@ export function LeaveApplyDialog({
     setError("");
     if (!fromDate || !toDate) {
       setError("Select both dates");
+      return;
+    }
+    if (fromDate < today) {
+      setError("Leave cannot start in the past");
       return;
     }
     if (fromDate > toDate) {
@@ -96,11 +103,19 @@ export function LeaveApplyDialog({
         <DialogBody className="grid gap-4">
           <div className="grid gap-2">
             <Label>From</Label>
-            <DatePicker value={fromDate} onChange={handleFromChange} />
+            <DatePicker
+              value={fromDate}
+              onChange={handleFromChange}
+              minDate={minDate}
+            />
           </div>
           <div className="grid gap-2">
             <Label>To</Label>
-            <DatePicker value={toDate} onChange={setToDate} />
+            <DatePicker
+              value={toDate}
+              onChange={setToDate}
+              minDate={fromDate ? new Date(`${fromDate}T00:00:00`) : minDate}
+            />
           </div>
           <div className="grid gap-2">
             <Label>Reason</Label>

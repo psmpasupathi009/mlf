@@ -125,7 +125,7 @@ export function PresenceTodaySection({
               <CardTitle>Who’s in today</CardTitle>
               <p className="mt-1 text-xs text-muted-foreground">
                 {officeHoliday
-                  ? `Office closed — ${officeHoliday.title}. Everyone shows as office closed; check-in is blocked.`
+                  ? `Office closed — ${officeHoliday.title}. Check-in is blocked. Individual rows still show real punch / leave status.`
                   : "Color bar: amber absent · green present · grey on leave. Busy chips (court / travel / client meet) mean booking is blocked — status can still be In. Check-in notes are board-only."}
               </p>
             </div>

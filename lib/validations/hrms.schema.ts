@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { istDateKey } from "@/lib/utils/ist";
 
 export const ymdSchema = z
   .string()
@@ -14,6 +15,16 @@ export const applyLeaveSchema = z
   .refine((d) => d.fromDate <= d.toDate, {
     message: "From date must be on/before to date",
     path: ["toDate"],
+  })
+  .superRefine((d, ctx) => {
+    const today = istDateKey();
+    if (d.fromDate < today) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["fromDate"],
+        message: "Leave cannot start in the past",
+      });
+    }
   });
 
 export const decideLeaveSchema = z

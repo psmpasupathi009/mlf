@@ -11,7 +11,7 @@ import {
   notifyUsers,
   scheduleNotify,
 } from "@/lib/notifications/notify";
-import { istDisplayDate } from "@/lib/utils/ist";
+import { istDisplayDate, istDateKey, istDayBounds } from "@/lib/utils/ist";
 import {
   assertAdvocateCourtDayAvailable,
   clashMessage,
@@ -41,6 +41,15 @@ export const POST = apiHandler(async (request, context) => {
     );
   }
   const input = parsed.data;
+
+  const { start: todayStart } = istDayBounds(istDateKey());
+  if (input.nextHearingDate < todayStart) {
+    return jsonFail(
+      "VALIDATION",
+      "Next hearing date cannot be in the past",
+      400
+    );
+  }
 
   const caseItem = await prisma.case.findUnique({
     where: { id: hearing.caseId },

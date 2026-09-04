@@ -54,17 +54,33 @@ export const createOfficeTaskSchema = z
     }
   });
 
-export const updateOfficeTaskSchema = z.object({
-  title: z.string().trim().min(1).max(200).optional(),
-  kind: officeTaskKindEnum.optional(),
-  status: officeTaskStatusEnum.optional(),
-  dueDate: optionalDayField,
-  workDate: optionalDayField,
-  assigneeUnitId: z.string().trim().optional().or(z.literal("")),
-  caseUnitId: z.string().trim().optional().or(z.literal("")),
-  notes: z.string().trim().max(1000).optional().or(z.literal("")),
-  finishNote: z.string().trim().max(1000).optional().or(z.literal("")),
-});
+export const updateOfficeTaskSchema = z
+  .object({
+    title: z.string().trim().min(1).max(200).optional(),
+    kind: officeTaskKindEnum.optional(),
+    status: officeTaskStatusEnum.optional(),
+    dueDate: optionalDayField,
+    workDate: optionalDayField,
+    assigneeUnitId: z.string().trim().optional().or(z.literal("")),
+    caseUnitId: z.string().trim().optional().or(z.literal("")),
+    notes: z.string().trim().max(1000).optional().or(z.literal("")),
+    finishNote: z.string().trim().max(1000).optional().or(z.literal("")),
+  })
+  .superRefine((data, ctx) => {
+    // Empty string would wipe the note while marking done — reject it.
+    // Omitting finishNote is allowed when an existing note is already stored.
+    if (
+      data.status === "done" &&
+      data.finishNote !== undefined &&
+      !data.finishNote.trim()
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["finishNote"],
+        message: "Finishing note is required when marking done",
+      });
+    }
+  });
 
 export const OFFICE_TASK_KIND_OPTIONS = [
   { value: "allotment", label: "Allotment" },

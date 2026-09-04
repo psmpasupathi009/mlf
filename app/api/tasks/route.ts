@@ -9,6 +9,7 @@ import { toOfficeTaskSummary } from "@/features/tasks/server/serialize";
 import { containsInsensitive } from "@/lib/db/search";
 import { istDateKey, istDayBounds } from "@/lib/utils/ist";
 import { notifyUser, scheduleNotify } from "@/lib/notifications/notify";
+import { isStaffUser } from "@/lib/auth/client-portal";
 
 async function resolveAssignee(assigneeUnitId: string | undefined | null) {
   if (!assigneeUnitId) return { assigneeUnitId: undefined as string | undefined, assigneeId: undefined as string | undefined };
@@ -154,6 +155,9 @@ export const POST = apiHandler(async (request) => {
 
   const status = input.status ?? "open";
   const assignToAllStaff = Boolean(input.assignToAllStaff);
+  const defaultWorkDate =
+    input.workDate ??
+    (status === "open" ? istDayBounds(istDateKey()).start : undefined);
 
   type ResolvedAssignee = {
     assigneeUnitId: string;
@@ -169,13 +173,14 @@ export const POST = apiHandler(async (request) => {
         isActive: true,
         NOT: { roles: { equals: ["client"] } },
       },
-      select: { id: true, unitId: true, name: true },
+      select: { id: true, unitId: true, name: true, roles: true },
       orderBy: { name: "asc" },
     });
-    if (staff.length === 0) {
+    const officeStaff = staff.filter((p) => isStaffUser(p.roles));
+    if (officeStaff.length === 0) {
       return jsonFail("VALIDATION", "No active staff to assign", 400);
     }
-    targets = staff.map((p) => ({
+    targets = officeStaff.map((p) => ({
       assigneeUnitId: p.unitId,
       assigneeId: p.id,
       name: p.name,
@@ -208,7 +213,7 @@ export const POST = apiHandler(async (request) => {
         kind: input.kind ?? "general",
         status,
         dueDate: input.dueDate ?? undefined,
-        workDate: input.workDate ?? undefined,
+        workDate: defaultWorkDate,
         caseUnitId,
         notes: input.notes || undefined,
         finishNote: input.finishNote || undefined,
@@ -252,7 +257,7 @@ export const POST = apiHandler(async (request) => {
         kind: input.kind ?? "general",
         status,
         dueDate: input.dueDate ?? undefined,
-        workDate: input.workDate ?? undefined,
+        workDate: defaultWorkDate,
         assigneeUnitId: target.assigneeUnitId,
         assigneeId: target.assigneeId,
         caseUnitId,

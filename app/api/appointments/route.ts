@@ -158,6 +158,13 @@ export const POST = apiHandler(async (request) => {
       select: { id: true, unitId: true, clientUnitId: true },
     });
     if (!caseItem) return jsonFail("VALIDATION", "Case not found", 400);
+    if (clientUnitId && caseItem.clientUnitId !== clientUnitId) {
+      return jsonFail(
+        "VALIDATION",
+        "Case does not belong to the selected client",
+        400
+      );
+    }
     caseId = caseItem.id;
     caseUnitId = caseItem.unitId;
   }

@@ -8,6 +8,7 @@ import { normalizeMobile } from "@/lib/auth/mobile";
 import { createClientSchema } from "@/lib/validations/clients.schema";
 import { toClientSummary } from "@/features/clients/server/serialize";
 import { containsInsensitive } from "@/lib/db/search";
+import { findClientByMobile } from "@/lib/imports/lookups";
 
 const CLIENT_AUDIT_KEYS = [
   "name",
@@ -97,6 +98,15 @@ export const POST = apiHandler(async (request) => {
   const mobile = normalizeMobile(input.mobile);
   if (!mobile) {
     return jsonFail("VALIDATION", "Enter a valid 10-digit Indian mobile number", 400);
+  }
+
+  const existing = await findClientByMobile(mobile);
+  if (existing) {
+    return jsonFail(
+      "CONFLICT",
+      `A client with this mobile already exists (${existing.unitId})`,
+      409
+    );
   }
 
   const unitId = await nextUnitId("client");

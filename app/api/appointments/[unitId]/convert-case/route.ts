@@ -99,27 +99,53 @@ export const POST = apiHandler(async (request, context) => {
   ] as const);
 
   const caseUnitId = await nextUnitId("case");
-  const created = await prisma.case.create({
-    data: {
-      unitId: caseUnitId,
-      clientId: client.id,
-      clientUnitId: client.unitId,
-      status: "enquiry",
-      primaryAdvocateMobile: advocateMobile || undefined,
-      advocateMobiles: advocateMobile ? [advocateMobile] : [],
-      agreedFee: parsed.data.agreedFee,
-      notes: noteParts.length ? noteParts.join("\n") : undefined,
-      createdById: user.id,
-    },
-  });
+  let created;
+  let updated;
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const stillOpen = await tx.appointment.findFirst({
+        where: { id: item.id, caseUnitId: null },
+      });
+      if (!stillOpen) {
+        throw new Error("ALREADY_LINKED");
+      }
 
-  const updated = await prisma.appointment.update({
-    where: { id: item.id },
-    data: {
-      caseId: created.id,
-      caseUnitId: created.unitId,
-    },
-  });
+      const createdCase = await tx.case.create({
+        data: {
+          unitId: caseUnitId,
+          clientId: client.id,
+          clientUnitId: client.unitId,
+          status: "enquiry",
+          primaryAdvocateMobile: advocateMobile || undefined,
+          advocateMobiles: advocateMobile ? [advocateMobile] : [],
+          agreedFee: parsed.data.agreedFee,
+          notes: noteParts.length ? noteParts.join("\n") : undefined,
+          createdById: user.id,
+        },
+      });
+
+      const updatedApt = await tx.appointment.update({
+        where: { id: item.id },
+        data: {
+          caseId: createdCase.id,
+          caseUnitId: createdCase.unitId,
+        },
+      });
+
+      return { created: createdCase, updated: updatedApt };
+    });
+    created = result.created;
+    updated = result.updated;
+  } catch (err) {
+    if (err instanceof Error && err.message === "ALREADY_LINKED") {
+      return jsonFail(
+        "CONFLICT",
+        "This appointment is already linked to a case",
+        409
+      );
+    }
+    throw err;
+  }
 
   const aptAfter = pickAuditFields(updated as Record<string, unknown>, [
     "caseUnitId",

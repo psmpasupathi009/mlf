@@ -141,7 +141,7 @@ export const PATCH = apiHandler(async (request, context) => {
     } else {
       const caseItem = await prisma.case.findUnique({
         where: { unitId: input.caseUnitId },
-        select: { id: true, unitId: true },
+        select: { id: true, unitId: true, clientUnitId: true },
       });
       if (!caseItem) return jsonFail("VALIDATION", "Case not found", 400);
       caseId = caseItem.id;
@@ -182,6 +182,25 @@ export const PATCH = apiHandler(async (request, context) => {
     advocateMobile !== undefined ? advocateMobile : item.advocateMobile;
   const nextClient =
     clientUnitId !== undefined ? clientUnitId : item.clientUnitId;
+  const nextCaseUnitId =
+    caseUnitId !== undefined ? caseUnitId : item.caseUnitId;
+
+  if (nextCaseUnitId) {
+    const linkedCase = await prisma.case.findUnique({
+      where: { unitId: nextCaseUnitId },
+      select: { clientUnitId: true },
+    });
+    if (!linkedCase) {
+      return jsonFail("VALIDATION", "Case not found", 400);
+    }
+    if (nextClient && linkedCase.clientUnitId !== nextClient) {
+      return jsonFail(
+        "VALIDATION",
+        "Case does not belong to the selected client",
+        400
+      );
+    }
+  }
 
   if (
     nextStatus === "scheduled" &&

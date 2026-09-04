@@ -6,6 +6,8 @@ import { updatePaymentSchema } from "@/lib/validations/accounts.schema";
 import { toPaymentSummary } from "@/features/accounts/server/serialize";
 import { resolveActorsByIds } from "@/features/accounts/server/actors";
 import { toDocumentSummary } from "@/features/documents/server/serialize";
+import { feeRemainingForCase } from "@/features/accounts/server/fee-rollup";
+import { FEE_PURPOSES } from "@/features/accounts/lib/payment-purposes";
 
 export const GET = apiHandler(async (request, context) => {
   const { user, response } = await requirePerm(request, "accounts", "view");
@@ -118,6 +120,23 @@ export const PATCH = apiHandler(async (request, context) => {
       "Paid on date is required when status is paid",
       400
     );
+  }
+
+  const nextAmount = input.amount ?? item.amount;
+  if (
+    item.caseUnitId &&
+    (FEE_PURPOSES as readonly string[]).includes(nextType)
+  ) {
+    const remaining = await feeRemainingForCase(item.caseUnitId, {
+      excludePaymentId: item.id,
+    });
+    if (remaining != null && nextAmount > remaining) {
+      return jsonFail(
+        "VALIDATION",
+        `Amount exceeds remaining fee balance (₹${remaining.toLocaleString("en-IN")})`,
+        400
+      );
+    }
   }
 
   const before = {

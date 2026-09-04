@@ -51,14 +51,13 @@ export async function ensureEnvAdminUser(mobile91: string): Promise<User | null>
       : undefined;
 
   if (existing) {
+    // Do not clear PIN lockout here — that would unlock via phone re-entry.
     return prisma.user.update({
       where: { id: existing.id },
       data: {
         mobile: mobile91,
         roles,
         isActive: true,
-        failedPinAttempts: 0,
-        pinLockedUntil: null,
         name: existing.name ?? "Super Admin",
         designation: existing.designation ?? "Managing Partner",
         ...(defaultPinHash ? { pinHash: defaultPinHash } : {}),

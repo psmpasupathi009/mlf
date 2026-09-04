@@ -93,6 +93,33 @@ export async function feeRollupForCase(
   );
 }
 
+/**
+ * Remaining fee capacity for a case, subtracting pending fee payments
+ * and pending waivers so concurrent rows cannot over-collect.
+ */
+export async function feeRemainingForCase(
+  caseUnitId: string,
+  opts?: { excludePaymentId?: string }
+): Promise<number | null> {
+  const fee = await feeRollupForCase(caseUnitId);
+  if (fee.outstanding == null) return null;
+
+  const pendingFees = await prisma.cashPayment.aggregate({
+    where: {
+      caseUnitId,
+      status: "pending",
+      type: { in: [...FEE_PURPOSES] },
+      ...(opts?.excludePaymentId ? { id: { not: opts.excludePaymentId } } : {}),
+    },
+    _sum: { amount: true },
+  });
+
+  return Math.max(
+    0,
+    fee.outstanding - (pendingFees._sum.amount ?? 0) - fee.pendingWaived
+  );
+}
+
 /** Paid fee-purpose totals across all matters for a client. */
 export async function feeRollupForClient(
   clientUnitId: string

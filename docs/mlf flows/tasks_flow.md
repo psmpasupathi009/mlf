@@ -36,7 +36,7 @@ Clients never see Work allotment.
 | List / filter | `GET /api/tasks` |
 | Assign (one or all staff) | `POST /api/tasks` (`assigneeUnitId` **or** `assignToAllStaff: true`) |
 | Update / reassign / done | `PATCH /api/tasks/[unitId]` — **done requires `finishNote`** |
-| Pending tonight | `GET /api/tasks/pending-response` (current user’s open tasks for today) |
+| Pending tonight | `GET /api/tasks/pending-response` (current user’s open tasks for today **or overdue**) |
 | Import | `POST /api/tasks/import` |
 | Day board | `GET /api/diary` (open tasks in IST day) |
 
@@ -50,9 +50,10 @@ Clients never see Work allotment.
 |------|--------|
 | Assign all staff | One open task per active office employee (not client logins) |
 | Evening response | Same as mark done — non-empty `finishNote` required |
-| Logout | UI asks for pending responses before signing out |
-| Check-out | UI dialog + server rejects check-out while pending open tasks remain for today |
-| Statuses | `open` → `done` (sets `completedAt`) · `cancelled` |
+| Logout | UI asks for pending responses before signing out (fail-closed; soft gate — logout API itself is not blocked) |
+| Check-out | UI dialog + server rejects check-out while pending open tasks remain (today + overdue) |
+| Assignee respond | Assignee may mark **their own** open task `done` with a note even without `tasks.edit` |
+| Statuses | `open` → `done` (sets `completedAt`) · `cancelled` (cannot mark done) |
 
 ---
 

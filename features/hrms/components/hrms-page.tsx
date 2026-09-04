@@ -424,16 +424,20 @@ export function HrmsPage({ user }: { user: PublicUser }) {
     setCheckBusy(true);
     try {
       const pending = await fetchPendingTaskResponses();
-      if (pending.length > 0) {
-        setCheckBusy(false);
+      if (!pending.ok) {
+        toast.error(pending.error);
+        return;
+      }
+      if (pending.tasks.length > 0) {
         setTaskGateOpen(true);
         return;
       }
       await runCheckOut();
     } catch (err) {
       toast.error(
-        err instanceof Error ? err.message : "Could not get your location"
+        err instanceof Error ? err.message : "Could not check pending tasks"
       );
+    } finally {
       setCheckBusy(false);
     }
   }
@@ -451,12 +455,14 @@ export function HrmsPage({ user }: { user: PublicUser }) {
         },
       });
       if (!ok) {
-        toast.error(
-          getErrorMessage(
-            data as Record<string, unknown>,
-            "Failed to check out"
-          )
+        const message = getErrorMessage(
+          data as Record<string, unknown>,
+          "Failed to check out"
         );
+        toast.error(message);
+        if (/open task/i.test(message)) {
+          setTaskGateOpen(true);
+        }
         return;
       }
       toast.success("Checked out");
@@ -643,7 +649,7 @@ export function HrmsPage({ user }: { user: PublicUser }) {
               { label: "Present", value: counts.present },
               { label: "Checked out", value: counts.out },
               {
-                label: officeHolidayToday ? "Office closed" : "On leave",
+                label: "On leave",
                 value: counts.onLeave,
               },
               { label: "Absent", value: counts.absent },

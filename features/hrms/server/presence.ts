@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/prisma";
+import { isStaffUser } from "@/lib/auth/client-portal";
 import { displayMobile, normalizeMobile } from "@/lib/auth/mobile";
 import { userPhotoUrl } from "@/lib/auth/user-photo";
 import { personDisplayName } from "@/shared/lib/person";
@@ -71,7 +72,7 @@ function addMinutes(date: Date, minutes: number): Date {
 }
 
 export async function buildPresenceBoard(dateKey: string): Promise<PresenceBoard> {
-  const staff = await prisma.user.findMany({
+  const allActive = await prisma.user.findMany({
     where: { isActive: true },
     select: {
       id: true,
@@ -84,6 +85,7 @@ export async function buildPresenceBoard(dateKey: string): Promise<PresenceBoard
     },
     orderBy: { name: "asc" },
   });
+  const staff = allActive.filter((u) => isStaffUser(u.roles));
 
   const userIds = staff.map((s) => s.id);
   const unitIds = staff.map((s) => s.unitId);
@@ -218,8 +220,9 @@ export async function buildPresenceBoard(dateKey: string): Promise<PresenceBoard
     });
     const leaveUnitId = leaveByUnit.get(s.unitId) ?? null;
     const att = attByUser.get(s.id);
+    // Holiday is board-level (officeHoliday); do not force everyone to on_leave.
     const status = derivePresenceStatus({
-      onApprovedLeave: Boolean(leaveUnitId) || Boolean(holiday),
+      onApprovedLeave: Boolean(leaveUnitId),
       checkInAt: att?.checkInAt,
       checkOutAt: att?.checkOutAt,
     });

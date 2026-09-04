@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import {
   PendingTasksGateDialog,
   fetchPendingTaskResponses,
@@ -27,7 +28,12 @@ export function useLogoutWithTaskGate() {
     if (loading) return;
     setLoading(true);
     const pending = await fetchPendingTaskResponses();
-    if (pending.length > 0) {
+    if (!pending.ok) {
+      toast.error(pending.error);
+      setLoading(false);
+      return;
+    }
+    if (pending.tasks.length > 0) {
       setLoading(false);
       proceedRef.current = () => {
         void finishLogout();
@@ -44,10 +50,17 @@ export function useLogoutWithTaskGate() {
     next?.();
   }, []);
 
+  const handleGateOpenChange = useCallback((open: boolean) => {
+    setGateOpen(open);
+    if (!open) {
+      proceedRef.current = null;
+    }
+  }, []);
+
   const gate = (
     <PendingTasksGateDialog
       open={gateOpen}
-      onOpenChange={setGateOpen}
+      onOpenChange={handleGateOpenChange}
       reason="logout"
       onAllDone={onAllDone}
     />

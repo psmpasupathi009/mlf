@@ -539,6 +539,7 @@ export function AppointmentFormDialog({
                     value={client}
                     onChange={(c) => {
                       setClient(c);
+                      setLinkedCase(null);
                       setScheduledAt("");
                     }}
                     label="Client (recommended for call-ins)"
@@ -586,7 +587,10 @@ export function AppointmentFormDialog({
               <div className="grid gap-4 md:grid-cols-2">
                 <ClientPicker
                   value={client}
-                  onChange={setClient}
+                  onChange={(c) => {
+                    setClient(c);
+                    setLinkedCase(null);
+                  }}
                   label="Client"
                 />
                 <div className="grid gap-2">
@@ -724,6 +728,7 @@ export function AppointmentFormDialog({
                   value={client}
                   onChange={(c) => {
                     setClient(c);
+                    setLinkedCase(null);
                     setScheduledAt("");
                   }}
                   label="Client"

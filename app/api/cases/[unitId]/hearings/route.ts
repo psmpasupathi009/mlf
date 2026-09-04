@@ -12,7 +12,7 @@ import {
   notifyUsers,
   scheduleNotify,
 } from "@/lib/notifications/notify";
-import { istDisplayDate } from "@/lib/utils/ist";
+import { istDisplayDate, istDateKey, istDayBounds } from "@/lib/utils/ist";
 
 export const POST = apiHandler(async (request, context) => {
   const { user, response } = await requirePerm(request, "cases", "edit");
@@ -28,6 +28,11 @@ export const POST = apiHandler(async (request, context) => {
     return jsonFail("VALIDATION", parsed.error.issues[0]?.message ?? "Invalid request", 400, parsed.error.issues);
   }
   const input = parsed.data;
+
+  const { start: todayStart } = istDayBounds(istDateKey());
+  if (input.hearingDate < todayStart) {
+    return jsonFail("VALIDATION", "Hearing date cannot be in the past", 400);
+  }
 
   const purpose = input.purpose?.trim() || undefined;
   const syncStage =

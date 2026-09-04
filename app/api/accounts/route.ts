@@ -11,7 +11,8 @@ import {
   buildAccountsWhere,
   parseAccountsFilters,
 } from "@/features/accounts/server/filters";
-import { feeRollupForCase } from "@/features/accounts/server/fee-rollup";
+import { feeRollupForCase, feeRemainingForCase } from "@/features/accounts/server/fee-rollup";
+import { FEE_PURPOSES } from "@/features/accounts/lib/payment-purposes";
 
 export const GET = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "accounts", "view");
@@ -121,6 +122,17 @@ export const POST = apiHandler(async (request) => {
     }
     caseId = caseItem.id;
     caseUnitId = caseItem.unitId;
+
+    if ((FEE_PURPOSES as readonly string[]).includes(input.type)) {
+      const remaining = await feeRemainingForCase(caseItem.unitId);
+      if (remaining != null && input.amount > remaining) {
+        return jsonFail(
+          "VALIDATION",
+          `Amount exceeds remaining fee balance (₹${remaining.toLocaleString("en-IN")})`,
+          400
+        );
+      }
+    }
   }
 
   const status = input.status ?? "pending";

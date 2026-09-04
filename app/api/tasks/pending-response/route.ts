@@ -1,4 +1,4 @@
-import { apiHandler, jsonFail, jsonOk } from "@/lib/api/response";
+import { apiHandler, jsonOk } from "@/lib/api/response";
 import { requireUser } from "@/lib/api/guard";
 import { isClientOnlyUser } from "@/lib/auth/client-portal";
 import { findPendingEveningTasks } from "@/features/tasks/server/pending-response";

@@ -74,8 +74,7 @@ Clients never see HRMS.
 | Action | API |
 |--------|-----|
 | List attendance / history | `GET /api/hrms/attendance` |
-| Create attendance row | `POST /api/hrms/attendance` |
-| Check-in / check-out | `POST .../check-in`, `.../check-out` |
+| Check-in / check-out | `POST .../check-in`, `.../check-out` (check-out blocked while evening tasks pending) |
 | List / request leave | `GET` / `POST /api/hrms/leave` |
 | Decide leave | `POST /api/hrms/leave/[unitId]/decide` |
 | Cancel leave | `POST /api/hrms/leave/[unitId]/cancel` |
@@ -173,3 +172,4 @@ sequenceDiagram
 | [Availability](./availability_flow.md) / [Appointments](./appointments_flow.md) | Holidays + leave close slots |
 | [Reports](./reports_flow.md) | `attendance` export |
 | [Activity](./activity_flow.md) | HRMS mutation audits |
+| [Tasks](./tasks_flow.md) | Check-out blocked until evening responses |

@@ -394,11 +394,9 @@ export function LoginForm() {
           onConfirmChange={setConfirmPin}
           onSubmit={handleSetupPin}
           onBack={() => {
-            // Keep otpProofToken — verified OTP cannot be reused; only clear PIN fields.
-            setPin("");
-            setConfirmPin("");
-            setError("");
-            setStep("otp_setup");
+            // Verified OTP cannot be reused — restart from phone.
+            resetCodes();
+            setStep("phone");
           }}
         />
       ) : null}
@@ -415,11 +413,8 @@ export function LoginForm() {
           onConfirmChange={setConfirmPin}
           onSubmit={handleResetPin}
           onBack={() => {
-            // Keep otpProofToken — verified OTP cannot be reused; only clear PIN fields.
-            setPin("");
-            setConfirmPin("");
-            setError("");
-            setStep("otp_forgot");
+            resetCodes();
+            setStep("phone");
           }}
         />
       ) : null}

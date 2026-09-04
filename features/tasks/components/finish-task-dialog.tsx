@@ -132,14 +132,26 @@ type PendingResponse = {
   count: number;
 };
 
-/** Fetch today's open tasks that still need an evening response. */
-export async function fetchPendingTaskResponses(): Promise<OfficeTaskSummary[]> {
+export type PendingFetchResult =
+  | { ok: true; tasks: OfficeTaskSummary[] }
+  | { ok: false; error: string };
+
+/** Fetch today's open tasks that still need an evening response. Fail-closed. */
+export async function fetchPendingTaskResponses(): Promise<PendingFetchResult> {
   const { ok, data } = await apiFetch<PendingResponse>(
     "/api/tasks/pending-response"
   );
-  if (!ok) return [];
+  if (!ok) {
+    return {
+      ok: false,
+      error: getErrorMessage(
+        data as Record<string, unknown>,
+        "Could not check pending tasks"
+      ),
+    };
+  }
   const body = data as unknown as PendingResponse;
-  return body.tasks ?? [];
+  return { ok: true, tasks: body.tasks ?? [] };
 }
 
 /**
@@ -171,11 +183,16 @@ export function PendingTasksGateDialog({
     setFinishNote("");
     setError("");
     void (async () => {
-      const list = await fetchPendingTaskResponses();
+      const result = await fetchPendingTaskResponses();
       if (cancelled) return;
-      setTasks(list);
       setLoading(false);
-      if (list.length === 0) {
+      if (!result.ok) {
+        setTasks([]);
+        setError(result.error);
+        return;
+      }
+      setTasks(result.tasks);
+      if (result.tasks.length === 0) {
         onAllDoneRef.current();
         onOpenChangeRef.current(false);
       }
@@ -187,6 +204,25 @@ export function PendingTasksGateDialog({
 
   const current = tasks[index] ?? null;
   const remaining = tasks.length - index;
+  const progressLabel =
+    tasks.length > 0 ? `${index + 1} of ${tasks.length}` : null;
+
+  async function completeGate() {
+    const again = await fetchPendingTaskResponses();
+    if (!again.ok) {
+      setError(again.error);
+      return;
+    }
+    if (again.tasks.length > 0) {
+      setTasks(again.tasks);
+      setIndex(0);
+      setFinishNote("");
+      setError("More tasks still need a response");
+      return;
+    }
+    onAllDone();
+    onOpenChange(false);
+  }
 
   async function submitCurrent() {
     if (!current) return;
@@ -201,8 +237,8 @@ export function PendingTasksGateDialog({
       method: "PATCH",
       json: { status: "done", finishNote: note },
     });
-    setBusy(false);
     if (!res.ok) {
+      setBusy(false);
       setError(
         getErrorMessage(
           res.data as Record<string, unknown>,
@@ -215,12 +251,13 @@ export function PendingTasksGateDialog({
     const nextIndex = index + 1;
     if (nextIndex >= tasks.length) {
       setFinishNote("");
-      onAllDone();
-      onOpenChange(false);
+      await completeGate();
+      setBusy(false);
       return;
     }
     setIndex(nextIndex);
     setFinishNote("");
+    setBusy(false);
   }
 
   const title =
@@ -242,9 +279,11 @@ export function PendingTasksGateDialog({
           <DialogDescription>
             {loading
               ? "Checking your open tasks for today…"
-              : remaining > 0
-                ? `${remaining} open task${remaining === 1 ? "" : "s"} need a short response note.`
-                : "All caught up."}
+              : error && tasks.length === 0
+                ? "Could not load pending tasks."
+                : remaining > 0
+                  ? `${remaining} open task${remaining === 1 ? "" : "s"} need a short response note${progressLabel ? ` (${progressLabel})` : ""}.`
+                  : "All caught up."}
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="grid gap-4">
@@ -272,6 +311,8 @@ export function PendingTasksGateDialog({
             </>
           ) : loading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>
+          ) : error ? (
+            <FormError>{error}</FormError>
           ) : null}
         </DialogBody>
         <DialogFooter>
@@ -283,19 +324,46 @@ export function PendingTasksGateDialog({
           >
             Cancel
           </Button>
-          <Button
-            type="button"
-            disabled={busy || loading || !current || !finishNote.trim()}
-            onClick={() => void submitCurrent()}
-          >
-            {busy
-              ? "Saving…"
-              : remaining > 1
-                ? "Save & next"
-                : reason === "logout"
-                  ? "Save & log out"
-                  : "Save & check out"}
-          </Button>
+          {error && tasks.length === 0 && !loading ? (
+            <Button
+              type="button"
+              disabled={busy}
+              onClick={() => {
+                setLoading(true);
+                setError("");
+                void (async () => {
+                  const result = await fetchPendingTaskResponses();
+                  setLoading(false);
+                  if (!result.ok) {
+                    setError(result.error);
+                    return;
+                  }
+                  setTasks(result.tasks);
+                  setIndex(0);
+                  if (result.tasks.length === 0) {
+                    onAllDone();
+                    onOpenChange(false);
+                  }
+                })();
+              }}
+            >
+              Retry
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              disabled={busy || loading || !current || !finishNote.trim()}
+              onClick={() => void submitCurrent()}
+            >
+              {busy
+                ? "Saving…"
+                : remaining > 1
+                  ? "Save & next"
+                  : reason === "logout"
+                    ? "Save & log out"
+                    : "Save & check out"}
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
