@@ -20,6 +20,7 @@ export const NOTIFICATION_CATEGORIES: readonly NotificationCategory[] = [
 const CATEGORY_TYPES: Record<NotificationCategory, readonly string[]> = {
   hearings: [
     "hearing_tomorrow",
+    "hearing_reminder",
     "hearing_adjourned",
     "appointment",
     "appointment_updated",
@@ -82,6 +83,7 @@ export function urgencyTone(type: string): UrgencyTone | null {
   }
   if (
     type === "hearing_tomorrow" ||
+    type === "hearing_reminder" ||
     type === "hearing_adjourned" ||
     type === "task_assigned"
   ) {
@@ -105,6 +107,7 @@ const TYPE_LABELS: Record<string, string> = {
   filing_defect: "Filing defect",
   batta_due: "Batta due",
   hearing_tomorrow: "Hearing tomorrow",
+  hearing_reminder: "Hearing reminder",
   hearing_adjourned: "Hearing adjourned",
   office_holiday: "Office holiday",
   dak_received: "Dak",
@@ -186,6 +189,7 @@ export const ALL_NOTIFICATION_TYPES: readonly NotificationType[] = [
   "filing_defect",
   "batta_due",
   "hearing_tomorrow",
+  "hearing_reminder",
   "hearing_adjourned",
   "office_holiday",
   "dak_received",

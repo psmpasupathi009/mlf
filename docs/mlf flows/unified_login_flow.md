@@ -1,22 +1,3 @@
----
-name: Unified Login Flow
-overview: Recommend a single mobile+PIN login flow for web and mobile apps where every user type (super admin, sub-admin, staff, client) uses the same `/login` entry and APIs; role and permissions are resolved after authentication, not at login time.
-todos:
-  - id: confirm-bootstrap
-    content: "Decide: keep SEED_PIN for dev convenience or force OTP setup for super admin in production"
-    status: pending
-  - id: mobile-parity
-    content: Ensure mobile app mirrors LoginForm step machine and stores accessToken (see docs/mobile-app-build-prompt.md)
-    status: pending
-  - id: onboarding-copy
-    content: "Optional: clarify OTP setup vs Forgot PIN in login UI labels"
-    status: pending
-  - id: doc-playbook
-    content: "Optional: add short login playbook to docs/application-flows.md for admin onboarding staff/clients"
-    status: pending
-isProject: false
----
-
 # Recommended unified login flow (web + mobile)
 
 ## Core principle: one login, many roles
@@ -92,7 +73,7 @@ When any user enters a mobile on `/login`:
 |--------|-------------------|------------------------|
 | **Create employee** (`POST /api/employees`) | `User` row (staff roles) | **Yes** — mobile works on `/login` right away (OTP setup first, then PIN) |
 | **Create client** (`POST /api/clients`) | `Client` row only | **No** — client record is not a login account |
-| **Invite to portal** (`POST /api/clients/[unitId]/portal-access`) | `User` row (`roles: ["client"]`, linked via `clientUnitId`) | **Yes** — after invite, same OTP → PIN flow as staff |
+| **Invite to portal** (`POST /api/clients/[unitId]/portal`) | `User` row (`roles: ["client"]`, linked via `clientUnitId`) | **Yes** — after invite, same OTP → PIN flow as staff |
 
 ```mermaid
 flowchart LR
@@ -120,7 +101,7 @@ flowchart LR
 
 If a client tries to log in **before** invite → `check-mobile` returns `not_found` (“This number is not registered”).
 
-**Optional future improvement:** Auto-invite on client create (checkbox “Enable portal access”) — not implemented today; would call the same `portal-access` logic after create.
+**Optional future improvement:** Auto-invite on client create (checkbox “Enable portal access”) — not implemented today; would call the same `POST .../portal` logic after create.
 
 ---
 
@@ -198,7 +179,7 @@ sequenceDiagram
 
 ### 3. Client (portal invite)
 
-**Admin invites** from client detail — [`POST /api/clients/[unitId]/portal-access`](app/api/clients/[unitId]/portal-access/route.ts):
+**Admin invites** from client detail — [`POST /api/clients/[unitId]/portal`](app/api/clients/[unitId]/portal/route.ts):
 - Creates `User` with `roles: ["client"]`, `clientUnitId` linked to `Client`.
 - Uses mobile from the client record; **no `pinHash`**.
 

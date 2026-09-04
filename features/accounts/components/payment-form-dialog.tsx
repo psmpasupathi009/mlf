@@ -22,10 +22,12 @@ import { SearchableSelect } from "@/shared/components/forms/searchable-select";
 import {
   PAYMENT_PURPOSE_OPTIONS,
   PAYMENT_PURPOSE_LABELS,
+  isFeePurpose,
   type PaymentPurpose,
 } from "@/features/accounts/lib/payment-purposes";
 import type { PaymentSummary } from "@/features/accounts/server/serialize";
 import { istDateKey } from "@/lib/utils/ist";
+import { rupee } from "@/features/accounts/components/accounts-page-helpers";
 
 const PAYMENT_STATUS_OPTIONS = [
   { value: "pending", label: "Pending" },
@@ -60,6 +62,7 @@ export function PaymentFormDialog({
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [remaining, setRemaining] = useState<number | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -101,6 +104,32 @@ export function PaymentFormDialog({
     })();
   }, [open, defaultClientUnitId, defaultCaseUnitId, payment, onOpenChange]);
 
+  useEffect(() => {
+    if (!open || !caseUnitId.trim()) {
+      setRemaining(null);
+      return;
+    }
+    const cse = caseUnitId.trim();
+    let cancelled = false;
+    void (async () => {
+      const res = await apiFetch<{
+        fee: { outstanding: number | null } | null;
+      }>(`/api/accounts?caseUnitId=${encodeURIComponent(cse)}&pageSize=1`);
+      if (cancelled) return;
+      if (res.ok) {
+        const body = res.data as unknown as {
+          fee: { outstanding: number | null } | null;
+        };
+        setRemaining(body.fee?.outstanding ?? null);
+      } else {
+        setRemaining(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [open, caseUnitId]);
+
   const purposeOptions = (() => {
     if (PAYMENT_PURPOSE_OPTIONS.some((o) => o.value === type)) {
       return PAYMENT_PURPOSE_OPTIONS;
@@ -133,6 +162,17 @@ export function PaymentFormDialog({
     }
     if (status === "paid" && !paidOn) {
       setError("Paid on date is required when status is paid");
+      return;
+    }
+    if (
+      !isEdit &&
+      isFeePurpose(type) &&
+      remaining != null &&
+      amt > remaining + 1e-9
+    ) {
+      setError(
+        `Amount exceeds remaining balance (${rupee(remaining)}). Reduce the amount or record actuals separately.`
+      );
       return;
     }
 
@@ -224,6 +264,15 @@ export function PaymentFormDialog({
                 onChange={(e) => setCaseUnitId(e.target.value)}
                 placeholder="CSE-00001"
               />
+              {remaining != null ? (
+                <p className="text-xs text-muted-foreground">
+                  Remaining balance:{" "}
+                  <span className="font-medium text-navy">{rupee(remaining)}</span>
+                  {type === "advance"
+                    ? " — default purpose is Advance"
+                    : null}
+                </p>
+              ) : null}
             </div>
           )}
 

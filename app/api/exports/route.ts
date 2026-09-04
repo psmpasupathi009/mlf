@@ -655,21 +655,34 @@ export const GET = apiHandler(async (request) => {
     });
 
     const caseUnitIds = cases.map((c) => c.unitId);
-    const paidRows = caseUnitIds.length
-      ? await prisma.cashPayment.groupBy({
-          by: ["caseUnitId"],
-          where: {
-            caseUnitId: { in: caseUnitIds },
-            status: "paid",
-            type: { in: [...FEE_PURPOSES] },
-          },
-          _sum: { amount: true },
-        })
-      : [];
+    const [paidRows, waiverRows] = caseUnitIds.length
+      ? await Promise.all([
+          prisma.cashPayment.groupBy({
+            by: ["caseUnitId"],
+            where: {
+              caseUnitId: { in: caseUnitIds },
+              status: "paid",
+              type: { in: [...FEE_PURPOSES] },
+            },
+            _sum: { amount: true },
+          }),
+          prisma.feeWaiver.groupBy({
+            by: ["caseUnitId"],
+            where: {
+              caseUnitId: { in: caseUnitIds },
+              status: { in: ["approved", "active"] },
+            },
+            _sum: { amount: true },
+          }),
+        ])
+      : [[], []];
     const collectedMap = new Map(
       paidRows
         .filter((r) => r.caseUnitId)
         .map((r) => [r.caseUnitId as string, r._sum.amount ?? 0])
+    );
+    const waivedMap = new Map(
+      waiverRows.map((r) => [r.caseUnitId, r._sum.amount ?? 0])
     );
 
     const clientIds = Array.from(new Set(cases.map((c) => c.clientUnitId)));
@@ -689,12 +702,21 @@ export const GET = apiHandler(async (request) => {
       { header: "courtName", key: "courtName", width: 24 },
       { header: "agreedFee", key: "agreedFee", width: 12 },
       { header: "collected", key: "collected", width: 12 },
+      { header: "waived", key: "waived", width: 12 },
       { header: "outstanding", key: "outstanding", width: 12 },
+      { header: "settlement", key: "settlement", width: 12 },
     ];
     for (const c of cases) {
       const agreed = c.agreedFee ?? 0;
       const collected = collectedMap.get(c.unitId) ?? 0;
-      const outstanding = Math.max(0, agreed - collected);
+      const waived = waivedMap.get(c.unitId) ?? 0;
+      const outstanding = Math.max(0, agreed - collected - waived);
+      const settlement =
+        outstanding === 0 && (collected > 0 || waived > 0 || agreed === 0)
+          ? "paid"
+          : collected > 0 || waived > 0
+            ? "partial"
+            : "none";
       sheet.addRow({
         caseUnitId: c.unitId,
         caseNumber: c.caseNumber ?? "",
@@ -704,7 +726,9 @@ export const GET = apiHandler(async (request) => {
         courtName: c.courtName ?? "",
         agreedFee: agreed,
         collected,
+        waived,
         outstanding,
+        settlement,
       });
     }
   } else {

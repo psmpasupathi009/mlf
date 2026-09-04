@@ -1,13 +1,8 @@
----
-name: Cases Flow
-overview: Full Cases module — list/board, create, pipeline status, checklist, hearings/adjourn, CSV import, and staff vs client scope. New cases default to enquiry; appointments can convert into enquiry cases.
----
-
 # Cases flow (`/cases`)
 
 ## Core principle: matter pipeline with dual client link
 
-A **case** (`CSE`) always belongs to an existing **client** (`CLI`). Staff run full CRUD, status pipeline, filing checklist, and hearings. Clients see **only their own** cases. Consultations can become enquiry cases via appointment **convert-case** ([appointments](./appointments_flow.plan.md)).
+A **case** (`CSE`) always belongs to an existing **client** (`CLI`). Staff run full CRUD, status pipeline, filing checklist, and hearings. Clients see **only their own** cases. Consultations can become enquiry cases via appointment **convert-case** ([appointments](./appointments_flow.md)).
 
 ```mermaid
 flowchart TD
@@ -69,7 +64,7 @@ flowchart TD
 | List all / filter / board | Yes | Own `clientUnitId` only |
 | Create / edit / status / checklist | Yes | No |
 | Hearings / adjourn | Yes | View on detail (scoped) |
-| Upload docs on case | Yes | Via [documents](./documents_flow.plan.md) / allowed types |
+| Upload docs on case | Yes | Via [documents](./documents_flow.md) / allowed types |
 | Convert from appointment | Yes | No |
 
 API forces client filter via `requireClientUnitId` + `isClientOnlyUser` in [`app/api/cases/route.ts`](../../app/api/cases/route.ts).
@@ -82,7 +77,7 @@ API forces client filter via `requireClientUnitId` + `isClientOnlyUser` in [`app
 |--------|-----|-----|
 | List / filters / board | `/cases` | `GET /api/cases?...` (`view=board` raises page size) |
 | Open create | **New case**, `?new=1`, or from client | — |
-| Create | `CaseFormDialog` — client, court cascade, case type, primary advocate; default status **enquiry** | `POST /api/cases` |
+| Create | `CaseFormDialog` — client, court cascade, case type, primary advocate, **required case fee (₹)**; default status **enquiry** | `POST /api/cases` |
 | Detail | `/cases/[unitId]` | `GET /api/cases/[unitId]` |
 | Edit fields | Form dialog | `PATCH /api/cases/[unitId]` |
 | Status transition | Pipeline UI | `PATCH /api/cases/[unitId]/status` → `canTransitionStatus` |
@@ -100,7 +95,7 @@ API forces client filter via `requireClientUnitId` + `isClientOnlyUser` in [`app
 ## Create path (line by line)
 
 1. Page [`app/(portal)/cases/page.tsx`](../../app/(portal)/cases/page.tsx) — `cases.view`; create needs `cases.create`.
-2. [`CaseFormDialog`](../../features/cases/components/case-form-dialog.tsx) requires existing client (picker can create client inline — see [clients](./clients_flow.plan.md)).
+2. [`CaseFormDialog`](../../features/cases/components/case-form-dialog.tsx) requires existing client (picker can create client inline — see [clients](./clients_flow.md)).
 3. Court / location cascade, case type, primary advocate mobile, optional case number uniqueness.
 4. `POST /api/cases` → Zod → verify client exists → `nextUnitId("case")` → create with dual `clientId` + `clientUnitId` → audit → may notify advocates.
 5. Toast often points to upload docs on detail.
@@ -123,14 +118,23 @@ sequenceDiagram
 
 ## Status, checklist, hearings
 
-**Pipeline** rules live in [`config/company/case-pipeline.ts`](../../config/company/case-pipeline.ts). Illegal transitions return 400.
+**Pipeline** rules live in [`config/company/case-pipeline.ts`](../../config/company/case-pipeline.ts). Illegal transitions return 400. New cases (and convert-case) start at **enquiry**.
+
+| From (examples) | Allowed next (via `canTransitionStatus`) |
+|-----------------|------------------------------------------|
+| `enquiry` | `engaged`, `withdrawn` |
+| `engaged` | `pre_filing`, `enquiry`, `withdrawn` |
+| `withdrawn` | `archived`, `enquiry` |
+| Open statuses | Clerks can jump to `withdrawn` / `transferred` per pipeline helpers |
+
+Full graph and labels: same config file. UI uses short labels (Enquiry, Engaged, …).
 
 **Hearings:**
 
 - Create updates `Case.nextHearingAt`.
-- May notify; SMS eligibility uses client `smsConsent`.
+- May notify staff in-app; client SMS eligibility uses `smsConsent`.
 - **Adjourn** keeps history on old `HRG` and creates a replacement.
-- Hearing import for **tomorrow** dates can SMS immediately (catch-up if nightly cron already ran). Day board / cron details: [day board](./day_board_flow.plan.md).
+- New/imported hearings join the **pending SMS list** (`smsSentAt` null, upcoming date). At `HEARING_SMS_TIME_IST` the cron drains that list (SMS + client in-app); hearing calendar date does not drive send day. Day board / cron details: [day board](./day_board_flow.md).
 
 ```text
 /cases  -->  POST /api/cases { clientUnitId, court, advocates }
@@ -142,9 +146,19 @@ sequenceDiagram
 
 ---
 
+## State / rules
+
+| Rule | Behavior |
+|------|----------|
+| Client parent | Required dual `clientId` + `clientUnitId` |
+| Default status | `enquiry` on create and convert-case |
+| Client list scope | Own `clientUnitId` only (`requireClientUnitId`) |
+| Hearing SMS | Pending list @ `HEARING_SMS_TIME_IST`; `smsConsent`; once per `Hearing` via `smsSentAt` |
+---
+
 ## Convert-case inbound
 
-Staff on an appointment with a linked client: `POST /api/appointments/[unitId]/convert-case` creates an **enquiry** case and dual-links the appointment. Requires cases + appointments modules and `appointments.edit` or `cases.create`. Full path: [appointments](./appointments_flow.plan.md).
+Staff on an appointment with a linked client: `POST /api/appointments/[unitId]/convert-case` creates an **enquiry** case and dual-links the appointment. Requires cases + appointments modules and `appointments.edit` or `cases.create`. Full path: [appointments](./appointments_flow.md).
 
 ---
 
@@ -167,10 +181,10 @@ Staff on an appointment with a linked client: `POST /api/appointments/[unitId]/c
 
 | Module | Link |
 |--------|------|
-| [Clients](./clients_flow.plan.md) | Required parent `CLI` |
-| [Documents](./documents_flow.plan.md) | Case parent uploads |
-| [Accounts](./accounts_flow.plan.md) | Fee rollup by `caseUnitId` |
-| [Day board](./day_board_flow.plan.md) | Hearings for IST day + SMS |
-| [Tasks](./tasks_flow.plan.md) / [Postal](./postal_flow.plan.md) | Soft `caseUnitId` |
-| [Court roster](./court_roster_flow.plan.md) | Who appears / default courts |
-| [Appointments](./appointments_flow.plan.md) | convert-case → enquiry |
+| [Clients](./clients_flow.md) | Required parent `CLI` |
+| [Documents](./documents_flow.md) | Case parent uploads |
+| [Accounts](./accounts_flow.md) | Required case fee; rollup + Paid/Partial/Unpaid; waivers (sub_admin requests → admin approves) |
+| [Day board](./day_board_flow.md) | Hearings for IST day + SMS |
+| [Tasks](./tasks_flow.md) / [Postal](./postal_flow.md) | Soft `caseUnitId` |
+| [Court roster](./court_roster_flow.md) | Who appears / default courts |
+| [Appointments](./appointments_flow.md) | convert-case → enquiry **requires agreedFee** |

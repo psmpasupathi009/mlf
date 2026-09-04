@@ -9,10 +9,12 @@ import { canBookForAnyAdvocate } from "@/lib/appointments/booking-rules";
 import { enrichAppointment } from "@/features/appointments/server/enrich";
 import { toCaseSummary } from "@/features/cases/server/serialize";
 import { isClientOnlyUser } from "@/lib/auth/client-portal";
+import { convertAppointmentCaseSchema } from "@/lib/validations/cases.schema";
 
 /**
  * Convert a consultation appointment into an enquiry case and link them.
  * Allowed with appointments.edit or cases.create.
+ * Requires agreedFee (case fee).
  */
 export const POST = apiHandler(async (request, context) => {
   const casesMod = requireModuleEnabled("cases");
@@ -63,6 +65,17 @@ export const POST = apiHandler(async (request, context) => {
     );
   }
 
+  const raw = await request.json().catch(() => ({}));
+  const parsed = convertAppointmentCaseSchema.safeParse(raw ?? {});
+  if (!parsed.success) {
+    return jsonFail(
+      "VALIDATION",
+      parsed.error.issues[0]?.message ?? "Case fee is required",
+      400,
+      parsed.error.issues
+    );
+  }
+
   const client = await prisma.client.findUnique({
     where: { unitId: item.clientUnitId },
   });
@@ -94,6 +107,7 @@ export const POST = apiHandler(async (request, context) => {
       status: "enquiry",
       primaryAdvocateMobile: advocateMobile || undefined,
       advocateMobiles: advocateMobile ? [advocateMobile] : [],
+      agreedFee: parsed.data.agreedFee,
       notes: noteParts.length ? noteParts.join("\n") : undefined,
       createdById: user.id,
     },
@@ -125,6 +139,7 @@ export const POST = apiHandler(async (request, context) => {
       case: pickAuditFields(created as Record<string, unknown>, [
         "clientUnitId",
         "status",
+        "agreedFee",
         "primaryAdvocateMobile",
         "advocateMobiles",
         "notes",

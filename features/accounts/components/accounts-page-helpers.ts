@@ -6,7 +6,10 @@ export type PaymentRow = PaymentSummary & { clientName: string | null };
 export type FeeSummary = {
   agreedFee: number | null;
   collected: number;
+  waived: number;
+  pendingWaived: number;
   outstanding: number | null;
+  settlement: "none" | "partial" | "paid";
 };
 
 export type ListResponse = {
@@ -47,6 +50,22 @@ export const STATUS_CHIPS: { id: string; label: string }[] = [
 
 export function rupee(n: number) {
   return `₹${n.toLocaleString("en-IN")}`;
+}
+
+export function settlementBadge(
+  settlement: FeeSummary["settlement"] | undefined,
+  waived?: number
+): { label: string; variant: "success" | "warning" | "muted" } | null {
+  if (!settlement || settlement === "none") {
+    return { label: "Unpaid", variant: "muted" };
+  }
+  if (settlement === "paid") {
+    return {
+      label: waived && waived > 0 ? "Paid · waived" : "Paid",
+      variant: "success",
+    };
+  }
+  return { label: "Partial", variant: "warning" };
 }
 
 export function truncate(s: string | null, n = 40) {

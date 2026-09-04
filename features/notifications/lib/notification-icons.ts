@@ -27,6 +27,7 @@ const TYPE_ICONS: Record<string, LucideIcon> = {
   filing_defect: FileWarning,
   batta_due: Landmark,
   hearing_tomorrow: Gavel,
+  hearing_reminder: Gavel,
   hearing_adjourned: Gavel,
   office_holiday: Calendar,
   dak_received: ClipboardList,

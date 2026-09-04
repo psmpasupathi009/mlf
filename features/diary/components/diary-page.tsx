@@ -56,6 +56,7 @@ type DiaryResponse = {
 type TomorrowNotifyItem = {
   hearingUnitId: string;
   hearingDate: string;
+  hearingDateLabel?: string;
   purpose: string | null;
   smsSentAt: string | null;
   caseUnitId: string;
@@ -148,7 +149,6 @@ export function DiaryPage({ user }: { user: PublicUser }) {
     bookAny ? null : user.name ?? displayMobile(user.mobile)
   );
   const [adjourning, setAdjourning] = useState<string | null>(null);
-  const tomorrowKey = istAddCalendarDays(todayKey, 1);
   const [tomorrowNotify, setTomorrowNotify] =
     useState<TomorrowNotifyResponse | null>(null);
   const [tomorrowLoading, setTomorrowLoading] = useState(true);
@@ -245,7 +245,7 @@ export function DiaryPage({ user }: { user: PublicUser }) {
     applyDiary(res.data);
   }, [date, advocateFilter, applyDiary]);
 
-  async function sendTomorrowSms() {
+  async function sendPendingSms() {
     if (!canEdit || smsSending) return;
     setSmsSending(true);
     const res = await apiFetch<{
@@ -270,7 +270,7 @@ export function DiaryPage({ user }: { user: PublicUser }) {
       `Hearing SMS: ${sent} sent, ${failed} failed, ${skipped} skipped (${total} due)`
     );
     await reloadTomorrowNotify();
-    if (date === tomorrowKey) await reload();
+    await reload();
   }
 
   const q = search.trim().toLowerCase();
@@ -419,24 +419,22 @@ export function DiaryPage({ user }: { user: PublicUser }) {
       </div>
 
 
-      {!tomorrowLoading && tomorrowNotify && tomorrowNotify.summary.total > 0 ? (
+      {!tomorrowLoading &&
+      tomorrowNotify &&
+      tomorrowNotify.summary.smsPending > 0 ? (
         <div className="rounded-2xl border border-amber-200/80 bg-amber-50/80 p-3 shadow-sm print:hidden sm:p-4 dark:border-amber-900/50 dark:bg-amber-950/30">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <MessageSquareWarning className="size-4 shrink-0 text-amber-800 dark:text-amber-200" />
                 <h2 className="text-sm font-semibold text-navy dark:text-amber-50">
-                  Tomorrow — inform clients
+                  Pending hearing SMS
                 </h2>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                {tomorrowNotify.summary.total} hearing
-                {tomorrowNotify.summary.total === 1 ? "" : "s"} on{" "}
-                {istDisplayDate(
-                  new Date(`${tomorrowNotify.date}T12:00:00+05:30`)
-                )}
-                {" · "}
-                {tomorrowNotify.summary.smsPending} SMS not yet sent
+                {tomorrowNotify.summary.smsPending} upcoming hearing
+                {tomorrowNotify.summary.smsPending === 1 ? "" : "s"} waiting for
+                client SMS · sends at office ENV time (or send now)
               </p>
             </div>
             <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -444,28 +442,20 @@ export function DiaryPage({ user }: { user: PublicUser }) {
                 <Button
                   type="button"
                   className="h-10 w-full gap-2 sm:w-auto"
-                  disabled={smsSending || tomorrowNotify.summary.smsPending === 0}
-                  onClick={() => void sendTomorrowSms()}
+                  disabled={smsSending}
+                  onClick={() => void sendPendingSms()}
                 >
                   <Send className="size-4" />
-                  {smsSending ? "Sending…" : "Send tomorrow SMS now"}
+                  {smsSending ? "Sending…" : "Send pending SMS now"}
                 </Button>
               ) : null}
-              <Button
-                type="button"
-                variant="outline"
-                className="h-10 w-full sm:w-auto"
-                onClick={() => setDate(tomorrowKey)}
-              >
-                Open tomorrow’s list
-              </Button>
               <Button
                 type="button"
                 variant="secondary"
                 className="h-10 w-full sm:w-auto"
                 onClick={() => setPreviewOpen((v) => !v)}
               >
-                {previewOpen ? "Hide SMS list" : "Preview tomorrow SMS list"}
+                {previewOpen ? "Hide SMS list" : "Preview pending SMS list"}
               </Button>
             </div>
           </div>
@@ -485,6 +475,9 @@ export function DiaryPage({ user }: { user: PublicUser }) {
                         : ""}
                     </p>
                     <p className="text-xs text-muted-foreground">
+                      {item.hearingDateLabel ||
+                        istDisplayDate(new Date(item.hearingDate))}
+                      {" · "}
                       {item.courtName || "Court TBD"}
                       {item.purpose ? ` · ${item.purpose}` : ""}
                     </p>
@@ -513,11 +506,7 @@ export function DiaryPage({ user }: { user: PublicUser }) {
                 </li>
               ) : null}
             </ul>
-          ) : (
-            <p className="mt-3 border-t border-amber-200/70 pt-3 text-sm text-muted-foreground dark:border-amber-900/40">
-              All tomorrow’s clients already have SMS marked sent.
-            </p>
-          )}
+          ) : null}
         </div>
       ) : null}
 

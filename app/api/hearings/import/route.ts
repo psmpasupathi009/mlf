@@ -11,7 +11,6 @@ import {
 } from "@/lib/utils/ist";
 import { findCaseByUnitId } from "@/lib/imports/lookups";
 import { IMPORT_HEARING_COLUMNS } from "@/lib/imports/columns";
-import { sendHearingSmsForUnitIds } from "@/lib/services/hearing-sms.job";
 import {
   findCaseNotifyRecipients,
   notifyUsers,
@@ -28,7 +27,6 @@ const CLOSED = new Set([
 function smsHint(input: {
   hearingKey: string;
   todayKey: string;
-  tomorrowKey: string;
   smsConsent: boolean | null | undefined;
   hasMobile: boolean;
   caseStatus: string;
@@ -43,15 +41,9 @@ function smsHint(input: {
     return "no client SMS (missing mobile)";
   }
   if (input.hearingKey < input.todayKey) {
-    return "past date — no day-before SMS";
+    return "past date — not on pending SMS list";
   }
-  if (input.hearingKey === input.todayKey) {
-    return "today — day-before SMS window already passed";
-  }
-  if (input.hearingKey === input.tomorrowKey) {
-    return "tomorrow — client SMS will send now (or with tonight’s cron)";
-  }
-  return "client SMS auto day before hearing";
+  return "queued for pending SMS list (ENV office time)";
 }
 
 export const POST = createImportHandler({
@@ -65,7 +57,6 @@ export const POST = createImportHandler({
     const tomorrowKey = istAddCalendarDays(todayKey, 1);
     const { start: todayStart } = istDayBounds(todayKey);
     const touchedCaseIds = new Set<string>();
-    const tomorrowSmsUnitIds: string[] = [];
     const nearNotify: Array<{
       hearingUnitId: string;
       caseUnitId: string;
@@ -110,7 +101,6 @@ export const POST = createImportHandler({
         const hint = smsHint({
           hearingKey,
           todayKey,
-          tomorrowKey,
           smsConsent: client?.smsConsent,
           hasMobile: Boolean(client?.mobile?.trim()),
           caseStatus: caseItem.status,
@@ -176,10 +166,6 @@ export const POST = createImportHandler({
 
         touchedCaseIds.add(caseItem.id);
 
-        if (hearingKey === tomorrowKey) {
-          tomorrowSmsUnitIds.push(hearing.unitId);
-        }
-
         if (hearingKey >= todayKey && hearingKey <= tomorrowKey) {
           nearNotify.push({
             hearingUnitId: hearing.unitId,
@@ -231,24 +217,6 @@ export const POST = createImportHandler({
       );
     }
 
-    let smsSent = 0;
-    let smsFailed = 0;
-    if (!dryRun && tomorrowSmsUnitIds.length > 0) {
-      // Catch-up if nightly cron already ran — claim-then-send is idempotent.
-      const sms = await sendHearingSmsForUnitIds(tomorrowSmsUnitIds);
-      smsSent = sms.sent;
-      smsFailed = sms.failed;
-      if (sms.sent > 0 || sms.failed > 0) {
-        for (const d of sms.details) {
-          const row = results.find((r) => r.unitId === d.hearingUnitId);
-          if (!row || row.status !== "ok") continue;
-          row.message = d.ok
-            ? `${row.message} · SMS sent`
-            : `${row.message} · SMS failed: ${d.message}`;
-        }
-      }
-    }
-
     if (!dryRun && nearNotify.length > 0) {
       scheduleNotify(async () => {
         for (const item of nearNotify) {
@@ -279,9 +247,9 @@ export const POST = createImportHandler({
     return {
       results,
       auditMeta: {
-        tomorrowSmsQueued: tomorrowSmsUnitIds.length,
-        smsSent,
-        smsFailed,
+        queuedForPendingSms: results.filter(
+          (r) => r.status === "ok" && r.unitId
+        ).length,
       },
     };
   },

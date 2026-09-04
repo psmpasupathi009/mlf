@@ -2,27 +2,31 @@ import { apiHandler, jsonOk } from "@/lib/api/response";
 import { requirePerm } from "@/lib/api/guard";
 import { prisma } from "@/lib/db/prisma";
 import { displayMobile } from "@/lib/auth/mobile";
-import { istAddCalendarDays, istDateKey, istDayBounds } from "@/lib/utils/ist";
+import { pendingHearingSmsWhere } from "@/lib/services/hearing-sms.job";
+import { istDateKey, istDayBounds, istDisplayDate } from "@/lib/utils/ist";
 
 /**
- * Tomorrow’s hearings for clerks to call / WhatsApp clients
- * (pairs with the overnight hearing-SMS cron).
+ * Pending / upcoming hearings for clerks (SMS + notify queue).
+ * Same upcoming filter as the ENV-timed hearing-SMS job.
  */
 export const GET = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "cases", "edit");
   if (!user) return response;
 
-  const tomorrowKey = istAddCalendarDays(istDateKey(), 1);
-  const { start, end } = istDayBounds(tomorrowKey);
+  const sendDayKey = istDateKey();
+  const { start: todayStart } = istDayBounds(sendDayKey);
+  const pendingWhere = pendingHearingSmsWhere(todayStart);
 
   const hearings = await prisma.hearing.findMany({
     where: {
-      hearingDate: { gte: start, lte: end },
       isAdjourned: false,
+      hearingDate: { gte: todayStart },
     },
     orderBy: { hearingDate: "asc" },
     take: 200,
   });
+
+  const smsPendingCount = await prisma.hearing.count({ where: pendingWhere });
 
   const caseUnitIds = [...new Set(hearings.map((h) => h.caseUnitId))];
   const cases = caseUnitIds.length
@@ -44,6 +48,7 @@ export const GET = apiHandler(async (request) => {
     return {
       hearingUnitId: h.unitId,
       hearingDate: h.hearingDate.toISOString(),
+      hearingDateLabel: istDisplayDate(h.hearingDate),
       purpose: h.purpose,
       smsSentAt: h.smsSentAt?.toISOString() ?? null,
       caseUnitId: h.caseUnitId,
@@ -60,12 +65,12 @@ export const GET = apiHandler(async (request) => {
   const withMobile = pendingSms.filter((i) => i.clientMobile);
 
   return jsonOk({
-    date: tomorrowKey,
+    date: sendDayKey,
     items,
     summary: {
       total: items.length,
-      smsPending: pendingSms.length,
-      smsSent: items.length - pendingSms.length,
+      smsPending: smsPendingCount,
+      smsSent: items.filter((i) => i.smsSentAt).length,
       withMobile: withMobile.length,
     },
   });

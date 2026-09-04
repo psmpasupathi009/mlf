@@ -330,8 +330,18 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
       toast.error("Link a client before opening a case");
       return;
     }
+    const feeRaw = window.prompt(
+      "Case fee (₹) for the new enquiry case?",
+      ""
+    );
+    if (feeRaw == null) return;
+    const agreedFee = Number(feeRaw.trim());
+    if (!Number.isFinite(agreedFee) || agreedFee < 0) {
+      toast.error("Enter a valid case fee (₹)");
+      return;
+    }
     const okConfirm = window.confirm(
-      "Open an enquiry case from this consultation and link them?"
+      `Open an enquiry case with fee ₹${agreedFee.toLocaleString("en-IN")} and link this consultation?`
     );
     if (!okConfirm) return;
 
@@ -339,7 +349,10 @@ export function AppointmentsPage({ user }: { user: PublicUser }) {
     const { ok, data } = await apiFetch<{
       case: CaseSummary;
       appointment: AppointmentSummary;
-    }>(`/api/appointments/${a.unitId}/convert-case`, { method: "POST" });
+    }>(`/api/appointments/${a.unitId}/convert-case`, {
+      method: "POST",
+      json: { agreedFee },
+    });
     setActionBusy(null);
     if (!ok) {
       toast.error(

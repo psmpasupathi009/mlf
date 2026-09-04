@@ -14,6 +14,7 @@ import {
   PERIOD_CHIPS,
   STATUS_CHIPS,
   rupee,
+  settlementBadge,
   type FeeSummary,
 } from "@/features/accounts/components/accounts-page-helpers";
 
@@ -165,36 +166,59 @@ export function AccountsFiltersSection({
             </div>
 
             {fee && caseUnitId ? (
-              <div className="grid gap-3 border-t border-border/70 pt-4 md:grid-cols-3">
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Agreed fee
-                  </p>
-                  <p className="mt-1 text-lg font-semibold text-navy">
-                    {fee.agreedFee != null ? rupee(fee.agreedFee) : "—"}
-                  </p>
+              <div className="space-y-3 border-t border-border/70 pt-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  {(() => {
+                    const badge = settlementBadge(fee.settlement, fee.waived);
+                    return badge ? (
+                      <Badge variant={badge.variant}>{badge.label}</Badge>
+                    ) : null;
+                  })()}
                 </div>
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Fee collected
-                  </p>
-                  <p className="mt-1 text-lg font-semibold text-navy">
-                    {rupee(fee.collected)}
-                  </p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    <span className="sm:hidden">All-time (excl. actuals)</span>
-                    <span className="hidden sm:inline">
-                      All-time fees (excl. actuals) — not limited by period filter
-                    </span>
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Outstanding
-                  </p>
-                  <p className="mt-1 text-lg font-semibold text-navy">
-                    {fee.outstanding != null ? rupee(fee.outstanding) : "—"}
-                  </p>
+                <div className="grid gap-3 md:grid-cols-4">
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Case fee
+                    </p>
+                    <p className="mt-1 text-lg font-semibold text-navy">
+                      {fee.agreedFee != null ? rupee(fee.agreedFee) : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Collected
+                    </p>
+                    <p className="mt-1 text-lg font-semibold text-navy">
+                      {rupee(fee.collected)}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                      <span className="sm:hidden">All-time (excl. actuals)</span>
+                      <span className="hidden sm:inline">
+                        All-time fees (excl. actuals) — not limited by period filter
+                      </span>
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Waived
+                    </p>
+                    <p className="mt-1 text-lg font-semibold text-navy">
+                      {rupee(fee.waived ?? 0)}
+                    </p>
+                    {(fee.pendingWaived ?? 0) > 0 ? (
+                      <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
+                        + {rupee(fee.pendingWaived)} pending
+                      </p>
+                    ) : null}
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Remaining
+                    </p>
+                    <p className="mt-1 text-lg font-semibold text-navy">
+                      {fee.outstanding != null ? rupee(fee.outstanding) : "—"}
+                    </p>
+                  </div>
                 </div>
               </div>
             ) : null}

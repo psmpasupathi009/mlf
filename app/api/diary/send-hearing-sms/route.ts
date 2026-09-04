@@ -10,7 +10,7 @@ import {
   scheduleNotify,
 } from "@/lib/notifications/notify";
 
-/** Staff trigger: send tomorrow's client hearing SMS now (same job as cron). */
+/** Staff trigger: drain pending hearing SMS list now (bypasses ENV time window). */
 export const POST = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "cases", "edit");
   if (!user) return response;

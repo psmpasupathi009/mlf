@@ -66,7 +66,9 @@ export const createCaseSchema = z.object({
   status: caseStatusEnum.optional(),
   filingDate: dateStringOrDate.optional(),
   nextHearingAt: dateStringOrDate.optional(),
-  agreedFee: z.coerce.number().nonnegative().optional(),
+  agreedFee: z.coerce
+    .number({ error: "Case fee is required" })
+    .nonnegative("Case fee cannot be negative"),
   notes: z.string().trim().max(2000).optional().or(z.literal("")),
   battaDue: z.boolean().optional(),
   awaitingService: z.boolean().optional(),
@@ -75,6 +77,14 @@ export const createCaseSchema = z.object({
 
 export const updateCaseSchema = createCaseSchema.partial().omit({
   clientUnitId: true,
+}).extend({
+  agreedFee: z.coerce.number().nonnegative("Case fee cannot be negative").optional(),
+});
+
+export const convertAppointmentCaseSchema = z.object({
+  agreedFee: z.coerce
+    .number({ error: "Case fee is required" })
+    .nonnegative("Case fee cannot be negative"),
 });
 
 export const updateCaseStatusSchema = z.object({

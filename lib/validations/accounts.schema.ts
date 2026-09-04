@@ -72,6 +72,16 @@ export const voidPaymentSchema = z.object({
   reason: z.string().trim().min(1, "Reason is required").max(500),
 });
 
+export const createWaiverSchema = z.object({
+  caseUnitId: z.string().trim().min(1, "Case is required"),
+  amount: z.coerce.number().positive("Amount must be greater than 0"),
+  reason: z.string().trim().min(1, "Reason is required").max(500),
+});
+
+export const voidWaiverSchema = z.object({
+  reason: z.string().trim().min(1, "Reason is required").max(500),
+});
+
 export const importPaymentsRowSchema = z.object({
   clientUnitId: z.string().trim().min(1, "clientUnitId is required"),
   caseUnitId: z.string().trim().optional().or(z.literal("")),

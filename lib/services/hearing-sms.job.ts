@@ -4,12 +4,9 @@ import { writeAudit } from "@/lib/audit";
 import { normalizeMobile } from "@/lib/auth/mobile";
 import { sendTransactionalSms } from "@/lib/services/two-factor.service";
 import { smsTemplates } from "@/config/company/sms-templates";
-import {
-  istDateKey,
-  istDayBounds,
-  istDisplayDate,
-  istAddCalendarDays,
-} from "@/lib/utils/ist";
+import { isWithinHearingSmsWindow } from "@/lib/hearings/sms-window";
+import { notifyUser } from "@/lib/notifications/notify";
+import { istDateKey, istDayBounds, istDisplayDate } from "@/lib/utils/ist";
 
 export type HearingSmsDetail = {
   hearingUnitId: string;
@@ -19,6 +16,7 @@ export type HearingSmsDetail = {
 };
 
 export type HearingSmsJobResult = {
+  /** IST calendar day the job ran for (send day). */
   date: string;
   total: number;
   sent: number;
@@ -27,6 +25,13 @@ export type HearingSmsJobResult = {
   /** True when more due hearings remain (batch capped for serverless time). */
   hasMore: boolean;
   details: HearingSmsDetail[];
+  /** Set when cron gated on HEARING_SMS_TIME_IST and current time is outside the window. */
+  skippedReason?: "outside_window";
+};
+
+export type RunHearingSmsJobOptions = {
+  /** When true, no-op unless current IST time is inside HEARING_SMS_TIME_IST window. */
+  respectEnvWindow?: boolean;
 };
 
 const CLOSED_CASE_STATUSES = new Set([
@@ -67,9 +72,50 @@ type RowResult = {
   detail: HearingSmsDetail;
 };
 
+/** Pending upcoming hearings not yet SMS'd (any future/today hearing date). */
+export function pendingHearingSmsWhere(todayStart: Date) {
+  return {
+    smsSentAt: null as null,
+    isAdjourned: false,
+    hearingDate: { gte: todayStart },
+  };
+}
+
+async function notifyClientHearingReminder(input: {
+  clientUnitId: string;
+  caseUnitId: string;
+  caseLabel: string;
+  hearingDateIst: string;
+  courtName: string;
+}) {
+  const portalUser = await prisma.user.findUnique({
+    where: { clientUnitId: input.clientUnitId },
+    select: { id: true, unitId: true, roles: true, isActive: true },
+  });
+  if (
+    !portalUser?.isActive ||
+    !portalUser.roles.length ||
+    !portalUser.roles.every((r) => r === "client")
+  ) {
+    return;
+  }
+  await notifyUser({
+    userId: portalUser.id,
+    userUnitId: portalUser.unitId,
+    type: "hearing_reminder",
+    title: `Hearing on ${input.hearingDateIst}`,
+    body: `Hearing for ${input.caseLabel} is on ${input.hearingDateIst} at ${input.courtName}.`,
+    href: `/cases/${input.caseUnitId}`,
+    meta: {
+      caseUnitId: input.caseUnitId,
+      hearingDateIst: input.hearingDateIst,
+    },
+  });
+}
+
 async function processHearingSmsBatch(
   dueHearings: Hearing[]
-): Promise<Omit<HearingSmsJobResult, "date" | "hasMore">> {
+): Promise<Omit<HearingSmsJobResult, "date" | "hasMore" | "skippedReason">> {
   let sent = 0;
   let failed = 0;
   let skipped = 0;
@@ -86,6 +132,7 @@ async function processHearingSmsBatch(
       id: true,
       unitId: true,
       clientId: true,
+      clientUnitId: true,
       status: true,
       caseNumber: true,
       courtName: true,
@@ -98,6 +145,7 @@ async function processHearingSmsBatch(
     where: { id: { in: clientIds } },
     select: {
       id: true,
+      unitId: true,
       name: true,
       mobile: true,
       smsConsent: true,
@@ -177,11 +225,14 @@ async function processHearingSmsBatch(
         }
 
         const mobile = normalizeMobile(client.mobile) ?? client.mobile;
+        const hearingDateIst = istDisplayDate(hearing.hearingDate);
+        const caseLabel = caseItem.caseNumber ?? caseItem.unitId;
+        const courtName = caseItem.courtName ?? "the court";
         const message = smsTemplates.hearingReminder({
           clientName: client.name,
-          caseLabel: caseItem.caseNumber ?? caseItem.unitId,
-          hearingDateIst: istDisplayDate(hearing.hearingDate),
-          courtName: caseItem.courtName ?? "the court",
+          caseLabel,
+          hearingDateIst,
+          courtName,
         });
 
         // Claim before send so cron + manual cannot double-SMS.
@@ -207,6 +258,17 @@ async function processHearingSmsBatch(
         const result = await sendTransactionalSms(mobile, message);
 
         if (result.ok) {
+          try {
+            await notifyClientHearingReminder({
+              clientUnitId: client.unitId,
+              caseUnitId: caseItem.unitId,
+              caseLabel,
+              hearingDateIst,
+              courtName,
+            });
+          } catch {
+            /* SMS succeeded; portal notify is best-effort */
+          }
           return {
             sent: 1,
             failed: 0,
@@ -270,28 +332,35 @@ async function processHearingSmsBatch(
 }
 
 /**
- * Day-before hearing SMS to clients only (2Factor transactional).
- * Skips adjourned, already-sent, opted-out, and closed cases.
- * Processes up to BATCH_SIZE hearings per run (concurrent sends).
+ * Pending-list hearing SMS + client in-app notify (2Factor transactional).
+ * Selects upcoming hearings with smsSentAt null (any hearing date ≥ today IST).
+ * Once sent, smsSentAt blocks repeats — including on the hearing day.
  */
-export async function runHearingSmsJob(): Promise<HearingSmsJobResult> {
-  const tomorrowKey = istAddCalendarDays(istDateKey(), 1);
-  const { start, end } = istDayBounds(tomorrowKey);
-
-  const dueTotal = await prisma.hearing.count({
-    where: {
-      smsSentAt: null,
-      isAdjourned: false,
-      hearingDate: { gte: start, lte: end },
-    },
+export async function runHearingSmsJob(
+  options: RunHearingSmsJobOptions = {}
+): Promise<HearingSmsJobResult> {
+  const sendDayKey = istDateKey();
+  const empty = (): HearingSmsJobResult => ({
+    date: sendDayKey,
+    total: 0,
+    sent: 0,
+    failed: 0,
+    skipped: 0,
+    hasMore: false,
+    details: [],
   });
 
+  if (options.respectEnvWindow && !isWithinHearingSmsWindow()) {
+    return { ...empty(), skippedReason: "outside_window" };
+  }
+
+  const { start: todayStart } = istDayBounds(sendDayKey);
+  const where = pendingHearingSmsWhere(todayStart);
+
+  const dueTotal = await prisma.hearing.count({ where });
+
   const dueHearings = await prisma.hearing.findMany({
-    where: {
-      smsSentAt: null,
-      isAdjourned: false,
-      hearingDate: { gte: start, lte: end },
-    },
+    where,
     orderBy: { hearingDate: "asc" },
     take: BATCH_SIZE,
   });
@@ -303,30 +372,31 @@ export async function runHearingSmsJob(): Promise<HearingSmsJobResult> {
     action: "cron.hearing_sms",
     entity: "Hearing",
     meta: {
-      tomorrowKey,
+      sendDayKey,
       total: batch.total,
       dueTotal,
       sent: batch.sent,
       failed: batch.failed,
       skipped: batch.skipped,
       hasMore,
+      respectEnvWindow: Boolean(options.respectEnvWindow),
     },
   });
 
   return {
-    date: tomorrowKey,
+    date: sendDayKey,
     ...batch,
     hasMore,
   };
 }
 
 /**
- * Send client SMS for specific hearings (e.g. imported with tomorrow’s date
- * after the nightly cron already ran). Claim-then-send; safe to call twice.
+ * Send client SMS for specific hearings (force / tools). Claim-then-send; safe to call twice.
+ * Prefer the daily ENV pending-list job for normal office flow.
  */
 export async function sendHearingSmsForUnitIds(
   unitIds: string[]
-): Promise<Omit<HearingSmsJobResult, "date" | "hasMore">> {
+): Promise<Omit<HearingSmsJobResult, "date" | "hasMore" | "skippedReason">> {
   const unique = [...new Set(unitIds.filter(Boolean))];
   if (unique.length === 0) {
     return { total: 0, sent: 0, failed: 0, skipped: 0, details: [] };

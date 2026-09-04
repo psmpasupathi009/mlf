@@ -1,15 +1,10 @@
----
-name: Clients Flow
-overview: Full staff Clients module — list, create, edit, detail, CSV import, and portal invite. Creating a Client does not create a login account; portal access is a separate invite step.
----
-
 # Clients flow (`/clients`)
 
 ## Core principle: registry first, login later
 
 **Clients** are intake records (`CLI`), not login accounts. Staff create/edit them under Matters → Clients. A client can use `/login` only after **Invite to portal** on the detail page creates a linked `User` with `roles: ["client"]`.
 
-See also: [unified login](./unified_login_flow_c5377653.plan.md) (staff vs client create paths), [cases](./cases_flow.plan.md), [appointments](./appointments_flow.plan.md).
+See also: [unified login](./unified_login_flow.md) (staff vs client create paths), [cases](./cases_flow.md), [appointments](./appointments_flow.md).
 
 ```mermaid
 flowchart TB
@@ -118,7 +113,7 @@ sequenceDiagram
 
 1. [`client-detail-page.tsx`](../../features/clients/components/client-detail-page.tsx) loads client, related cases/payments/docs panels.
 2. **Invite to portal** → `POST /api/clients/[unitId]/portal` creates `User` with `unitId` / `clientUnitId` = `CLI-…`, `roles: ["client"]`, no `pinHash`.
-3. Client first login: `check-mobile` → `otp_required` → verify OTP → setup PIN (same as staff). Details in [login playbook](./unified_login_flow_c5377653.plan.md).
+3. Client first login: `check-mobile` → `otp_required` → verify OTP → setup PIN (same as staff). Details in [login playbook](./unified_login_flow.md).
 
 ```text
 /clients  -->  POST /api/clients  -->  CLI record only
@@ -131,6 +126,17 @@ sequenceDiagram
 ## CSV import
 
 Uses shared [`import-dialog.tsx`](../../shared/components/data/import-dialog.tsx) → `POST /api/clients/import` with dry-run first. Sample: `public/samples/clients.sample.csv`. Import order across the office: **clients before cases** (see [`prisma/data/README.md`](../../prisma/data/README.md)).
+
+---
+
+## State / rules
+
+| State | Login? | Notes |
+|-------|--------|-------|
+| Client record only | **No** | `check-mobile` → `not_found` |
+| Portal invited (`POST .../portal`) | Yes after OTP → PIN | `User` with `roles: ["client"]`, same `CLI` unit id |
+| Portal disabled (`DELETE .../portal`) | **No** | User row kept; sign-in blocked |
+| SMS consent | — | Gates hearing SMS, not login |
 
 ---
 
@@ -155,9 +161,9 @@ Uses shared [`import-dialog.tsx`](../../shared/components/data/import-dialog.tsx
 
 ## Cross-module links
 
-| From / to | How |
-|-----------|-----|
-| → Cases | Case create requires `clientUnitId`; client detail can deep-link `/cases?clientUnitId=CLI-…&new=1` |
-| → Appointments | Book with optional client; client portal books as self |
-| → Accounts / DAK / Documents | Soft or dual links on detail panels |
-| → Login | Only after portal invite |
+| Module | Link |
+|--------|------|
+| [Cases](./cases_flow.md) | Case create requires `clientUnitId`; deep-link `/cases?clientUnitId=CLI-…&new=1` |
+| [Appointments](./appointments_flow.md) | Staff book with optional client; client **views / confirms / cancels** only |
+| [Accounts](./accounts_flow.md) / [Postal](./postal_flow.md) / [Documents](./documents_flow.md) | Dual or soft links on detail panels |
+| [Login](./unified_login_flow.md) | Only after portal invite |

@@ -1,8 +1,3 @@
----
-name: Appointments Flow
-overview: Full Appointments module — office staff book when a client calls; clients view/cancel only. Confirm-coming RSVP in an env-timed window for client and staff; cancel frees the slot. Also edit, CSV import, convert-case.
----
-
 # Appointments flow (`/appointments`)
 
 ## Core principle: office books when the client calls
@@ -57,7 +52,7 @@ flowchart LR
 | Edit / cancel | appointments edit-or-cancel rules |
 | Convert-case | Staff; `appointments.edit` **or** `cases.create`; both modules on |
 
-Related staff nav: [Availability](./availability_flow.plan.md) (`/availability`).
+Related staff nav: [Availability](./availability_flow.md) (`/availability`).
 
 ---
 
@@ -92,7 +87,7 @@ Booking advocate resolution: [`lib/appointments/booking-rules.ts`](../../lib/app
 | Create | `AppointmentFormDialog` create mode | `POST /api/appointments` |
 | Edit / reschedule / cancel | Same dialog / actions | `PATCH /api/appointments/[unitId]` |
 | Confirm coming | Button in window (list + client home) | `POST /api/appointments/[unitId]/confirm` |
-| Convert to case | Staff action on row/detail | `POST /api/appointments/[unitId]/convert-case` |
+| Convert to case | Staff action on row/detail · requires **case fee (₹)** | `POST /api/appointments/[unitId]/convert-case` `{ agreedFee }` |
 | CSV import | Import dialog | `POST /api/appointments/import` |
 | Advocates | Picker | `GET /api/advocates` |
 
@@ -136,7 +131,7 @@ Staff APT with clientUnitId
   -->  Appointment dual-linked to Case
 ```
 
-Clients cannot convert. After convert, continue on [cases](./cases_flow.plan.md) (checklist, hearings, docs).
+Clients cannot convert. After convert, continue on [cases](./cases_flow.md) (checklist, hearings, docs).
 
 ---
 
@@ -160,9 +155,22 @@ Env: [`APPOINTMENT_CONFIRM_WINDOW_HOURS`](../../.env.example) · [`CRON_SECRET`]
 
 ---
 
+## State / rules
+
+| State | Confirm? | Cancel? | Slot busy? |
+|-------|----------|---------|------------|
+| Before confirm window | No | Yes | Yes |
+| In window, not confirmed | Yes (client + staff) | Yes | Yes |
+| Confirmed (`confirmedAt`) | No (already) | Yes | Yes — status still `scheduled` |
+| Cancelled | No | — | **No** |
+| Completed | No | — | No |
+
+No auto-cancel if unconfirmed. Only `scheduled` counts as busy in slot math.
+---
+
 ## Availability dependency
 
-Without weekly hours ([availability](./availability_flow.plan.md)), slot picker returns empty / unbookable. Court/break/personal **blocks** and HRMS **holidays** remove slots. Day board shows appointments for the IST day ([day board](./day_board_flow.plan.md)).
+Without weekly hours ([availability](./availability_flow.md)), slot picker returns empty / unbookable. Court/break/personal **blocks** and HRMS **holidays** remove slots. Day board shows appointments for the IST day ([day board](./day_board_flow.md)).
 
 ---
 
@@ -193,9 +201,9 @@ Without weekly hours ([availability](./availability_flow.plan.md)), slot picker 
 
 | Module | Link |
 |--------|------|
-| [Availability](./availability_flow.plan.md) | Hours + blocks feed slots |
-| [Clients](./clients_flow.plan.md) | Optional / required for convert |
-| [Cases](./cases_flow.plan.md) | Optional link; convert creates enquiry |
-| [Day board](./day_board_flow.plan.md) | Same-day appointments |
-| [HRMS](./hrms_flow.plan.md) | Holidays close slots |
-| [Employees](./employees_flow.plan.md) | Advocates via `/api/advocates` |
+| [Availability](./availability_flow.md) | Hours + blocks feed slots |
+| [Clients](./clients_flow.md) | Optional / required for convert |
+| [Cases](./cases_flow.md) | Optional link; convert creates enquiry |
+| [Day board](./day_board_flow.md) | Same-day appointments |
+| [HRMS](./hrms_flow.md) | Holidays close slots |
+| [Employees](./employees_flow.md) | Advocates via `/api/advocates` |

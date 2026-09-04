@@ -40,6 +40,13 @@ import { CaseCourtStatusStrip } from "@/features/cases/components/case-court-sta
 import { CaseFilingChecklist } from "@/features/cases/components/case-filing-checklist";
 import { UploadDocumentDialog } from "@/features/documents/components/upload-document-dialog";
 import { CaseDocumentsPanel } from "@/features/documents/components/case-documents-panel";
+import { ApplyWaiverDialog } from "@/features/accounts/components/apply-waiver-dialog";
+import {
+  rupee,
+  settlementBadge,
+} from "@/features/accounts/components/accounts-page-helpers";
+import type { FeeRollup } from "@/features/accounts/server/fee-rollup";
+import type { WaiverSummary } from "@/features/accounts/server/waiver-serialize";
 import type { DocumentTypeValue } from "@/lib/validations/documents.schema";
 import {
   normalizeCaseStatus,
@@ -65,6 +72,11 @@ export function CaseDetailPage({
   const can = (module: string, action: string) =>
     user.permissions.includes(`${module}.${action}`);
   const clientPortal = isClientOnlyUser(user.roles);
+  const isAdmin = user.roles.includes("admin");
+  const canWaive =
+    can("accounts", "waive") &&
+    (isAdmin || user.roles.includes("sub_admin"));
+  const canApproveWaiver = canWaive && isAdmin;
 
   const [detail, setDetail] = useState<DetailResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -73,11 +85,10 @@ export function CaseDetailPage({
   const [uploadOpen, setUploadOpen] = useState(false);
   const [uploadType, setUploadType] = useState<DocumentTypeValue>("other");
   const [adjourning, setAdjourning] = useState<string | null>(null);
-  const [fee, setFee] = useState<{
-    agreedFee: number | null;
-    collected: number;
-    outstanding: number | null;
-  } | null>(null);
+  const [waiverOpen, setWaiverOpen] = useState(false);
+  const [fee, setFee] = useState<FeeRollup | null>(null);
+  const [waivers, setWaivers] = useState<WaiverSummary[]>([]);
+  const [waiverBusy, setWaiverBusy] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -94,25 +105,32 @@ export function CaseDetailPage({
     setDetail(data as unknown as DetailResponse);
 
     if (user.permissions.includes("accounts.view")) {
-      const feeRes = await apiFetch<{
-        fee: {
-          agreedFee: number | null;
-          collected: number;
-          outstanding: number | null;
-        } | null;
-      }>(`/api/accounts?caseUnitId=${encodeURIComponent(unitId)}&pageSize=1`);
+      const [feeRes, wvrRes] = await Promise.all([
+        apiFetch<{
+          fee: FeeRollup | null;
+        }>(`/api/accounts?caseUnitId=${encodeURIComponent(unitId)}&pageSize=1`),
+        apiFetch<{
+          waivers: WaiverSummary[];
+          fee: FeeRollup;
+        }>(`/api/accounts/waivers?caseUnitId=${encodeURIComponent(unitId)}`),
+      ]);
       if (feeRes.ok) {
         const body = feeRes.data as unknown as {
-          fee: {
-            agreedFee: number | null;
-            collected: number;
-            outstanding: number | null;
-          } | null;
+          fee: FeeRollup | null;
         };
         setFee(body.fee ?? null);
       }
+      if (wvrRes.ok) {
+        const body = wvrRes.data as unknown as {
+          waivers: WaiverSummary[];
+          fee: FeeRollup;
+        };
+        setWaivers(body.waivers ?? []);
+        if (body.fee) setFee(body.fee);
+      }
     } else {
       setFee(null);
+      setWaivers([]);
     }
   }, [unitId, user.permissions]);
 
@@ -161,6 +179,59 @@ export function CaseDetailPage({
   function applyCaseUpdate(next: CaseSummary) {
     setDetail((prev) => (prev ? { ...prev, case: next } : prev));
   }
+
+  async function approveWaiver(waiverUnitId: string) {
+    if (!window.confirm("Approve this fee waiver?")) return;
+    setWaiverBusy(waiverUnitId);
+    const { ok, data } = await apiFetch<{ fee: FeeRollup }>(
+      `/api/accounts/waivers/${waiverUnitId}/approve`,
+      { method: "POST" }
+    );
+    setWaiverBusy(null);
+    if (!ok) {
+      toast.error(
+        getErrorMessage(data as Record<string, unknown>, "Failed to approve")
+      );
+      return;
+    }
+    toast.success("Waiver approved");
+    const body = data as unknown as { fee: FeeRollup };
+    setFee(body.fee);
+    void load();
+  }
+
+  async function voidWaiver(waiverUnitId: string, cancelOnly: boolean) {
+    const reason = window.prompt(
+      cancelOnly ? "Reason for cancelling this request?" : "Reason for voiding?"
+    );
+    if (reason == null) return;
+    if (!reason.trim()) {
+      toast.error("Reason is required");
+      return;
+    }
+    setWaiverBusy(waiverUnitId);
+    const { ok, data } = await apiFetch<{ fee: FeeRollup }>(
+      `/api/accounts/waivers/${waiverUnitId}/void`,
+      { method: "POST", json: { reason: reason.trim() } }
+    );
+    setWaiverBusy(null);
+    if (!ok) {
+      toast.error(
+        getErrorMessage(data as Record<string, unknown>, "Failed to void")
+      );
+      return;
+    }
+    toast.success(cancelOnly ? "Request cancelled" : "Waiver voided");
+    const body = data as unknown as { fee: FeeRollup };
+    setFee(body.fee);
+    void load();
+  }
+
+  const pendingWaivers = waivers.filter((w) => w.status === "pending");
+  const availableForWaiver =
+    fee?.outstanding != null
+      ? Math.max(0, fee.outstanding - (fee.pendingWaived ?? 0))
+      : null;
 
   return (
     <section className="space-y-6">
@@ -281,13 +352,23 @@ export function CaseDetailPage({
           <Card>
             <CardContent className="p-4 sm:p-5">
               <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                Agreed fee
+                Case fee
               </p>
               <p className="mt-2 text-sm font-medium text-navy">
                 {item.agreedFee != null
-                  ? `₹${item.agreedFee.toLocaleString("en-IN")}`
+                  ? rupee(item.agreedFee)
                   : "—"}
               </p>
+              {fee ? (
+                <div className="mt-2">
+                  {(() => {
+                    const badge = settlementBadge(fee.settlement, fee.waived);
+                    return badge ? (
+                      <Badge variant={badge.variant}>{badge.label}</Badge>
+                    ) : null;
+                  })()}
+                </div>
+              ) : null}
             </CardContent>
           </Card>
         ) : null}
@@ -391,28 +472,62 @@ export function CaseDetailPage({
                   <Wallet className="size-4" />
                 </span>
                 <div>
-                  <p className="font-medium text-navy">Cash register</p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="font-medium text-navy">Cash register</p>
+                    {fee
+                      ? (() => {
+                          const badge = settlementBadge(
+                            fee.settlement,
+                            fee.waived
+                          );
+                          return badge ? (
+                            <Badge variant={badge.variant}>{badge.label}</Badge>
+                          ) : null;
+                        })()
+                      : null}
+                  </div>
                   <p className="text-sm text-muted-foreground">
                     Fee vs collected for {item.unitId} (actuals excluded)
                   </p>
                 </div>
               </div>
-              <Button asChild type="button" variant="outline" size="sm">
-                <Link href={`/accounts?caseUnitId=${item.unitId}`}>
-                  Open accounts
-                </Link>
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                {can("accounts", "create") ? (
+                  <Button asChild type="button" size="sm">
+                    <Link
+                      href={`/accounts?caseUnitId=${item.unitId}&clientUnitId=${item.clientUnitId}`}
+                    >
+                      Record payment
+                    </Link>
+                  </Button>
+                ) : null}
+                {canWaive &&
+                availableForWaiver != null &&
+                availableForWaiver > 0 ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setWaiverOpen(true)}
+                  >
+                    {canApproveWaiver ? "Apply waiver" : "Request waiver"}
+                  </Button>
+                ) : null}
+                <Button asChild type="button" variant="outline" size="sm">
+                  <Link href={`/accounts?caseUnitId=${item.unitId}`}>
+                    Open accounts
+                  </Link>
+                </Button>
+              </div>
             </div>
             {fee ? (
-              <div className="grid gap-3 md:grid-cols-3">
+              <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Agreed fee
+                    Case fee
                   </p>
                   <p className="mt-1 text-sm font-semibold text-navy">
-                    {fee.agreedFee != null
-                      ? `₹${fee.agreedFee.toLocaleString("en-IN")}`
-                      : "—"}
+                    {fee.agreedFee != null ? rupee(fee.agreedFee) : "—"}
                   </p>
                 </div>
                 <div>
@@ -420,19 +535,93 @@ export function CaseDetailPage({
                     Collected
                   </p>
                   <p className="mt-1 text-sm font-semibold text-navy">
-                    ₹{fee.collected.toLocaleString("en-IN")}
+                    {rupee(fee.collected)}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    Outstanding
+                    Waived
                   </p>
                   <p className="mt-1 text-sm font-semibold text-navy">
-                    {fee.outstanding != null
-                      ? `₹${fee.outstanding.toLocaleString("en-IN")}`
-                      : "—"}
+                    {rupee(fee.waived ?? 0)}
+                  </p>
+                  {(fee.pendingWaived ?? 0) > 0 ? (
+                    <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-400">
+                      + {rupee(fee.pendingWaived)} pending approval
+                    </p>
+                  ) : null}
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    Remaining
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-navy">
+                    {fee.outstanding != null ? rupee(fee.outstanding) : "—"}
                   </p>
                 </div>
+              </div>
+            ) : null}
+            {pendingWaivers.length > 0 ? (
+              <div className="space-y-2 border-t border-border/70 pt-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Pending waivers
+                </p>
+                <ul className="space-y-2">
+                  {pendingWaivers.map((w) => {
+                    const canCancelOwn =
+                      canWaive &&
+                      !canApproveWaiver &&
+                      w.createdBy?.unitId === user.unitId;
+                    return (
+                      <li
+                        key={w.unitId}
+                        className="flex flex-col gap-2 rounded-lg border border-border/70 bg-muted/30 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-navy">
+                            {rupee(w.amount)}{" "}
+                            <Badge variant="warning" className="ml-1">
+                              Pending
+                            </Badge>
+                          </p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            {w.reason}
+                            {w.createdBy?.name
+                              ? ` · ${w.createdBy.name}`
+                              : ""}
+                          </p>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          {canApproveWaiver ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              disabled={waiverBusy === w.unitId}
+                              onClick={() => void approveWaiver(w.unitId)}
+                            >
+                              {waiverBusy === w.unitId
+                                ? "Approving…"
+                                : "Approve"}
+                            </Button>
+                          ) : null}
+                          {canApproveWaiver || canCancelOwn ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              disabled={waiverBusy === w.unitId}
+                              onClick={() =>
+                                void voidWaiver(w.unitId, !canApproveWaiver)
+                              }
+                            >
+                              {canApproveWaiver ? "Reject" : "Cancel"}
+                            </Button>
+                          ) : null}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
               </div>
             ) : null}
           </CardContent>
@@ -444,6 +633,18 @@ export function CaseDetailPage({
         onOpenChange={setEditOpen}
         caseItem={{ ...item, clientName: client?.name ?? null }}
         onSaved={load}
+      />
+      <ApplyWaiverDialog
+        open={waiverOpen}
+        onOpenChange={setWaiverOpen}
+        caseUnitId={item.unitId}
+        outstanding={fee?.outstanding ?? null}
+        pendingWaived={fee?.pendingWaived ?? 0}
+        requiresApproval={!canApproveWaiver}
+        onSaved={(nextFee) => {
+          setFee(nextFee);
+          void load();
+        }}
       />
       <AddHearingDialog
         open={hearingOpen}

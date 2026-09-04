@@ -11,42 +11,42 @@ import {
 export const maxDuration = 300;
 
 /**
- * Day-before hearing SMS reminders (IST).
- * Vercel Cron: GET /api/cron/hearing-sms
- *   (Authorization: Bearer <CRON_SECRET> or x-cron-secret)
- * Manual / external: POST with the same header.
- * Query-string secrets are rejected (log / Referer leak risk).
+ * Pending-list hearing SMS + client notify at HEARING_SMS_TIME_IST.
+ * Vercel Cron every 15m; job no-ops outside the ENV window.
+ * Auth: Authorization: Bearer <CRON_SECRET> or x-cron-secret.
  */
 async function handleCron(request: Request) {
   const denied = authorizeCron(request);
   if (denied) return denied;
-  const result = await runHearingSmsJob();
+  const result = await runHearingSmsJob({ respectEnvWindow: true });
 
-  scheduleNotify(async () => {
-    const admins = await findUsersByRoles(["admin", "sub_admin"]);
-    const title = `Hearing SMS: ${result.sent} sent for ${result.date}`;
-    const more = result.hasMore ? " · more pending" : "";
-    const body = `Total ${result.total} · failed ${result.failed} · skipped ${result.skipped}${more}`;
-    await notifyUsers(
-      admins.map((u) => ({
-        userId: u.id,
-        userUnitId: u.unitId,
-        type: "system",
-        title,
-        body,
-        href: "/diary",
-        meta: {
-          date: result.date,
-          sent: result.sent,
-          failed: result.failed,
-          skipped: result.skipped,
-          total: result.total,
-          hasMore: result.hasMore,
-          source: "cron",
-        },
-      }))
-    );
-  });
+  if (result.skippedReason !== "outside_window") {
+    scheduleNotify(async () => {
+      const admins = await findUsersByRoles(["admin", "sub_admin"]);
+      const title = `Hearing SMS: ${result.sent} sent for ${result.date}`;
+      const more = result.hasMore ? " · more pending" : "";
+      const body = `Total ${result.total} · failed ${result.failed} · skipped ${result.skipped}${more}`;
+      await notifyUsers(
+        admins.map((u) => ({
+          userId: u.id,
+          userUnitId: u.unitId,
+          type: "system",
+          title,
+          body,
+          href: "/diary",
+          meta: {
+            date: result.date,
+            sent: result.sent,
+            failed: result.failed,
+            skipped: result.skipped,
+            total: result.total,
+            hasMore: result.hasMore,
+            source: "cron",
+          },
+        }))
+      );
+    });
+  }
 
   return jsonOk(result);
 }

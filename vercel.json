@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/hearing-sms",
-      "schedule": "30 11 * * *"
+      "schedule": "*/15 * * * *"
     },
     {
       "path": "/api/cron/appointment-confirm-remind",

@@ -23,6 +23,10 @@ export const ACTION_LABELS: Record<string, string> = {
   "payment.update": "Updated payment",
   "payment.void": "Voided payment",
   "payment.import": "Imported payments",
+  "waiver.create": "Applied fee waiver",
+  "waiver.request": "Requested fee waiver",
+  "waiver.approve": "Approved fee waiver",
+  "waiver.void": "Voided fee waiver",
   "appointment.create": "Created appointment",
   "appointment.update": "Updated appointment",
   "appointment.cancel": "Cancelled appointment",
@@ -96,6 +100,7 @@ export const ENTITY_LABELS: Record<string, string> = {
   User: "Employee",
   Document: "Document",
   CashPayment: "Payment",
+  FeeWaiver: "Fee waiver",
   Appointment: "Appointment",
   OfficeTask: "Task",
   DakEntry: "Dak",
@@ -115,6 +120,7 @@ export const ENTITY_ICON_CLASS: Record<string, string> = {
   User: "bg-violet-500/12 text-violet-700 dark:text-violet-300",
   Document: "bg-slate-500/12 text-slate-700 dark:text-slate-300",
   CashPayment: "bg-emerald-500/12 text-emerald-700 dark:text-emerald-300",
+  FeeWaiver: "bg-teal-500/12 text-teal-700 dark:text-teal-300",
   Appointment: "bg-amber-500/12 text-amber-700 dark:text-amber-300",
   OfficeTask: "bg-sky-500/12 text-sky-700 dark:text-sky-300",
   DakEntry: "bg-orange-500/12 text-orange-700 dark:text-orange-300",
@@ -144,6 +150,10 @@ export function entityHref(
       return `/employees`;
     case "CashPayment":
       return `/accounts`;
+    case "FeeWaiver": {
+      const caseUnitId = waiverCaseUnitId(meta, entityUnitId);
+      return caseUnitId ? `/cases/${caseUnitId}` : `/accounts`;
+    }
     case "LeaveRequest":
     case "OfficeHoliday":
       return `/hrms`;
@@ -176,12 +186,20 @@ function hearingCaseUnitId(meta: unknown): string | null {
   return null;
 }
 
+function waiverCaseUnitId(
+  meta: unknown,
+  _entityUnitId: string
+): string | null {
+  return hearingCaseUnitId(meta);
+}
+
 export const ENTITY_OPTIONS = [
   "Client",
   "Case",
   "User",
   "Document",
   "CashPayment",
+  "FeeWaiver",
   "Appointment",
   "OfficeTask",
   "DakEntry",

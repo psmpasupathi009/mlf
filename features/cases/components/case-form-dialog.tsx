@@ -226,6 +226,10 @@ export function CaseFormDialog({
       setError("Select or enter primary advocate mobile");
       return;
     }
+    if (agreedFee === "" || !Number.isFinite(Number(agreedFee)) || Number(agreedFee) < 0) {
+      setError("Enter the case fee (₹)");
+      return;
+    }
     if (cnr && !isValidCnr(cnr)) {
       setError("CNR must be 16 letters/digits (dashes optional)");
       return;
@@ -262,12 +266,7 @@ export function CaseFormDialog({
       ...(isEdit ? {} : { status: "enquiry" as const }),
       filingDate: filingDate || undefined,
       nextHearingAt: nextHearingAt || undefined,
-      agreedFee:
-        agreedFee === ""
-          ? undefined
-          : Number.isFinite(Number(agreedFee))
-            ? Number(agreedFee)
-            : undefined,
+      agreedFee: Number(agreedFee),
       notes: notes || undefined,
     };
 
@@ -553,7 +552,7 @@ export function CaseFormDialog({
 
             <Section
               title="6. Dates & fee"
-              description="Optional"
+              description="Case fee is required"
               className="md:col-span-2"
             >
               <div className="grid min-w-0 gap-3 sm:grid-cols-2">
@@ -566,13 +565,15 @@ export function CaseFormDialog({
                   <DatePicker value={nextHearingAt} onChange={setNextHearingAt} />
                 </div>
                 <div className="grid min-w-0 gap-2">
-                  <Label htmlFor="cs-fee">Agreed fee (₹)</Label>
+                  <Label htmlFor="cs-fee">Case fee (₹) *</Label>
                   <Input
                     id="cs-fee"
                     type="number"
                     min={0}
+                    required
                     value={agreedFee}
                     onChange={(e) => setAgreedFee(e.target.value)}
+                    placeholder="Total agreed fee"
                   />
                 </div>
                 <div className="grid min-w-0 gap-2">
@@ -599,7 +600,7 @@ export function CaseFormDialog({
 
         <DialogFooter className="shrink-0 border-t border-border/80 bg-muted/30 px-4 py-3 sm:px-6 sm:py-4 sm:justify-between">
           <p className="hidden text-xs text-muted-foreground sm:block">
-            Required: court location, client, case type, advocate
+            Required: court location, client, case type, advocate, case fee
           </p>
           <div className="flex w-full flex-col-reverse gap-2 sm:w-auto sm:flex-row">
             <Button

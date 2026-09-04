@@ -325,15 +325,21 @@ export function ClientDetailPage({
             {fee ? (
               <>
                 <p className="mt-2 text-sm font-medium text-navy">
-                  {fee.outstanding != null
-                    ? `${rupee(fee.outstanding)} due`
-                    : fee.collected > 0
-                      ? `${rupee(fee.collected)} collected`
-                      : "—"}
+                  {fee.settlement === "paid"
+                    ? "Paid"
+                    : fee.outstanding != null
+                      ? `${rupee(fee.outstanding)} due`
+                      : fee.collected > 0
+                        ? `${rupee(fee.collected)} collected`
+                        : "—"}
                 </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Agreed {fee.agreedFee != null ? rupee(fee.agreedFee) : "—"} ·
+                  Fee {fee.agreedFee != null ? rupee(fee.agreedFee) : "—"} ·
                   Collected {rupee(fee.collected)}
+                  {fee.waived > 0 ? ` · Waived ${rupee(fee.waived)}` : ""}
+                  {(fee.pendingWaived ?? 0) > 0
+                    ? ` · Pending ${rupee(fee.pendingWaived)}`
+                    : ""}
                 </p>
               </>
             ) : (

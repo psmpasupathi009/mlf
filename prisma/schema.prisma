@@ -339,6 +339,35 @@ model CashPayment {
   @@index([paidOn])
 }
 
+/// Non-cash fee write-off — reduces outstanding without counting as collected.
+model FeeWaiver {
+  id           String    @id @default(auto()) @map("_id") @db.ObjectId
+  unitId       String    @unique
+  clientId     String    @db.ObjectId
+  clientUnitId String
+  caseId       String    @db.ObjectId
+  caseUnitId   String
+  amount       Float
+  reason       String
+  /// pending | approved | void  (legacy: active = approved)
+  status       String    @default("pending")
+  approvedAt   DateTime?
+  approvedById String?   @db.ObjectId
+  voidedAt     DateTime?
+  voidedById   String?   @db.ObjectId
+  voidReason   String?
+  createdById  String?   @db.ObjectId
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([clientId])
+  @@index([clientUnitId])
+  @@index([caseId])
+  @@index([caseUnitId])
+  @@index([status])
+  @@index([createdAt])
+}
+
 model OfficeExpense {
   id                 String                @id @default(auto()) @map("_id") @db.ObjectId
   unitId             String                @unique
