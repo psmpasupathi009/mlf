@@ -73,6 +73,28 @@ function readStoredView(): CasesView {
   }
 }
 
+/** Prefer the most common type among loaded rows; else first catalog value. */
+function pickBoardCaseType(
+  rows: { caseType: string | null }[]
+): string {
+  const counts = new Map<string, number>();
+  for (const r of rows) {
+    const t = r.caseType?.trim();
+    if (!t) continue;
+    counts.set(t, (counts.get(t) ?? 0) + 1);
+  }
+  let best: string | null = null;
+  let bestN = 0;
+  for (const [t, n] of counts) {
+    if (n > bestN) {
+      best = t;
+      bestN = n;
+    }
+  }
+  if (best) return best;
+  return CASE_TYPES[0]?.value ?? "OS";
+}
+
 export function CasesPage({ user }: { user: PublicUser }) {
   const can = (action: string) => user.permissions.includes(`cases.${action}`);
   const canExport = user.permissions.includes("reports.view");
@@ -171,10 +193,19 @@ export function CasesPage({ user }: { user: PublicUser }) {
     });
   }, [clientPortal]);
 
+  /** Board needs a concrete case type for court-status columns. */
+  useEffect(() => {
+    if (clientPortal || view !== "board" || caseType !== "all") return;
+    setCaseType(pickBoardCaseType(rows));
+  }, [clientPortal, view, caseType, rows]);
+
   function setCasesView(next: CasesView) {
     if (clientPortal) return;
     setView(next);
     setPage(1);
+    if (next === "board" && caseType === "all") {
+      setCaseType(pickBoardCaseType(rows));
+    }
     try {
       window.localStorage.setItem(VIEW_STORAGE_KEY, next);
     } catch {
@@ -408,7 +439,43 @@ export function CasesPage({ user }: { user: PublicUser }) {
         }
       />
 
-      {!loading && rows.length === 0 ? (
+      {view === "board" && !clientPortal ? (
+        caseType === "all" ? (
+          <EmptyState
+            title="Select a case type"
+            description="The board shows court status columns for one case type (CC, OS, Bail, …). Pick a type above, then drag cards to the next step."
+          />
+        ) : !loading && rows.length === 0 ? (
+          <EmptyState
+            title={`No ${caseType} cases`}
+            description="No cases for this type match the current filters. Try another type or clear filters."
+            action={
+              can("create") && quick === "all" ? (
+                <Button type="button" onClick={() => setFormOpen(true)}>
+                  Register case
+                </Button>
+              ) : undefined
+            }
+          />
+        ) : (
+          <CasesBoard
+            rows={rows}
+            total={total}
+            canEdit={can("edit")}
+            caseType={caseType}
+            loading={loading}
+            onCaseUpdated={(next) => {
+              setRows((prev) =>
+                prev.map((r) =>
+                  r.unitId === next.unitId
+                    ? { ...r, ...next, clientName: r.clientName }
+                    : r
+                )
+              );
+            }}
+          />
+        )
+      ) : !loading && rows.length === 0 ? (
         <EmptyState
           title={
             quick === "today"
@@ -432,30 +499,6 @@ export function CasesPage({ user }: { user: PublicUser }) {
             ) : undefined
           }
         />
-      ) : view === "board" ? (
-        caseType === "all" ? (
-          <EmptyState
-            title="Select a case type"
-            description="The board shows court status columns for one case type (CC, OS, Bail, …)."
-          />
-        ) : (
-          <CasesBoard
-            rows={rows}
-            total={total}
-            canEdit={can("edit")}
-            caseType={caseType}
-            loading={loading}
-            onCaseUpdated={(next) => {
-              setRows((prev) =>
-                prev.map((r) =>
-                  r.unitId === next.unitId
-                    ? { ...r, ...next, clientName: r.clientName }
-                    : r
-                )
-              );
-            }}
-          />
-        )
       ) : (
         <>
           <Table>

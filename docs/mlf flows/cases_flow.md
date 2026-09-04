@@ -75,12 +75,13 @@ API forces client filter via `requireClientUnitId` + `isClientOnlyUser` in [`app
 
 | Action | How | API |
 |--------|-----|-----|
-| List / filters / board | `/cases` | `GET /api/cases?...` (`view=board` raises page size) |
+| List / filters / board | `/cases` · List/Board toggle (staff). Board auto-picks a case type if “All types”; drag card → next court step (`stage`) | `GET /api/cases?...` (`view=board` raises page size); drag → `PATCH /api/cases/[unitId]` `{ stage }` |
 | Open create | **New case**, `?new=1`, or from client | — |
 | Create | `CaseFormDialog` — client, court cascade, case type, primary advocate, **required case fee (₹)**; default status **enquiry** | `POST /api/cases` |
 | Detail | `/cases/[unitId]` | `GET /api/cases/[unitId]` |
 | Edit fields | Form dialog | `PATCH /api/cases/[unitId]` |
-| Status transition | Pipeline UI | `PATCH /api/cases/[unitId]/status` → `canTransitionStatus` |
+| Status transition | Pipeline UI on detail (`enquiry` → …) | `PATCH /api/cases/[unitId]/status` → `canTransitionStatus` |
+| Court next step | Board Kanban or detail status strip | `PATCH /api/cases/[unitId]` `{ stage }` |
 | Filing checklist | Detail | `PATCH /api/cases/[unitId]/checklist` |
 | Add hearing | Detail | `POST /api/cases/[unitId]/hearings` → sets `nextHearingAt` |
 | Adjourn | Hearing action | `POST /api/hearings/[unitId]/adjourn` → new `HRG` |
