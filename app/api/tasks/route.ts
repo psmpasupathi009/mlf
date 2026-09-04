@@ -152,69 +152,158 @@ export const POST = apiHandler(async (request) => {
     caseUnitId = caseItem.unitId;
   }
 
-  const assignee = await resolveAssignee(input.assigneeUnitId || null);
-  if (input.assigneeUnitId && !assignee) {
-    return jsonFail("VALIDATION", "Assignee not found", 400);
-  }
-
   const status = input.status ?? "open";
-  const unitId = await nextUnitId("officeTask");
-  const created = await prisma.officeTask.create({
-    data: {
-      unitId,
-      title: input.title,
-      kind: input.kind ?? "general",
-      status,
-      dueDate: input.dueDate ?? undefined,
-      workDate: input.workDate ?? undefined,
-      assigneeUnitId: assignee?.assigneeUnitId,
-      assigneeId: assignee?.assigneeId,
-      caseUnitId,
-      notes: input.notes || undefined,
-      finishNote: input.finishNote || undefined,
-      completedAt: status === "done" ? new Date() : undefined,
-      createdById: user.id,
-    },
-  });
+  const assignToAllStaff = Boolean(input.assignToAllStaff);
 
-  await writeAudit({
-    actorUnitId: user.unitId,
-    action: "task.create",
-    entity: "OfficeTask",
-    entityUnitId: created.unitId,
-    meta: {
-      after: pickAuditFields(created as Record<string, unknown>, [
-        "title",
-        "kind",
-        "status",
-        "dueDate",
-        "workDate",
-        "assigneeUnitId",
-        "caseUnitId",
-        "notes",
-        "finishNote",
-      ] as const),
-    },
-  });
+  type ResolvedAssignee = {
+    assigneeUnitId: string;
+    assigneeId: string;
+    name?: string | null;
+  };
 
-  if (assignee?.assigneeId && assignee.assigneeId !== user.id) {
-    scheduleNotify(async () => {
-      await notifyUser({
-        userId: assignee.assigneeId!,
-        userUnitId: assignee.assigneeUnitId!,
-        type: "task_assigned",
-        title: `Task assigned: ${created.title}`,
-        body: created.notes ?? null,
-        href: `/tasks?q=${encodeURIComponent(created.unitId)}&status=all`,
-        meta: { taskUnitId: created.unitId },
-      });
+  let targets: ResolvedAssignee[] = [];
+
+  if (assignToAllStaff) {
+    const staff = await prisma.user.findMany({
+      where: {
+        isActive: true,
+        NOT: { roles: { equals: ["client"] } },
+      },
+      select: { id: true, unitId: true, name: true },
+      orderBy: { name: "asc" },
     });
+    if (staff.length === 0) {
+      return jsonFail("VALIDATION", "No active staff to assign", 400);
+    }
+    targets = staff.map((p) => ({
+      assigneeUnitId: p.unitId,
+      assigneeId: p.id,
+      name: p.name,
+    }));
+  } else {
+    const assignee = await resolveAssignee(input.assigneeUnitId || null);
+    if (input.assigneeUnitId && !assignee) {
+      return jsonFail("VALIDATION", "Assignee not found", 400);
+    }
+    if (assignee?.assigneeUnitId && assignee.assigneeId) {
+      targets = [
+        {
+          assigneeUnitId: assignee.assigneeUnitId,
+          assigneeId: assignee.assigneeId,
+          name: assignee.name,
+        },
+      ];
+    } else {
+      targets = [];
+    }
   }
 
-  if (status === "done" && created.createdById) {
+  // Unassigned single create (no assignToAllStaff)
+  if (!assignToAllStaff && targets.length === 0) {
+    const unitId = await nextUnitId("officeTask");
+    const created = await prisma.officeTask.create({
+      data: {
+        unitId,
+        title: input.title,
+        kind: input.kind ?? "general",
+        status,
+        dueDate: input.dueDate ?? undefined,
+        workDate: input.workDate ?? undefined,
+        caseUnitId,
+        notes: input.notes || undefined,
+        finishNote: input.finishNote || undefined,
+        completedAt: status === "done" ? new Date() : undefined,
+        createdById: user.id,
+      },
+    });
+
+    await writeAudit({
+      actorUnitId: user.unitId,
+      action: "task.create",
+      entity: "OfficeTask",
+      entityUnitId: created.unitId,
+      meta: {
+        after: pickAuditFields(created as Record<string, unknown>, [
+          "title",
+          "kind",
+          "status",
+          "dueDate",
+          "workDate",
+          "assigneeUnitId",
+          "caseUnitId",
+          "notes",
+          "finishNote",
+        ] as const),
+      },
+    });
+
+    const [summary] = await enrichTasks([created]);
+    return jsonOk({ task: summary, tasks: [summary], createdCount: 1 }, 201);
+  }
+
+  const createdRows: Awaited<ReturnType<typeof prisma.officeTask.create>>[] =
+    [];
+  for (const target of targets) {
+    const unitId = await nextUnitId("officeTask");
+    const created = await prisma.officeTask.create({
+      data: {
+        unitId,
+        title: input.title,
+        kind: input.kind ?? "general",
+        status,
+        dueDate: input.dueDate ?? undefined,
+        workDate: input.workDate ?? undefined,
+        assigneeUnitId: target.assigneeUnitId,
+        assigneeId: target.assigneeId,
+        caseUnitId,
+        notes: input.notes || undefined,
+        finishNote: input.finishNote || undefined,
+        completedAt: status === "done" ? new Date() : undefined,
+        createdById: user.id,
+      },
+    });
+    createdRows.push(created);
+
+    await writeAudit({
+      actorUnitId: user.unitId,
+      action: "task.create",
+      entity: "OfficeTask",
+      entityUnitId: created.unitId,
+      meta: {
+        after: pickAuditFields(created as Record<string, unknown>, [
+          "title",
+          "kind",
+          "status",
+          "dueDate",
+          "workDate",
+          "assigneeUnitId",
+          "caseUnitId",
+          "notes",
+          "finishNote",
+        ] as const),
+        ...(assignToAllStaff ? { assignToAllStaff: true } : {}),
+      },
+    });
+
+    if (target.assigneeId !== user.id) {
+      scheduleNotify(async () => {
+        await notifyUser({
+          userId: target.assigneeId,
+          userUnitId: target.assigneeUnitId,
+          type: "task_assigned",
+          title: `Task assigned: ${created.title}`,
+          body: created.notes ?? null,
+          href: `/tasks?q=${encodeURIComponent(created.unitId)}&status=all`,
+          meta: { taskUnitId: created.unitId },
+        });
+      });
+    }
+  }
+
+  if (status === "done" && createdRows[0]?.createdById) {
     scheduleNotify(async () => {
       const creator = await prisma.user.findUnique({
-        where: { id: created.createdById! },
+        where: { id: createdRows[0]!.createdById! },
         select: { id: true, unitId: true },
       });
       if (!creator || creator.id === user.id) return;
@@ -222,13 +311,20 @@ export const POST = apiHandler(async (request) => {
         userId: creator.id,
         userUnitId: creator.unitId,
         type: "task_done",
-        title: `Task done: ${created.title}`,
-        href: `/tasks?q=${encodeURIComponent(created.unitId)}&status=all`,
-        meta: { taskUnitId: created.unitId },
+        title: `Task done: ${createdRows[0]!.title}`,
+        href: `/tasks?q=${encodeURIComponent(createdRows[0]!.unitId)}&status=all`,
+        meta: { taskUnitId: createdRows[0]!.unitId },
       });
     });
   }
 
-  const [summary] = await enrichTasks([created]);
-  return jsonOk({ task: summary }, 201);
+  const summaries = await enrichTasks(createdRows);
+  return jsonOk(
+    {
+      task: summaries[0],
+      tasks: summaries,
+      createdCount: summaries.length,
+    },
+    201
+  );
 });

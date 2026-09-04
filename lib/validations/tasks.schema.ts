@@ -30,17 +30,29 @@ const optionalDayField = z
     "Invalid date"
   );
 
-export const createOfficeTaskSchema = z.object({
-  title: z.string().trim().min(1, "Title is required").max(200),
-  kind: officeTaskKindEnum.optional().default("general"),
-  status: officeTaskStatusEnum.optional().default("open"),
-  dueDate: optionalDayField,
-  workDate: optionalDayField,
-  assigneeUnitId: z.string().trim().optional().or(z.literal("")),
-  caseUnitId: z.string().trim().optional().or(z.literal("")),
-  notes: z.string().trim().max(1000).optional().or(z.literal("")),
-  finishNote: z.string().trim().max(1000).optional().or(z.literal("")),
-});
+export const createOfficeTaskSchema = z
+  .object({
+    title: z.string().trim().min(1, "Title is required").max(200),
+    kind: officeTaskKindEnum.optional().default("general"),
+    status: officeTaskStatusEnum.optional().default("open"),
+    dueDate: optionalDayField,
+    workDate: optionalDayField,
+    assigneeUnitId: z.string().trim().optional().or(z.literal("")),
+    /** Create one open task for every active office employee. */
+    assignToAllStaff: z.boolean().optional().default(false),
+    caseUnitId: z.string().trim().optional().or(z.literal("")),
+    notes: z.string().trim().max(1000).optional().or(z.literal("")),
+    finishNote: z.string().trim().max(1000).optional().or(z.literal("")),
+  })
+  .superRefine((data, ctx) => {
+    if (data.status === "done" && !(data.finishNote ?? "").trim()) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["finishNote"],
+        message: "Finishing note is required when marking done",
+      });
+    }
+  });
 
 export const updateOfficeTaskSchema = z.object({
   title: z.string().trim().min(1).max(200).optional(),

@@ -52,6 +52,10 @@ import { dateIsOfficeHoliday } from "@/features/hrms/lib/office-holiday";
 import { getAttendanceLocation } from "@/features/hrms/lib/get-attendance-location";
 import { istAddCalendarDays, istDateKey } from "@/lib/utils/ist";
 import { cn } from "@/lib/utils/cn";
+import {
+  PendingTasksGateDialog,
+  fetchPendingTaskResponses,
+} from "@/features/tasks/components/finish-task-dialog";
 
 type HolidayList = {
   data: OfficeHolidaySummary[];
@@ -92,6 +96,7 @@ export function HrmsPage({ user }: { user: PublicUser }) {
   const [checkInOpen, setCheckInOpen] = useState(false);
   const [checkInNotes, setCheckInNotes] = useState("");
   const [checkBusy, setCheckBusy] = useState(false);
+  const [taskGateOpen, setTaskGateOpen] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<LeaveSummary | null>(null);
   const [rejectTarget, setRejectTarget] = useState<LeaveSummary | null>(null);
   const [rejectReason, setRejectReason] = useState("");
@@ -416,6 +421,24 @@ export function HrmsPage({ user }: { user: PublicUser }) {
   }
 
   async function handleCheckOut() {
+    setCheckBusy(true);
+    try {
+      const pending = await fetchPendingTaskResponses();
+      if (pending.length > 0) {
+        setCheckBusy(false);
+        setTaskGateOpen(true);
+        return;
+      }
+      await runCheckOut();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Could not get your location"
+      );
+      setCheckBusy(false);
+    }
+  }
+
+  async function runCheckOut() {
     setCheckBusy(true);
     try {
       const loc = await getAttendanceLocation();
@@ -898,6 +921,15 @@ export function HrmsPage({ user }: { user: PublicUser }) {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <PendingTasksGateDialog
+        open={taskGateOpen}
+        onOpenChange={setTaskGateOpen}
+        reason="checkout"
+        onAllDone={() => {
+          void runCheckOut();
+        }}
+      />
     </section>
   );
 }

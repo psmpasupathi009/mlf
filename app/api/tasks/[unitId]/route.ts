@@ -92,6 +92,19 @@ export const PATCH = apiHandler(async (request, context) => {
   const nextStatus = input.status ?? item.status;
   let completedAt = item.completedAt;
   if (nextStatus === "done" && item.status !== "done") {
+    const noteFromInput =
+      input.finishNote !== undefined ? input.finishNote.trim() : null;
+    const effectiveNote =
+      noteFromInput !== null && noteFromInput !== ""
+        ? noteFromInput
+        : (item.finishNote ?? "").trim();
+    if (!effectiveNote) {
+      return jsonFail(
+        "VALIDATION",
+        "Add a finishing note before marking done",
+        400
+      );
+    }
     completedAt = new Date();
   } else if (nextStatus !== "done") {
     completedAt = null;

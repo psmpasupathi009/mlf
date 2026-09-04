@@ -194,7 +194,7 @@ export function TasksPage({ user }: { user: PublicUser }) {
     <section className="space-y-5">
       <PageHeader
         title="Office tasks"
-        description="Morning allotment and evening finishing for the office work day."
+        description="Assign work to staff. They respond in the evening with a note — required before logout or check-out."
         actions={
           <>
             {canExport ? (
@@ -240,7 +240,7 @@ export function TasksPage({ user }: { user: PublicUser }) {
                 }}
               >
                 <Plus className="size-4" />
-                Allot work
+                Assign task
               </Button>
             ) : null}
           </>
@@ -258,8 +258,8 @@ export function TasksPage({ user }: { user: PublicUser }) {
               setStatus("open");
             }}
             options={[
-              { id: "allotment", label: "Morning allotment" },
-              { id: "finishing", label: "Evening finishing" },
+              { id: "allotment", label: "Assign" },
+              { id: "finishing", label: "Finish today" },
             ]}
           />
           <div className="flex flex-wrap items-center gap-2">
@@ -351,13 +351,13 @@ export function TasksPage({ user }: { user: PublicUser }) {
         <EmptyState
           title={
             view === "allotment"
-              ? "No allotment for this day"
+              ? "No tasks for this day"
               : "No open tasks for this day"
           }
           description={
             view === "allotment"
-              ? "Create morning allotment tasks for today’s work."
-              : "Open tasks will appear here for evening finishing."
+              ? "Assign work to one person or all staff."
+              : "Open tasks show here so staff can respond with a note."
           }
           action={
             can("create") ? (
@@ -368,7 +368,7 @@ export function TasksPage({ user }: { user: PublicUser }) {
                   setFormOpen(true);
                 }}
               >
-                Allot work
+                Assign task
               </Button>
             ) : undefined
           }

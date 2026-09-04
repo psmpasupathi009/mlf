@@ -58,6 +58,7 @@ export function TaskFormDialog({
   const [kind, setKind] = useState<TaskKind>(defaultKind);
   const [workDate, setWorkDate] = useState(defaultWorkDate || istDateKey());
   const [dueDate, setDueDate] = useState("");
+  const [assignToAllStaff, setAssignToAllStaff] = useState(false);
   const [assigneeUnitId, setAssigneeUnitId] = useState<string | null>(null);
   const [assigneeLabel, setAssigneeLabel] = useState<string | null>(null);
   const [caseLink, setCaseLink] = useState<{
@@ -75,6 +76,7 @@ export function TaskFormDialog({
       setKind((task.kind as TaskKind) || "general");
       setWorkDate(task.workDateKey || istDateKey());
       setDueDate(task.dueDateKey || "");
+      setAssignToAllStaff(false);
       setAssigneeUnitId(task.assigneeUnitId);
       setAssigneeLabel(
         task.assigneeName
@@ -97,6 +99,7 @@ export function TaskFormDialog({
       setKind(defaultKind);
       setWorkDate(defaultWorkDate || istDateKey());
       setDueDate("");
+      setAssignToAllStaff(false);
       setAssigneeUnitId(null);
       setAssigneeLabel(null);
       setCaseLink(null);
@@ -111,6 +114,10 @@ export function TaskFormDialog({
       setError("Title is required");
       return;
     }
+    if (!isEdit && !assignToAllStaff && !assigneeUnitId) {
+      setError("Pick an assignee, or choose All staff");
+      return;
+    }
 
     setBusy(true);
     const body = {
@@ -118,7 +125,8 @@ export function TaskFormDialog({
       kind,
       workDate: workDate || "",
       dueDate: dueDate || "",
-      assigneeUnitId: assigneeUnitId ?? "",
+      assigneeUnitId: assignToAllStaff ? "" : (assigneeUnitId ?? ""),
+      ...(isEdit ? {} : { assignToAllStaff }),
       caseUnitId: caseLink?.unitId ?? "",
       notes: notes.trim() || "",
     };
@@ -144,7 +152,19 @@ export function TaskFormDialog({
       return;
     }
 
-    toast.success(isEdit ? "Task updated" : "Task allotted");
+    const payload = res.data as { createdCount?: number };
+    const createdCount =
+      !isEdit && typeof payload.createdCount === "number"
+        ? payload.createdCount
+        : null;
+
+    toast.success(
+      isEdit
+        ? "Task updated"
+        : createdCount && createdCount > 1
+          ? `Assigned to ${createdCount} staff`
+          : "Task assigned"
+    );
     onSaved();
     onOpenChange(false);
   }
@@ -153,9 +173,10 @@ export function TaskFormDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="md">
         <DialogHeader>
-          <DialogTitle>{isEdit ? "Edit task" : "Allot work"}</DialogTitle>
+          <DialogTitle>{isEdit ? "Edit task" : "Assign task"}</DialogTitle>
           <DialogDescription>
-            Morning allotment and office tasks for the selected work day.
+            Give work to one person or all staff. They respond in the evening
+            with a note.
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="grid gap-4">
@@ -194,11 +215,36 @@ export function TaskFormDialog({
             </div>
           </div>
 
+          {!isEdit ? (
+            <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border/80 bg-muted/30 px-3 py-3">
+              <input
+                type="checkbox"
+                className="mt-1 size-4 accent-[var(--brand)]"
+                checked={assignToAllStaff}
+                onChange={(e) => {
+                  setAssignToAllStaff(e.target.checked);
+                  if (e.target.checked) {
+                    setAssigneeUnitId(null);
+                    setAssigneeLabel(null);
+                  }
+                }}
+              />
+              <span>
+                <span className="block text-sm font-medium text-navy">
+                  All staff
+                </span>
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  Creates one open task for every active employee.
+                </span>
+              </span>
+            </label>
+          ) : null}
+
           <div className="grid gap-2">
-            <Label>Assignee (advocate / employee)</Label>
+            <Label>Assignee</Label>
             <AdvocatePicker
-              value={assigneeUnitId}
-              selectedLabel={assigneeLabel}
+              value={assignToAllStaff ? null : assigneeUnitId}
+              selectedLabel={assignToAllStaff ? null : assigneeLabel}
               valueBy="unitId"
               onChange={(a: AdvocateSummary | null) => {
                 if (!a) {
@@ -206,26 +252,34 @@ export function TaskFormDialog({
                   setAssigneeLabel(null);
                   return;
                 }
+                setAssignToAllStaff(false);
                 setAssigneeUnitId(a.unitId);
                 setAssigneeLabel(a.displayName || a.name || a.unitId);
               }}
-              placeholder="Select assignee"
+              placeholder={
+                assignToAllStaff ? "All staff selected" : "Select assignee"
+              }
               clearable
               clearLabel="Unassigned"
+              disabled={assignToAllStaff}
             />
-            <p className="text-xs text-muted-foreground">
-              Or enter employee unit ID below if not an advocate.
-            </p>
-            <Input
-              value={assigneeUnitId ?? ""}
-              onChange={(e) => {
-                const v = e.target.value.trim();
-                setAssigneeUnitId(v || null);
-                if (!v) setAssigneeLabel(null);
-              }}
-              placeholder="EMP-00001"
-              className="h-11"
-            />
+            {!assignToAllStaff ? (
+              <>
+                <p className="text-xs text-muted-foreground">
+                  Or enter employee unit ID below if not an advocate.
+                </p>
+                <Input
+                  value={assigneeUnitId ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value.trim();
+                    setAssigneeUnitId(v || null);
+                    if (!v) setAssigneeLabel(null);
+                  }}
+                  placeholder="EMP-00001"
+                  className="h-11"
+                />
+              </>
+            ) : null}
           </div>
 
           <div className="grid gap-2">
@@ -271,7 +325,13 @@ export function TaskFormDialog({
             Cancel
           </Button>
           <Button type="button" onClick={() => void handleSubmit()} disabled={busy}>
-            {busy ? "Saving…" : isEdit ? "Save changes" : "Create task"}
+            {busy
+              ? "Saving…"
+              : isEdit
+                ? "Save changes"
+                : assignToAllStaff
+                  ? "Assign to all staff"
+                  : "Assign task"}
           </Button>
         </DialogFooter>
       </DialogContent>

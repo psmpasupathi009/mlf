@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { istDateKey } from "@/lib/utils/ist";
 import { checkInOutSchema } from "@/lib/validations/hrms.schema";
 import { toAttendanceSummary } from "@/features/hrms/server/serialize";
+import { countPendingEveningTasks } from "@/features/tasks/server/pending-response";
 
 export const POST = apiHandler(async (request) => {
   const { user, response } = await requirePerm(request, "hrms", "own_attendance");
@@ -21,6 +22,15 @@ export const POST = apiHandler(async (request) => {
   }
 
   const today = istDateKey();
+  const pendingCount = await countPendingEveningTasks(user.unitId, today);
+  if (pendingCount > 0) {
+    return jsonFail(
+      "VALIDATION",
+      `Answer ${pendingCount} open task${pendingCount === 1 ? "" : "s"} for today before checking out`,
+      400
+    );
+  }
+
   const { latitude, longitude, accuracy, notes } = parsed.data;
   const existing = await prisma.attendance.findUnique({
     where: { userId_date: { userId: user.id, date: today } },

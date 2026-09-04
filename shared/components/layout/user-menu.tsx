@@ -1,8 +1,6 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { ChevronUp, LogOut, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,7 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { UserAvatar } from "@/shared/components/user/user-avatar";
 import { personDisplayName } from "@/shared/lib/person";
-import { performLogout } from "@/features/auth/lib/perform-logout";
+import { useLogoutWithTaskGate } from "@/features/tasks/hooks/use-logout-with-task-gate";
 import { displayMobile } from "@/lib/auth/mobile";
 import type { PublicUser } from "@/lib/auth/session";
 import { cn } from "@/lib/utils/cn";
@@ -30,8 +28,7 @@ export function UserMenu({
   variant?: "header" | "sidebar";
   onNavigate?: () => void;
 }) {
-  const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const { requestLogout, loading, gate } = useLogoutWithTaskGate();
   const displayName = personDisplayName({
     name: user.name,
     mobile: user.mobile,
@@ -42,51 +39,49 @@ export function UserMenu({
   const isSidebar = variant === "sidebar";
 
   async function handleLogout() {
-    if (loading) return;
-    setLoading(true);
-    await performLogout(router);
-    setLoading(false);
-  }
-
-  if (isSidebar) {
-    return (
-      <SidebarUserMenu
-        user={user}
-        displayName={displayName}
-        mobileLabel={mobileLabel}
-        loading={loading}
-        onLogout={handleLogout}
-        onNavigate={onNavigate}
-      />
-    );
+    await requestLogout();
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          className="h-10 max-w-48 gap-2 rounded-full px-1.5 hover:bg-muted sm:max-w-56 sm:pr-2"
-          aria-label={`Account menu for ${displayName}`}
-        >
-          <UserAvatar name={displayName} photoUrl={user.photoUrl} size="sm" />
-          <span className="hidden min-w-0 truncate text-sm font-medium text-navy sm:inline">
-            {displayName}
-          </span>
-        </Button>
-      </DropdownMenuTrigger>
-      <UserMenuContent
-        displayName={displayName}
-        mobileLabel={mobileLabel}
-        designation={user.designation}
-        loading={loading}
-        onLogout={handleLogout}
-        onNavigate={onNavigate}
-        align="end"
-        side="bottom"
-      />
-    </DropdownMenu>
+    <>
+      {isSidebar ? (
+        <SidebarUserMenu
+          user={user}
+          displayName={displayName}
+          mobileLabel={mobileLabel}
+          loading={loading}
+          onLogout={handleLogout}
+          onNavigate={onNavigate}
+        />
+      ) : (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-10 max-w-48 gap-2 rounded-full px-1.5 hover:bg-muted sm:max-w-56 sm:pr-2"
+              aria-label={`Account menu for ${displayName}`}
+            >
+              <UserAvatar name={displayName} photoUrl={user.photoUrl} size="sm" />
+              <span className="hidden min-w-0 truncate text-sm font-medium text-navy sm:inline">
+                {displayName}
+              </span>
+            </Button>
+          </DropdownMenuTrigger>
+          <UserMenuContent
+            displayName={displayName}
+            mobileLabel={mobileLabel}
+            designation={user.designation}
+            loading={loading}
+            onLogout={handleLogout}
+            onNavigate={onNavigate}
+            align="end"
+            side="bottom"
+          />
+        </DropdownMenu>
+      )}
+      {gate}
+    </>
   );
 }
 
