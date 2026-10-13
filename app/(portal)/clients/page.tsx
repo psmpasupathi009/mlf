@@ -14,7 +14,7 @@ export default async function Page() {
     return <ForbiddenState />;
   }
   return (
-    <Suspense fallback={<p className="text-sm text-muted-foreground">Loading…</p>}>
+    <Suspense fallback={<p className="text-sm text-muted-foreground">Loading... Please wait.</p>}>
       <ClientsPage user={user} />
     </Suspense>
   );
